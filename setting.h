@@ -7,7 +7,7 @@
 
 
 #  include "keymap.h"
-#  include "parser.h"
+#  include "lexer.h"
 #  include "multithread.h"
 #  include <memory>
 #  include <set>

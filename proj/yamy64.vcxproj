@@ -136,7 +136,7 @@
     <ClCompile Include="..\keymap.cpp" />
     <ClCompile Include="..\layoutmanager.cpp" />
     <ClCompile Include="..\mayu.cpp" />
-    <ClCompile Include="..\parser.cpp" />
+    <ClCompile Include="..\lexer.cpp" />
     <ClCompile Include="..\registry.cpp" />
     <ClCompile Include="..\setting.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
@@ -169,7 +169,7 @@
     <ClInclude Include="..\misc.h" />
     <ClInclude Include="..\msgstream.h" />
     <ClInclude Include="..\multithread.h" />
-    <ClInclude Include="..\parser.h" />
+    <ClInclude Include="..\lexer.h" />
     <ClInclude Include="..\registry.h" />
     <ClInclude Include="..\setting.h" />
     <ClInclude Include="..\stringtool.h" />

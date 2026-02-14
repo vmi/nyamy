@@ -1,11 +1,11 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// parser.cpp
+// lexer.cpp
 
 
 #include "misc.h"
 
 #include "errormessage.h"
-#include "parser.h"
+#include "lexer.h"
 #include <cassert>
 
 
@@ -128,10 +128,10 @@ tostream &operator<<(tostream &i_ost, const Token &i_token)
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Parser
+// Lexer
 
 
-Parser::Parser(const _TCHAR *i_str, size_t i_length)
+Lexer::Lexer(const _TCHAR *i_str, size_t i_length)
 		: m_lineNumber(1),
 		m_prefixes(NULL),
 		m_internalLineNumber(1),
@@ -142,13 +142,13 @@ Parser::Parser(const _TCHAR *i_str, size_t i_length)
 
 // set string that may be prefix of a token.
 // prefix_ is not copied, so it must be preserved after setPrefix()
-void Parser::setPrefixes(const Prefixes *i_prefixes)
+void Lexer::setPrefixes(const Prefixes *i_prefixes)
 {
 	m_prefixes = i_prefixes;
 }
 
 // get a line
-bool Parser::getLine(tstringi *o_line)
+bool Lexer::getLine(tstringi *o_line)
 {
 	o_line->resize(0);
 
@@ -218,7 +218,7 @@ static bool isSymbolChar(_TCHAR i_c)
 
 // get a parsed line.
 // if no more lines exist, returns false
-bool Parser::getLine(std::vector<Token> *o_tokens)
+bool Lexer::getLine(std::vector<Token> *o_tokens)
 {
 	o_tokens->clear();
 	m_lineNumber = m_internalLineNumber;

@@ -1,9 +1,9 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// parser.h
+// lexer.h
 
 
-#ifndef _PARSER_H
-#  define _PARSER_H
+#ifndef _LEXER_H
+#  define _LEXER_H
 
 #  include "misc.h"
 #  include "stringtool.h"
@@ -127,7 +127,7 @@ public:
 
 
 ///
-class Parser
+class Lexer
 {
 public:
 	///
@@ -152,7 +152,7 @@ private:
 
 public:
 	///
-	Parser(const _TCHAR *i_str, size_t i_length);
+	Lexer(const _TCHAR *i_str, size_t i_length);
 
 	/** get a parsed line.  if no more lines exist, returns false */
 	bool getLine(Tokens *o_tokens);
@@ -168,4 +168,4 @@ public:
 };
 
 
-#endif // !_PARSER_H
+#endif // !_LEXER_H

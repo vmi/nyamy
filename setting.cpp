@@ -1445,23 +1445,23 @@ void SettingLoader::load(const tstringi &i_filename)
 		std::sort(m_prefixes->begin(), m_prefixes->end(), prefixSortPred);
 	}
 
-	// create parser
+	// create lexer
 	// Hold a local copy of the shared_ptr so that nested load() calls
 	// (via load_INCLUDE()) can reset the static m_prefixes without
-	// destroying the data while this parser still references it.
+	// destroying the data while this lexer still references it.
 	auto localPrefixes = m_prefixes;
-	Parser parser(data.c_str(), data.size());
-	parser.setPrefixes(localPrefixes.get());
+	Lexer lexer(data.c_str(), data.size());
+	lexer.setPrefixes(localPrefixes.get());
 
 	while (true) {
 		try {
-			if (!parser.getLine(&m_tokens))
+			if (!lexer.getLine(&m_tokens))
 				break;
 			m_ti = m_tokens.begin();
 		} catch (ErrorMessage &e) {
 			if (m_log && m_soLog) {
 				Acquire a(m_soLog);
-				*m_log << m_currentFilename << _T("(") << parser.getLineNumber()
+				*m_log << m_currentFilename << _T("(") << lexer.getLineNumber()
 				<< _T(") : error: ") << e << std::endl;
 			}
 			m_isThereAnyError = true;
@@ -1475,13 +1475,13 @@ void SettingLoader::load(const tstringi &i_filename)
 		} catch (WarningMessage &w) {
 			if (m_log && m_soLog) {
 				Acquire a(m_soLog);
-				*m_log << i_filename << _T("(") << parser.getLineNumber()
+				*m_log << i_filename << _T("(") << lexer.getLineNumber()
 				<< _T(") : warning: ") << w << std::endl;
 			}
 		} catch (ErrorMessage &e) {
 			if (m_log && m_soLog) {
 				Acquire a(m_soLog);
-				*m_log << i_filename << _T("(") << parser.getLineNumber()
+				*m_log << i_filename << _T("(") << lexer.getLineNumber()
 				<< _T(") : error: ") << e << std::endl;
 			}
 			m_isThereAnyError = true;
@@ -1493,7 +1493,7 @@ void SettingLoader::load(const tstringi &i_filename)
 
 	if (0 < m_canReadStack.size()) {
 		Acquire a(m_soLog);
-		*m_log << m_currentFilename << _T("(") << parser.getLineNumber()
+		*m_log << m_currentFilename << _T("(") << lexer.getLineNumber()
 		<< _T(") : error: unbalanced `if'.  ")
 		<< _T("you forget `endif', didn'i_token you?")
 		<< std::endl;
