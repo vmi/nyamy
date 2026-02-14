@@ -8,6 +8,7 @@
 #include "mayurc.h"
 #include "misc.h"
 #include "registry.h"
+#include "setting_loader.h"
 #include "vkeytable.h"
 #include "windowstool.h"
 #include <algorithm>

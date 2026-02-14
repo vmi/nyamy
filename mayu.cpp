@@ -22,6 +22,7 @@
 #include "multithread.h"
 #include "registry.h"
 #include "setting.h"
+#include "setting_loader.h"
 #include "target.h"
 #include "windowstool.h"
 #include "fixscancodemap.h"
@@ -748,15 +749,16 @@ private:
 
 	/// load setting
 	void load() {
-		auto newSetting = std::make_unique<Setting>();
-
 		// set symbol
+		Symbols initialSymbols;
 		for (int i = 1; i < __argc; ++ i) {
 			if (__targv[i][0] == _T('-') && __targv[i][1] == _T('D'))
-				newSetting->m_symbols.insert(__targv[i] + 2);
+				initialSymbols.insert(__targv[i] + 2);
 		}
 
-		if (!SettingLoader(&m_log, &m_log).load(newSetting.get())) {
+		auto newSetting =
+			SettingLoader(&m_log, &m_log).load(_T(""), initialSymbols);
+		if (!newSetting) {
 			ShowWindow(m_hwndLog, SW_SHOW);
 			SetForegroundWindow(m_hwndLog);
 			Acquire a(&m_log, 0);

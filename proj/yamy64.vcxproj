@@ -123,6 +123,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\compiler_specific_func.cpp" />
+    <ClCompile Include="..\config_files.cpp" />
     <ClCompile Include="..\dlgeditsetting.cpp" />
     <ClCompile Include="..\dlginvestigate.cpp" />
     <ClCompile Include="..\dlglog.cpp" />
@@ -139,6 +140,8 @@
     <ClCompile Include="..\lexer.cpp" />
     <ClCompile Include="..\registry.cpp" />
     <ClCompile Include="..\setting.cpp" />
+    <ClCompile Include="..\setting_builder.cpp" />
+    <ClCompile Include="..\setting_loader.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\target.cpp" />
     <ClCompile Include="..\vkeytable.cpp" />
@@ -148,6 +151,7 @@
     <ClInclude Include="..\array.h" />
     <ClInclude Include="..\compiler_specific.h" />
     <ClInclude Include="..\compiler_specific_func.h" />
+    <ClInclude Include="..\config_files.h" />
     <ClInclude Include="..\dlgeditsetting.h" />
     <ClInclude Include="..\dlginvestigate.h" />
     <ClInclude Include="..\dlglog.h" />
@@ -172,6 +176,8 @@
     <ClInclude Include="..\lexer.h" />
     <ClInclude Include="..\registry.h" />
     <ClInclude Include="..\setting.h" />
+    <ClInclude Include="..\setting_builder.h" />
+    <ClInclude Include="..\setting_loader.h" />
     <ClInclude Include="..\stringtool.h" />
     <ClInclude Include="..\target.h" />
     <ClInclude Include="..\vk2tchar.h" />
