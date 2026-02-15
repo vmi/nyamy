@@ -6,10 +6,26 @@
 #  define _FUNCTION_H
 
 #include <memory>
+#include <vector>
+
+#include "cmd_stream.h"
 
 class SettingLoader;
 class Engine;
 class FunctionParam;
+class Keymap;
+class KeySeq;
+
+
+/// Context for loadFromCmd - provides resolution of references
+class CmdLoadContext
+{
+public:
+	virtual ~CmdLoadContext() = default;
+	virtual const Keymap *resolveKeymap(const tstringi &name) = 0;
+	virtual const KeySeq *resolveKeySeq(uint32_t index) = 0;
+	virtual Modifier resolveModifier(const struct CmdModifier &bm) = 0;
+};
 
 ///
 class FunctionData
@@ -19,6 +35,9 @@ public:
 	virtual ~FunctionData() = 0;
 	///
 	virtual void load(SettingLoader *i_sl) = 0;
+	///
+	virtual void loadFromCmd(const std::vector<CmdArgument> &i_args,
+								  CmdLoadContext *i_ctx) = 0;
 	///
 	virtual void exec(Engine *i_engine, FunctionParam *i_param) const = 0;
 	///

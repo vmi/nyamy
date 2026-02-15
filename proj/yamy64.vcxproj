@@ -141,6 +141,9 @@
     <ClCompile Include="..\registry.cpp" />
     <ClCompile Include="..\setting.cpp" />
     <ClCompile Include="..\setting_builder.cpp" />
+    <ClCompile Include="..\mayu_parser.cpp" />
+    <ClCompile Include="..\mayu_compiler.cpp" />
+    <ClCompile Include="..\cmd_stream.cpp" />
     <ClCompile Include="..\setting_loader.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\target.cpp" />
@@ -177,6 +180,11 @@
     <ClInclude Include="..\registry.h" />
     <ClInclude Include="..\setting.h" />
     <ClInclude Include="..\setting_builder.h" />
+    <ClInclude Include="..\ast.h" />
+    <ClInclude Include="..\ast_visitor.h" />
+    <ClInclude Include="..\mayu_parser.h" />
+    <ClInclude Include="..\mayu_compiler.h" />
+    <ClInclude Include="..\cmd_stream.h" />
     <ClInclude Include="..\setting_loader.h" />
     <ClInclude Include="..\stringtool.h" />
     <ClInclude Include="..\target.h" />

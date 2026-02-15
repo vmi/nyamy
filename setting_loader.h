@@ -139,6 +139,14 @@ public:
 	/// load setting
 	std::unique_ptr<Setting> load(const tstringi &i_filename,
 								  const Symbols &i_initialSymbols);
+
+	/// load setting from a resolved full path (skips file search)
+	std::unique_ptr<Setting> loadDirect(const tstringi &i_fullpath,
+										const Symbols &i_initialSymbols);
+
+	/// load setting from a command stream (binary)
+	std::unique_ptr<Setting> loadFromStream(std::istream &in,
+											const Symbols &i_initialSymbols);
 };
 
 

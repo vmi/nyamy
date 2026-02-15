@@ -2,6 +2,7 @@
 // function.cpp
 
 
+#include "cmd_stream.h"
 #include "engine.h"
 #include "hook.h"
 #include "mayu.h"

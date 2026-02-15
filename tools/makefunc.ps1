@@ -1,7 +1,6 @@
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [string]$InputPath,
-    
+    [string]$InputPath,  
     [Parameter(Mandatory = $true, Position = 1)]
     [string]$OutputPath
 )
@@ -221,6 +220,74 @@ foreach ($stmt in $statements) {
         $null = $sb.AppendLine("  }")
         $null = $sb.AppendLine("")
         
+        # loadCmd
+        $null = $sb.AppendLine("  virtual void loadFromCmd(const std::vector<CmdArgument> &i_args,")
+        $null = $sb.AppendLine("                                CmdLoadContext *i_ctx)")
+        $null = $sb.AppendLine("  {")
+
+        for ($i = 0; $i -lt $argc; $i++) {
+            $a = $cleanArgs[$i]
+            $type = $a.Type.Trim()
+            $member = "m_$($a.ArgName)"
+
+            $null = $sb.AppendLine("    if (i_args.size() <= $i) return;")
+
+            # Determine how to convert CmdArgument to the target type
+            switch -Regex ($type) {
+                "^bool\s*\*?$" {
+                    $null = $sb.AppendLine("    $member = !(i_args[$i].stringValue == _T(`"false`"));")
+                }
+                "^(int|long)$" {
+                    $null = $sb.AppendLine("    $member = static_cast<$type>(i_args[$i].numberValue);")
+                }
+                "^unsigned\s+int$" {
+                    $null = $sb.AppendLine("    $member = static_cast<unsigned int>(i_args[$i].numberValue);")
+                }
+                "^unsigned\s+__int64$" {
+                    $null = $sb.AppendLine("    $member = static_cast<unsigned __int64>(i_args[$i].numberValue);")
+                }
+                "^__int64$" {
+                    $null = $sb.AppendLine("    $member = static_cast<__int64>(i_args[$i].numberValue);")
+                }
+                "^(LONG|UINT|WPARAM|LPARAM|DWORD)$" {
+                    $null = $sb.AppendLine("    $member = static_cast<$type>(i_args[$i].numberValue);")
+                }
+                "^tstringq$" {
+                    $null = $sb.AppendLine("    $member = i_args[$i].stringValue;")
+                }
+                "^std::list<tstringq>$" {
+                    # Consume remaining string args from position $i onward
+                    $null = $sb.AppendLine("    for (size_t _j = $i; _j < i_args.size(); ++_j)")
+                    $null = $sb.AppendLine("      $member.push_back(i_args[_j].stringValue);")
+                }
+                "^tregex$" {
+                    $null = $sb.AppendLine("    $member = tregex(i_args[$i].stringValue, tregex::ECMAScript | tregex::icase);")
+                }
+                "^VKey$" {
+                    $null = $sb.AppendLine("    $member = static_cast<VKey>(i_args[$i].numberValue);")
+                }
+                "^const\s+Keymap\s*\*$" {
+                    $null = $sb.AppendLine("    $member = i_ctx->resolveKeymap(i_args[$i].stringValue);")
+                }
+                "^const\s+KeySeq\s*\*$" {
+                    $null = $sb.AppendLine("    $member = i_ctx->resolveKeySeq(i_args[$i].keySeqIndex);")
+                }
+                "^Modifier$" {
+                    $null = $sb.AppendLine("    $member = i_ctx->resolveModifier(i_args[$i].modifierValue);")
+                }
+                "^StrExprArg$" {
+                    $null = $sb.AppendLine("    $member = StrExprArg(i_args[$i].stringValue, StrExprArg::Literal);")
+                }
+                default {
+                    # Enum types that have getTypeValue()
+                    $null = $sb.AppendLine("    getTypeValue(&$member, i_args[$i].stringValue);")
+                }
+            }
+        }
+
+        $null = $sb.AppendLine("  }")
+        $null = $sb.AppendLine("")
+
         # Clone
         $null = $sb.AppendLine("  virtual FunctionData *clone() const")
         $null = $sb.AppendLine("  {")

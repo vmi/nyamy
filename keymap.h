@@ -364,6 +364,12 @@ public:
 
 	/// adjust modifier
 	void adjustModifier(Keyboard &i_keyboard);
+
+	/// iterators for enumeration
+	using iterator = KeymapList::iterator;
+	using const_iterator = KeymapList::const_iterator;
+	const_iterator begin() const { return m_keymapList.begin(); }
+	const_iterator end() const { return m_keymapList.end(); }
 };
 
 
@@ -382,6 +388,12 @@ public:
 
 	/// search by name
 	KeySeq *searchByName(const tstringi &i_name);
+
+	/// iterators for enumeration
+	using iterator = KeySeqList::iterator;
+	using const_iterator = KeySeqList::const_iterator;
+	const_iterator begin() const { return m_keySeqList.begin(); }
+	const_iterator end() const { return m_keySeqList.end(); }
 };
 
 

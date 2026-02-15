@@ -444,6 +444,12 @@ public:
 	KeyIterator getKeyIterator() {
 		return KeyIterator(&m_hashedKeys[0], HASHED_KEYS_SIZE);
 	}
+
+	/// get aliases (for enumeration)
+	const Aliases &getAliases() const { return m_aliases; }
+
+	/// get substitutes (for enumeration)
+	const Substitutes &getSubstitutes() const { return m_substitutes; }
 };
 
 
