@@ -1346,6 +1346,8 @@ std::shared_ptr<std::vector<tstringi>> SettingLoader::m_prefixes; // prefix term
 //=============================================================================
 
 #include "cmd_stream.h"
+#include "cmd_stream_reader.h"
+#include "cmd_stream_writer.h"
 
 namespace {
 

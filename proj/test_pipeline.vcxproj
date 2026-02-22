@@ -96,6 +96,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\cmd_stream_reader.cpp" />
+    <ClCompile Include="..\cmd_stream_writer.cpp" />
     <ClCompile Include="..\test_pipeline.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
     <ClCompile Include="..\config_files.cpp" />
@@ -117,7 +119,6 @@
     <ClCompile Include="..\setting_builder.cpp" />
     <ClCompile Include="..\mayu_parser.cpp" />
     <ClCompile Include="..\mayu_compiler.cpp" />
-    <ClCompile Include="..\cmd_stream.cpp" />
     <ClCompile Include="..\setting_loader.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\target.cpp" />
@@ -131,6 +132,11 @@
     <ProjectReference Include="yamy64dll.vcxproj">
       <Project>{ffec7383-47f7-459c-9d12-be79572793fe}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\cmd_stream.h" />
+    <ClInclude Include="..\cmd_stream_reader.h" />
+    <ClInclude Include="..\cmd_stream_writer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

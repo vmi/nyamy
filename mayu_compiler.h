@@ -11,6 +11,8 @@
 
 #  include "ast_visitor.h"
 #  include "cmd_stream.h"
+#  include "cmd_stream_reader.h"
+#  include "cmd_stream_writer.h"
 #  include "multithread.h"
 #  include <set>
 
