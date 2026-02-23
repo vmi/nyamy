@@ -156,6 +156,7 @@ public:
 
 	/// stream output
 	friend tostream &operator<<(tostream &i_ost, const KeySeq &i_ks);
+	friend tostream &operator<<(tostream& i_ost, const KeySeq* i_ks);
 
 	///
 	bool isCorrectMode(Modifier::Type i_mode) {

@@ -116,12 +116,17 @@ CmdModifier MayuCompiler::compileModifierSpecs(
 	const std::vector<AstModifierSpec> &specs)
 {
 	CmdModifier mod;
+
+	// Collect which modifier bits were explicitly specified (not wildcard).
+	// Wildcards ("*" / "~" sentinels) are recognised by their name value.
+	uint64_t explicitBits = 0;
 	for (const auto &spec : specs) {
 		// Find the modifier type
 		for (size_t i = 0; i < NUMBER_OF(g_modifierMap); ++i) {
 			if (_tcsicmp(spec.name.c_str(), g_modifierMap[i].name) == 0) {
 				Modifier::Type mt = g_modifierMap[i].type;
 				uint64_t bit = static_cast<uint64_t>(1) << mt;
+				explicitBits |= bit;
 				switch (spec.flag) {
 				case AstModifierSpec::Press:
 					mod.modifiers |= bit;
@@ -139,6 +144,26 @@ CmdModifier MayuCompiler::compileModifierSpecs(
 			}
 		}
 	}
+
+	// Apply wildcard sentinel ("*" = all-dontcare, "~" = all-release) to every
+	// modifier bit that was not explicitly specified.  This replicates the old
+	// pipeline's "trailing flag" behaviour (e.g. bare * before a key name).
+	for (const auto &spec : specs) {
+		if (spec.name == _T("*") || spec.name == _T("~")) {
+			const uint64_t allBits =
+				(static_cast<uint64_t>(1) << Modifier::Type_ASSIGN) - 1;
+			const uint64_t unspecBits = allBits & ~explicitBits;
+			if (spec.flag == AstModifierSpec::Dontcare) {
+				mod.dontcares |= unspecBits;
+				mod.modifiers  &= ~unspecBits;
+			} else if (spec.flag == AstModifierSpec::Release) {
+				mod.modifiers  &= ~unspecBits;
+				mod.dontcares  &= ~unspecBits;
+			}
+			break;  // only one wildcard sentinel expected
+		}
+	}
+
 	return mod;
 }
 
@@ -187,6 +212,10 @@ CmdArgument MayuCompiler::compileArgument(const AstArgument &arg)
 	case AstArgument::Kind_ModifierSeq:
 		ba.type = CmdArgument::ModSeq;
 		ba.modifierValue = compileModifierSpecs(arg.modifierSeq);
+		break;
+	case AstArgument::Kind_TokenSeq:
+		ba.type = CmdArgument::TokenSeq;
+		ba.tokens = arg.tokens;
 		break;
 	}
 	return ba;

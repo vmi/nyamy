@@ -65,6 +65,10 @@ enum VKey {
 /// stream output
 extern tostream &operator<<(tostream &i_ost, VKey i_data);
 
+/// Resolve a CmdArgument (String, TokenSeq, or Number) to a VKey value.
+/// Handles prefix tokens E-, U-, D- followed by a key name or number.
+extern VKey loadVKeyFromCmd(const CmdArgument &arg);
+
 
 ///
 enum ToWindowType {

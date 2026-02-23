@@ -187,6 +187,16 @@ tostream &operator<<(tostream &i_ost, const KeySeq &i_ks)
 }
 
 
+// stream output
+tostream &operator<<(tostream &i_ost, const KeySeq *i_ks)
+{
+	if (i_ks)
+		return i_ost << *i_ks;
+	else
+		return i_ost << _T("(null)");
+}
+
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Keymap
 

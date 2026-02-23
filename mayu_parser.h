@@ -55,8 +55,11 @@ private:
 
 	// Modifier parsing helpers
 	bool isModifierToken(const Token *t) const;
+	bool isModifierTokenName(const tstringi &name) const;
 	bool isAssignModifierToken(const Token *t) const;
 	std::vector<AstModifierSpec> parseModifierSpecs();
+	std::vector<AstModifierSpec> tokensToModifierSpecs(
+		const std::vector<tstringi> &tokens) const;
 
 	// Scan code parsing
 	std::vector<AstScanCode> parseScanCodes();

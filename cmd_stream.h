@@ -75,6 +75,7 @@ struct CmdArgument {
 		Regexp,
 		KeySeqIdx,		///< index into keySeqPool
 		ModSeq,			///< modifier sequence
+		TokenSeq,		///< raw token sequence (e.g. U- D- RButton)
 	};
 
 	Type type;
@@ -82,6 +83,7 @@ struct CmdArgument {
 	int32_t numberValue;
 	uint32_t keySeqIndex;
 	CmdModifier modifierValue;
+	std::vector<tstringi> tokens;		///< for TokenSeq
 
 	CmdArgument() : type(String), numberValue(0), keySeqIndex(0) {}
 };

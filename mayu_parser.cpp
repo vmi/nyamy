@@ -127,6 +127,12 @@ bool MayuParser::isModifierToken(const Token *t) const
 {
 	if (!t->isString())
 		return false;
+	return isModifierTokenName(t->getString());
+}
+
+
+bool MayuParser::isModifierTokenName(const tstringi &name) const
+{
 	static const _TCHAR *modifiers[] = {
 		_T("S-"), _T("A-"), _T("M-"), _T("C-"), _T("W-"),
 		_T("U-"), _T("D-"),
@@ -141,9 +147,41 @@ bool MayuParser::isModifierToken(const Token *t) const
 		_T("*"), _T("~"),
 	};
 	for (size_t i = 0; i < NUMBER_OF(modifiers); ++i)
-		if (*t == modifiers[i])
+		if (name == modifiers[i])
 			return true;
 	return false;
+}
+
+
+std::vector<AstModifierSpec> MayuParser::tokensToModifierSpecs(
+	const std::vector<tstringi> &tokens) const
+{
+	std::vector<AstModifierSpec> specs;
+	AstModifierSpec::Flag flag = AstModifierSpec::Press;
+
+	for (const auto &tok : tokens) {
+		if (tok == _T("*")) {
+			flag = AstModifierSpec::Dontcare;
+			continue;
+		}
+		if (tok == _T("~")) {
+			flag = AstModifierSpec::Release;
+			continue;
+		}
+		AstModifierSpec spec;
+		spec.name = tok;
+		spec.flag = flag;
+		specs.push_back(spec);
+		flag = AstModifierSpec::Press;
+	}
+	// Handle trailing bare * or ~
+	if (flag != AstModifierSpec::Press) {
+		AstModifierSpec wildcard;
+		wildcard.name = (flag == AstModifierSpec::Dontcare) ? _T("*") : _T("~");
+		wildcard.flag = flag;
+		specs.push_back(wildcard);
+	}
+	return specs;
 }
 
 
@@ -183,6 +221,16 @@ std::vector<AstModifierSpec> MayuParser::parseModifierSpecs()
 		specs.push_back(spec);
 		getToken();
 		flag = AstModifierSpec::Press;
+	}
+
+	// If a bare * or ~ was seen (no following modifier token), add a wildcard
+	// sentinel so the compiler can apply dontcare/release to all unspecified
+	// modifiers.  This replicates the old pipeline's "trailing flag" behavior.
+	if (flag != AstModifierSpec::Press) {
+		AstModifierSpec wildcard;
+		wildcard.name = (flag == AstModifierSpec::Dontcare) ? _T("*") : _T("~");
+		wildcard.flag = flag;
+		specs.push_back(wildcard);
 	}
 	return specs;
 }
@@ -915,6 +963,7 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 
 	Token *t = lookToken();
 
+	// $NAME -> Kind_KeySeqRef
 	if (*t == _T("$")) {
 		getToken();
 		arg->kind = AstArgument::Kind_KeySeqRef;
@@ -922,6 +971,7 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 		return arg;
 	}
 
+	// (KEY_SEQUENCE) -> Kind_KeySeqLiteral
 	if (t->isOpenParen()) {
 		getToken();
 		arg->kind = AstArgument::Kind_KeySeqLiteral;
@@ -930,6 +980,7 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 		return arg;
 	}
 
+	// NUMBER -> Kind_Number
 	if (t->isNumber()) {
 		getToken();
 		arg->kind = AstArgument::Kind_Number;
@@ -937,6 +988,7 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 		return arg;
 	}
 
+	// /REGEXP/ -> Kind_Regexp
 	if (t->isRegexp()) {
 		getToken();
 		arg->kind = AstArgument::Kind_Regexp;
@@ -944,17 +996,30 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 		return arg;
 	}
 
-	// Modifier-like tokens as arguments
-	if (isModifierToken(t)) {
-		arg->kind = AstArgument::Kind_ModifierSeq;
-		arg->modifierSeq = parseModifierSpecs();
-		return arg;
+	// General case: greedily collect all tokens until ',' / ')' / EOL.
+	// Each comma-separated element is one argument regardless of token count.
+	std::vector<tstringi> rawTokens;
+	while (!isEOL() && !lookToken()->isComma() && !lookToken()->isCloseParen()) {
+		rawTokens.push_back(getToken()->getString());
 	}
 
-	// Default: string
-	getToken();
-	arg->kind = AstArgument::Kind_String;
-	arg->stringValue = t->getString();
+	bool allModifiers = !rawTokens.empty() &&
+		std::all_of(rawTokens.begin(), rawTokens.end(),
+			[this](const tstringi &s) { return isModifierTokenName(s); });
+
+	if (rawTokens.size() == 1 && !isModifierTokenName(rawTokens[0])) {
+		// Single non-modifier token -> Kind_String (backward compatible)
+		arg->kind = AstArgument::Kind_String;
+		arg->stringValue = rawTokens[0];
+	} else if (allModifiers) {
+		// All modifier tokens -> Kind_ModifierSeq (backward compatible)
+		arg->kind = AstArgument::Kind_ModifierSeq;
+		arg->modifierSeq = tokensToModifierSpecs(rawTokens);
+	} else {
+		// Multiple tokens or modifier+non-modifier mix -> Kind_TokenSeq
+		arg->kind = AstArgument::Kind_TokenSeq;
+		arg->tokens = std::move(rawTokens);
+	}
 	return arg;
 }
 

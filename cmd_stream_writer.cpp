@@ -105,6 +105,11 @@ void CmdStreamWriter::writeArgument(const CmdArgument &arg)
 	case CmdArgument::ModSeq:
 		writeModifier(arg.modifierValue);
 		break;
+	case CmdArgument::TokenSeq:
+		writeU16(static_cast<uint16_t>(arg.tokens.size()));
+		for (const auto &tok : arg.tokens)
+			writeString(tok);
+		break;
 	}
 }
 

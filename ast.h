@@ -118,6 +118,7 @@ public:
 		Kind_KeySeqRef,		///< $name
 		Kind_KeySeqLiteral,	///< (key_sequence)
 		Kind_ModifierSeq,	///< modifier sequence as argument
+		Kind_TokenSeq,		///< multiple raw tokens as one argument (e.g. U- D- RButton)
 	};
 
 	Kind kind;
@@ -125,6 +126,7 @@ public:
 	int numberValue;
 	std::unique_ptr<class AstKeySequence> keySeq;
 	std::vector<AstModifierSpec> modifierSeq;
+	std::vector<tstringi> tokens;		///< for Kind_TokenSeq
 
 	AstArgument() : kind(Kind_String), numberValue(0) {}
 };

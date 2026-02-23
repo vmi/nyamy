@@ -15,6 +15,39 @@
 #include <algorithm>
 #include <process.h>
 
+VKey loadVKeyFromCmd(const CmdArgument &arg)
+{
+	// Replicates load_ARGUMENT(VKey*) logic from setting_loader.cpp.
+	// Accepts Number (pre-encoded), String (bare key name), or
+	// TokenSeq (prefix tokens + key name, e.g. ["U-", "D-", "RButton"]).
+	std::vector<tstringi> toks;
+	if (arg.type == CmdArgument::TokenSeq)
+		toks = arg.tokens;
+	else if (arg.type == CmdArgument::String)
+		toks.push_back(arg.stringValue);
+	else
+		return static_cast<VKey>(arg.numberValue); // Number: already encoded
+
+	int vkey = 0;
+	for (const auto &tok : toks) {
+		if (tok == _T("E-")) { vkey |= VKey_extended; continue; }
+		if (tok == _T("U-")) { vkey |= VKey_released; continue; }
+		if (tok == _T("D-")) { vkey |= VKey_pressed;  continue; }
+		// Last token: virtual key name (e.g. "RButton") or numeric code
+		const VKeyTable *vkt;
+		for (vkt = g_vkeyTable; vkt->m_name; ++vkt)
+			if (tstringi(vkt->m_name) == tok)
+				break;
+		if (vkt->m_name)
+			vkey |= vkt->m_code;
+	}
+	// Default state: if neither U- nor D- specified, apply both
+	if (!(vkey & VKey_released) && !(vkey & VKey_pressed))
+		vkey |= VKey_released | VKey_pressed;
+	return static_cast<VKey>(vkey);
+}
+
+
 #define FUNCTION_DATA
 #include "functions.h"
 #undef FUNCTION_DATA

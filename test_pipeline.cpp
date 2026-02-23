@@ -177,7 +177,7 @@ static std::unique_ptr<Setting> loadNewPipeline(
 	const tstringi &fullpath, const Symbols &initialSymbols,
 	tostream &log)
 {
-	ConfigFiles configFiles(nullptr, &log);
+	ConfigFiles configFiles(&nullSyncObject, &log);
 
 	// 1. Parse
 	MayuParser parser;
@@ -192,7 +192,7 @@ static std::unique_ptr<Setting> loadNewPipeline(
 	// 2. Compile -> command stream (in-memory buffer)
 	std::stringstream cmdBuf(std::ios::in | std::ios::out | std::ios::binary);
 	CmdStreamWriter writer(cmdBuf);
-	MayuCompiler compiler(writer, initialSymbols, configFiles, nullptr, &log);
+	MayuCompiler compiler(writer, initialSymbols, configFiles, &nullSyncObject, &log);
 	compiler.compile(*ast);
 	if (compiler.hasErrors()) {
 		log << _T("new pipeline: compile errors") << std::endl;

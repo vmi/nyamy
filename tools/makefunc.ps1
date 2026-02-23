@@ -264,7 +264,7 @@ foreach ($stmt in $statements) {
                     $null = $sb.AppendLine("    $member = tregex(i_args[$i].stringValue, tregex::ECMAScript | tregex::icase);")
                 }
                 "^VKey$" {
-                    $null = $sb.AppendLine("    $member = static_cast<VKey>(i_args[$i].numberValue);")
+                    $null = $sb.AppendLine("    $member = loadVKeyFromCmd(i_args[$i]);")
                 }
                 "^const\s+Keymap\s*\*$" {
                     $null = $sb.AppendLine("    $member = i_ctx->resolveKeymap(i_args[$i].stringValue);")

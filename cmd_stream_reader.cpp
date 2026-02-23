@@ -130,6 +130,13 @@ CmdArgument CmdStreamReader::readArgument()
 	case CmdArgument::ModSeq:
 		arg.modifierValue = readModifier();
 		break;
+	case CmdArgument::TokenSeq: {
+		uint16_t count = readU16();
+		arg.tokens.resize(count);
+		for (uint16_t i = 0; i < count; ++i)
+			arg.tokens[i] = readString();
+		break;
+	}
 	}
 	return arg;
 }
