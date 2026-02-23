@@ -164,21 +164,14 @@ bool ConfigFiles::readFile(tstring *o_data, const tstringi &i_filename) const
 		return true;
 	}
 
-	// try multibyte charset
-	size_t wsize = mbstowcs(NULL, reinterpret_cast<char *>(buf.data()), 0);
-	if (wsize != size_t(-1)) {
-		std::vector<wchar_t> wbuf(wsize);
-		mbstowcs(wbuf.data(), reinterpret_cast<char *>(buf.data()), wsize);
-		o_data->assign(wbuf.data(), wbuf.data() + wsize);
-		fclose(fp);
-		return true;
-	}
-
 	// try UTF-8
 	{
 		std::vector<wchar_t> wbuf(static_cast<size_t>(sbuf.st_size));
 		BYTE *f = buf.data();
 		BYTE *end = buf.data() + sbuf.st_size;
+		// skip UTF-8 BOM (EF BB BF)
+		if (end - f >= 3 && f[0] == 0xefU && f[1] == 0xbbU && f[2] == 0xbfU)
+			f += 3;
 		wchar_t *d = wbuf.data();
 		enum { STATE_1, STATE_2of2, STATE_2of3, STATE_3of3 } state = STATE_1;
 
@@ -221,6 +214,16 @@ bool ConfigFiles::readFile(tstring *o_data, const tstringi &i_filename) const
 
 not_UTF_8:
 		;
+	}
+
+	// try multibyte charset
+	size_t wsize = mbstowcs(NULL, reinterpret_cast<char *>(buf.data()), 0);
+	if (wsize != size_t(-1)) {
+		std::vector<wchar_t> wbuf(wsize);
+		mbstowcs(wbuf.data(), reinterpret_cast<char *>(buf.data()), wsize);
+		o_data->assign(wbuf.data(), wbuf.data() + wsize);
+		fclose(fp);
+		return true;
 	}
 #endif // _UNICODE
 

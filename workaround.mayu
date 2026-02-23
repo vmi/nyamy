@@ -1,46 +1,46 @@
-def key E0RightShift E0RShift		= E0-0x36
+ï»¿def key E0RightShift E0RShift		= E0-0x36
 mod shift += E0RShift
 key *E0RShift = *LShift
 
 if ( KBD109 )
-  def key E0”¼Šp/‘SŠp E0Š¿š E0Kanji	= E0-0x29 # ”¼Šp/‘SŠp Š¿š
-  def key E0‰p” E0Eisuu		= E0-0x3a # ‰p” CapsLock Š¿š”Ô†
-  def key E0‚Ğ‚ç‚ª‚È E0Hiragana		= E0-0x70 # ‚Ğ‚ç‚ª‚È ƒJƒ^ƒJƒi ƒ[ƒ}š
+  def key E0åŠè§’/å…¨è§’ E0æ¼¢å­— E0Kanji	= E0-0x29 # åŠè§’/å…¨è§’ æ¼¢å­—
+  def key E0è‹±æ•° E0Eisuu		= E0-0x3a # è‹±æ•° CapsLock æ¼¢å­—ç•ªå·
+  def key E0ã²ã‚‰ãŒãª E0Hiragana		= E0-0x70 # ã²ã‚‰ãŒãª ã‚«ã‚¿ã‚«ãƒŠ ãƒ­ãƒ¼ãƒå­—
 
   if ( KBD104on109 )
-    def subst ~S-*E0”¼Šp/‘SŠp		= $GRAVE_ACCENT
-    def subst  S-*E0”¼Šp/‘SŠp		= $TILDE
-    def subst  A-E0”¼Šp/‘SŠp		= $ToggleIME
-    def subst    *E0‚Ğ‚ç‚ª‚È		= *Space
-    def subst    *E0‰p”		= S-*‰p”
+    def subst ~S-*E0åŠè§’/å…¨è§’		= $GRAVE_ACCENT
+    def subst  S-*E0åŠè§’/å…¨è§’		= $TILDE
+    def subst  A-E0åŠè§’/å…¨è§’		= $ToggleIME
+    def subst    *E0ã²ã‚‰ãŒãª		= *Space
+    def subst    *E0è‹±æ•°		= S-*è‹±æ•°
   endif
 endif
 
 keymap Global
  if ( KBD109 ) and ( ! KBD104on109 )
-   key *E0”¼Šp/‘SŠp	= *Esc			# Esc ‚Æ”¼Šp/‘SŠp‚Ì“ü‚ê‘Ö‚¦
+   key *E0åŠè§’/å…¨è§’	= *Esc			# Esc ã¨åŠè§’/å…¨è§’ã®å…¥ã‚Œæ›¿ãˆ
  endif
  if ( KBD109 )
-   mod control += E0‰p”			# ‰p”‚ğ Control ‚É
-   key *E0‰p”		= *LControl		#	V
+   mod control += E0è‹±æ•°			# è‹±æ•°ã‚’ Control ã«
+   key *E0è‹±æ•°		= *LControl		#	ã€ƒ
  endif
 
 keymap	KeymapDefault = &Default
  if ( KBD109 )
-   mod control += E0‰p”			# ‰p”‚ğ Control ‚É
-   key *E0‰p”		= *LControl		#	V
+   mod control += E0è‹±æ•°			# è‹±æ•°ã‚’ Control ã«
+   key *E0è‹±æ•°		= *LControl		#	ã€ƒ
  endif
 
 keymap Emacsen : Global
- if ( MAP-ESCAPE-TO-META )			# ESC ‚ª M- ‚É‚È‚é‚Ì‚ğ‘j~‚·‚é
+ if ( MAP-ESCAPE-TO-META )			# ESC ãŒ M- ã«ãªã‚‹ã®ã‚’é˜»æ­¢ã™ã‚‹
    if ( KBD109 ) and ( ! KBD104on109 )
-     key *E0”¼Šp/‘SŠp	= *Esc
+     key *E0åŠè§’/å…¨è§’	= *Esc
    endif
  endif
 
 keymap2	EmacsMark
  if ( MAP-ESCAPE-TO-META )
    if ( KBD109 ) and ( ! KBD104on109 )
-     key E0”¼Šp/‘SŠp	= &Prefix(EmacsMarkEscape) &EditNextModifier(M-)
+     key E0åŠè§’/å…¨è§’	= &Prefix(EmacsMarkEscape) &EditNextModifier(M-)
    endif
  endif

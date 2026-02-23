@@ -1,16 +1,16 @@
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ‘‹g‚¢‚Ì—JŸT - 104on109.mayu
+ï»¿#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# çª“ä½¿ã„ã®æ†‚é¬± - 104on109.mayu
 # Copyright (C) 1999-2005, TAGA Nayuta <nayuta@users.sourceforge.net>
 #
 
 define KBD104on109
 
-def subst ~S-*”¼Šp/‘SŠp		= $GRAVE_ACCENT
-def subst  S-*”¼Šp/‘SŠp		= $TILDE
-def subst  A-”¼Šp/‘SŠp		= $ToggleIME
-def subst ~S-*E0”¼Šp/‘SŠp	= $GRAVE_ACCENT
-def subst  S-*E0”¼Šp/‘SŠp	= $TILDE
-def subst  A-E0”¼Šp/‘SŠp	= $ToggleIME
+def subst ~S-*åŠè§’/å…¨è§’		= $GRAVE_ACCENT
+def subst  S-*åŠè§’/å…¨è§’		= $TILDE
+def subst  A-åŠè§’/å…¨è§’		= $ToggleIME
+def subst ~S-*E0åŠè§’/å…¨è§’	= $GRAVE_ACCENT
+def subst  S-*E0åŠè§’/å…¨è§’	= $TILDE
+def subst  A-E0åŠè§’/å…¨è§’	= $ToggleIME
 def subst  S-*_2		= $COMMERCIAL_AT
 def subst  S-*_6		= $CIRCUMFLEX_ACCENT
 def subst  S-*_7		= $AMPERSAND
@@ -29,13 +29,13 @@ def subst  S-*CloseBracket	= $VERTICAL_LINE
 def subst  S-*Semicolon		= $COLON
 def subst ~S-*Colon		= $APOSTROPHE
 def subst  S-*Colon		= $QUOTATION_MARK
-def subst    *–³•ÏŠ·		= *Space
-def subst    *E0–³•ÏŠ·		= *Space
-def subst    *•ÏŠ·		= *Space
-def subst    *‚Ğ‚ç‚ª‚È		= *Space
-def subst    *E0‚Ğ‚ç‚ª‚È	= *Space
-def subst    *‰p”		= S-*‰p”
-def subst    *E0‰p”		= S-*‰p”
+def subst    *ç„¡å¤‰æ›		= *Space
+def subst    *E0ç„¡å¤‰æ›		= *Space
+def subst    *å¤‰æ›		= *Space
+def subst    *ã²ã‚‰ãŒãª		= *Space
+def subst    *E0ã²ã‚‰ãŒãª	= *Space
+def subst    *è‹±æ•°		= S-*è‹±æ•°
+def subst    *E0è‹±æ•°		= S-*è‹±æ•°
 def subst *ReverseSolidus	= *RightShift
 
 keymap Global

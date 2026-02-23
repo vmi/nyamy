@@ -1,5 +1,5 @@
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ‘‹g‚¢‚Ì—JŸT - default.mayu
+ï»¿#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# çª“ä½¿ã„ã®æ†‚é¬± - default.mayu
 # Copyright (C) 1999-2005, TAGA Nayuta <nayuta@users.sourceforge.net>
 #
 
@@ -7,107 +7,107 @@ if ( !KBD109 ) and ( !KBD104 )
   include "109.mayu"
 endif
 if ( KBD104 )
-  def alias ª	= Up
-  def alias «	= Down
-  def alias ©	= Left
-  def alias ¨	= Right
+  def alias â†‘	= Up
+  def alias â†“	= Down
+  def alias â†	= Left
+  def alias â†’	= Right
   def alias Yen	= BackSlash
 endif
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ƒL[ƒV[ƒPƒ“ƒX
+# ã‚­ãƒ¼ã‚·ãƒ¼ã‚±ãƒ³ã‚¹
 #
 
 keyseq $WindowClose = A-F4
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Global ƒL[ƒ}ƒbƒv
+# Global ã‚­ãƒ¼ãƒãƒƒãƒ—
 #
 
 keymap Global
- key *IC-C-Yen		= $ToggleIME		# IME ON/OFF ‚ğ‚·‚éƒL[‚Ìw’è
- key C-S-M     C-A-M	= Applications		# ƒAƒvƒŠƒP[ƒVƒ‡ƒ“ƒL[
- key C-S-L     C-A-L	= &WindowLower		# ƒEƒBƒ“ƒhƒE‚ğˆê”Ô‰º‚Ö
- key C-S-R     C-A-R	= &WindowRaise		# ƒEƒBƒ“ƒhƒE‚ğˆê”Ôã‚Ö
+ key *IC-C-Yen		= $ToggleIME		# IME ON/OFF ã‚’ã™ã‚‹ã‚­ãƒ¼ã®æŒ‡å®š
+ key C-S-M     C-A-M	= Applications		# ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã‚­ãƒ¼
+ key C-S-L     C-A-L	= &WindowLower		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ä¸€ç•ªä¸‹ã¸
+ key C-S-R     C-A-R	= &WindowRaise		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ä¸€ç•ªä¸Šã¸
 # key C-S-R     C-A-R	= &WindowToggleTopMost &Wait(200) &WindowToggleTopMost
- key C-S-Z     C-A-Z	= &WindowMaximize	# ƒEƒBƒ“ƒhƒE‚ÌÅ‘å‰» (IE‘S‰æ–Ê)
- key C-S-I     C-A-I	= &WindowMinimize	# ƒEƒBƒ“ƒhƒE‚ÌÅ¬‰»
- key C-S-X     C-A-X	= &WindowVMaximize	# ƒEƒBƒ“ƒhƒE‚ÌcÅ‘å‰»
- key C-S-C     C-A-C	= &WindowHMaximize	# ƒEƒBƒ“ƒhƒE‚Ì‰¡Å‘å‰»
- key C-S-Left  C-A-Left	= &WindowMove(-16, 0)	# ƒEƒBƒ“ƒhƒE‚ÌˆÚ“®
- key C-S-Right C-A-Right= &WindowMove(16, 0)	#	V
- key C-S-Up    C-A-Up	= &WindowMove(0, -16)	#	V
- key C-S-Down  C-A-Down	= &WindowMove(0, 16)	#	V
- key C-S-A-Left		= &WindowMove(-1, 0)	#	V
- key C-S-A-Right	= &WindowMove(1, 0)	#	V
- key C-S-A-Up		= &WindowMove(0, -1)	#	V
- key C-S-A-Down		= &WindowMove(0, 1)	#	V
- key W-Left		= &MouseMove(-16, 0)	# ƒ}ƒEƒX‚ÌˆÚ“®
- key W-Right		= &MouseMove(16, 0)	#	V
- key W-Up		= &MouseMove(0, -16)	#	V
- key W-Down		= &MouseMove(0, 16)	#	V
- key W-A-C-Left		= &MouseMove(-1, 0)	#	V
- key W-A-C-Right	= &MouseMove(1, 0)	#	V
- key W-A-C-Up		= &MouseMove(0, -1)	#	V
- key W-A-C-Down		= &MouseMove(0, 1)	#	V
- key C-A-A		= &WindowClingToLeft	# ƒEƒBƒ“ƒhƒE‚ğ¶‚ÉŠñ‚¹‚é
- key C-A-E		= &WindowClingToRight	# ƒEƒBƒ“ƒhƒE‚ğ‰E‚ÉŠñ‚¹‚é
- key C-A-P		= &WindowClingToTop	# ƒEƒBƒ“ƒhƒE‚ğã‚ÉŠñ‚¹‚é
- key C-A-N		= &WindowClingToBottom	# ƒEƒBƒ“ƒhƒE‚ğ‰º‚ÉŠñ‚¹‚é
- key C-A-V		= &WindowMoveVisibly	# ƒEƒBƒ“ƒhƒE‚ğŒ©‚¦‚éˆÊ’u‚ÖˆÚ“®
- key C-S-K     C-A-K	= $WindowClose		# ƒEƒBƒ“ƒhƒE‚ğ•Â‚¶‚é
- key C-S-T		= &WindowToggleTopMost	# Å‘O–ÊƒgƒOƒ‹
+ key C-S-Z     C-A-Z	= &WindowMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æœ€å¤§åŒ– (IEå…¨ç”»é¢)
+ key C-S-I     C-A-I	= &WindowMinimize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æœ€å°åŒ–
+ key C-S-X     C-A-X	= &WindowVMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ç¸¦æœ€å¤§åŒ–
+ key C-S-C     C-A-C	= &WindowHMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æ¨ªæœ€å¤§åŒ–
+ key C-S-Left  C-A-Left	= &WindowMove(-16, 0)	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ç§»å‹•
+ key C-S-Right C-A-Right= &WindowMove(16, 0)	#	ã€ƒ
+ key C-S-Up    C-A-Up	= &WindowMove(0, -16)	#	ã€ƒ
+ key C-S-Down  C-A-Down	= &WindowMove(0, 16)	#	ã€ƒ
+ key C-S-A-Left		= &WindowMove(-1, 0)	#	ã€ƒ
+ key C-S-A-Right	= &WindowMove(1, 0)	#	ã€ƒ
+ key C-S-A-Up		= &WindowMove(0, -1)	#	ã€ƒ
+ key C-S-A-Down		= &WindowMove(0, 1)	#	ã€ƒ
+ key W-Left		= &MouseMove(-16, 0)	# ãƒã‚¦ã‚¹ã®ç§»å‹•
+ key W-Right		= &MouseMove(16, 0)	#	ã€ƒ
+ key W-Up		= &MouseMove(0, -16)	#	ã€ƒ
+ key W-Down		= &MouseMove(0, 16)	#	ã€ƒ
+ key W-A-C-Left		= &MouseMove(-1, 0)	#	ã€ƒ
+ key W-A-C-Right	= &MouseMove(1, 0)	#	ã€ƒ
+ key W-A-C-Up		= &MouseMove(0, -1)	#	ã€ƒ
+ key W-A-C-Down		= &MouseMove(0, 1)	#	ã€ƒ
+ key C-A-A		= &WindowClingToLeft	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’å·¦ã«å¯„ã›ã‚‹
+ key C-A-E		= &WindowClingToRight	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’å³ã«å¯„ã›ã‚‹
+ key C-A-P		= &WindowClingToTop	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ä¸Šã«å¯„ã›ã‚‹
+ key C-A-N		= &WindowClingToBottom	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ä¸‹ã«å¯„ã›ã‚‹
+ key C-A-V		= &WindowMoveVisibly	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’è¦‹ãˆã‚‹ä½ç½®ã¸ç§»å‹•
+ key C-S-K     C-A-K	= $WindowClose		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’é–‰ã˜ã‚‹
+ key C-S-T		= &WindowToggleTopMost	# æœ€å‰é¢ãƒˆã‚°ãƒ«
  key C-S-D		= &WindowIdentify &MayuDialog(Log, SHOW)
-						# ƒEƒBƒ“ƒhƒE‚Ì‘f«‚ğ’²‚×‚é
- key C-S-H		= &WindowSetAlpha(70)	# ƒEƒBƒ“ƒhƒE‚Ì”¼“§–¾‰»
- key C-S-A-H		= &WindowSetAlpha(-1)	# ”¼“§–¾‰»‘S‚Ä‰ğœ
- key C-S-U		= &WindowRedraw		# ƒEƒBƒ“ƒhƒE‚ÌÄ•`‰æ
- key C-S-S		= &LoadSetting &HelpMessage(Mayu, "Ä“ÇŠ®—¹") # İ’èƒtƒ@ƒCƒ‹‚Ì“Ç‚İ‚İ
- key C-S-F1		= &InvestigateCommand	# WM_COMMAND ‚Ì’²¸
+						# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ç´ æ€§ã‚’èª¿ã¹ã‚‹
+ key C-S-H		= &WindowSetAlpha(70)	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®åŠé€æ˜åŒ–
+ key C-S-A-H		= &WindowSetAlpha(-1)	# åŠé€æ˜åŒ–å…¨ã¦è§£é™¤
+ key C-S-U		= &WindowRedraw		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®å†æç”»
+ key C-S-S		= &LoadSetting &HelpMessage(Mayu, "å†èª­è¾¼å®Œäº†") # è¨­å®šãƒ•ã‚¡ã‚¤ãƒ«ã®èª­ã¿è¾¼ã¿
+ key C-S-F1		= &InvestigateCommand	# WM_COMMAND ã®èª¿æŸ»
  if ( ! EmacsMove/ShiftSelection )
-   key C-S-A   C-S-B	= &WindowClingToLeft	# ƒEƒBƒ“ƒhƒE‚ğ¶‚ÉŠñ‚¹‚é
-   key C-S-F   C-S-E	= &WindowClingToRight	# ƒEƒBƒ“ƒhƒE‚ğ‰E‚ÉŠñ‚¹‚é
-   key C-S-P		= &WindowClingToTop	# ƒEƒBƒ“ƒhƒE‚ğã‚ÉŠñ‚¹‚é
-   key C-S-N		= &WindowClingToBottom	# ƒEƒBƒ“ƒhƒE‚ğ‰º‚ÉŠñ‚¹‚é
-   key C-S-V		= &WindowMoveVisibly	# ƒEƒBƒ“ƒhƒE‚ğŒ©‚¦‚éˆÊ’u‚ÖˆÚ“®
+   key C-S-A   C-S-B	= &WindowClingToLeft	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’å·¦ã«å¯„ã›ã‚‹
+   key C-S-F   C-S-E	= &WindowClingToRight	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’å³ã«å¯„ã›ã‚‹
+   key C-S-P		= &WindowClingToTop	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ä¸Šã«å¯„ã›ã‚‹
+   key C-S-N		= &WindowClingToBottom	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ä¸‹ã«å¯„ã›ã‚‹
+   key C-S-V		= &WindowMoveVisibly	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’è¦‹ãˆã‚‹ä½ç½®ã¸ç§»å‹•
  endif
 
  if ( KBD109 ) and ( ! KBD104on109 )
-   key *”¼Šp/‘SŠp	= *Esc			# Esc ‚Æ”¼Šp/‘SŠp‚Ì“ü‚ê‘Ö‚¦
-   key *E0”¼Šp/‘SŠp	= *Esc			# Esc ‚Æ”¼Šp/‘SŠp‚Ì“ü‚ê‘Ö‚¦
-   key *Esc		= *”¼Šp/‘SŠp		#	V
+   key *åŠè§’/å…¨è§’	= *Esc			# Esc ã¨åŠè§’/å…¨è§’ã®å…¥ã‚Œæ›¿ãˆ
+   key *E0åŠè§’/å…¨è§’	= *Esc			# Esc ã¨åŠè§’/å…¨è§’ã®å…¥ã‚Œæ›¿ãˆ
+   key *Esc		= *åŠè§’/å…¨è§’		#	ã€ƒ
  endif
 
  if ( KBD109 )
-   mod control += ‰p”				# ‰p”‚ğ Control ‚É
-   key *‰p”		= *LControl		#	V
-   mod control += E0‰p”				# ‰p”‚ğ Control ‚É
-   key *E0‰p”		= *LControl		#	V
+   mod control += è‹±æ•°				# è‹±æ•°ã‚’ Control ã«
+   key *è‹±æ•°		= *LControl		#	ã€ƒ
+   mod control += E0è‹±æ•°				# è‹±æ•°ã‚’ Control ã«
+   key *E0è‹±æ•°		= *LControl		#	ã€ƒ
  else
-   mod control += CapsLock			# CapsLock ‚ğ Control ‚É
-   key *CapsLock	= *LControl		#	V
-   mod control += E0CapsLock			# CapsLock ‚ğ Control ‚É
-   key *E0CapsLock	= *LControl		#	V
+   mod control += CapsLock			# CapsLock ã‚’ Control ã«
+   key *CapsLock	= *LControl		#	ã€ƒ
+   mod control += E0CapsLock			# CapsLock ã‚’ Control ã«
+   key *E0CapsLock	= *LControl		#	ã€ƒ
  endif
 
  if ( GANA )
    if ( KBD109 )
-     mod alt += !!–³•ÏŠ·			# –³•ÏŠ·‚ğ Alt ‚É
-     mod alt += !!E0–³•ÏŠ·			# –³•ÏŠ·‚ğ Alt ‚É
-     key *–³•ÏŠ·	= *–³•ÏŠ·		#	V
-     key *E0–³•ÏŠ·	= *–³•ÏŠ·		#	V
-     key A-–³•ÏŠ·	= –³•ÏŠ·		#	V
-     key A-E0–³•ÏŠ·	= –³•ÏŠ·		#	V
-     key IC-A-K		= –³•ÏŠ·		# IME ‚Å•ÏŠ·’†‚Ì A-K ‚Í–³•ÏŠ·
-     key *IC-•ÏŠ·	= $ToggleIME		# IME ON/OFF ‚ğ‚·‚éƒL[‚Ìw’è
+     mod alt += !!ç„¡å¤‰æ›			# ç„¡å¤‰æ›ã‚’ Alt ã«
+     mod alt += !!E0ç„¡å¤‰æ›			# ç„¡å¤‰æ›ã‚’ Alt ã«
+     key *ç„¡å¤‰æ›	= *ç„¡å¤‰æ›		#	ã€ƒ
+     key *E0ç„¡å¤‰æ›	= *ç„¡å¤‰æ›		#	ã€ƒ
+     key A-ç„¡å¤‰æ›	= ç„¡å¤‰æ›		#	ã€ƒ
+     key A-E0ç„¡å¤‰æ›	= ç„¡å¤‰æ›		#	ã€ƒ
+     key IC-A-K		= ç„¡å¤‰æ›		# IME ã§å¤‰æ›ä¸­ã® A-K ã¯ç„¡å¤‰æ›
+     key *IC-å¤‰æ›	= $ToggleIME		# IME ON/OFF ã‚’ã™ã‚‹ã‚­ãƒ¼ã®æŒ‡å®š
    endif
-   key *ScrollLock	= $CapsLock		# ScrollLock ‚ğ CapsLock ‚É
-   key C-ª		= W-ª			# for VD
-   key C-«		= W-«			#	V
-   key C-©		= W-©			#	V
-   key C-¨		= W-¨			#	V
+   key *ScrollLock	= $CapsLock		# ScrollLock ã‚’ CapsLock ã«
+   key C-â†‘		= W-â†‘			# for VD
+   key C-â†“		= W-â†“			#	ã€ƒ
+   key C-â†		= W-â†			#	ã€ƒ
+   key C-â†’		= W-â†’			#	ã€ƒ
  endif
 
 keymap2 GlobalEscape : Global = &KeymapParent
@@ -119,42 +119,42 @@ keymap Global
  if ( MAP-ESCAPE-TO-META )
    key Escape		= &Prefix(GlobalEscape) &EditNextModifier(M-)
    if ( KBD109 ) and ( ! KBD104on109 )
-     key ”¼Šp/‘SŠp	= &Prefix(GlobalEscape) &EditNextModifier(M-)
+     key åŠè§’/å…¨è§’	= &Prefix(GlobalEscape) &EditNextModifier(M-)
    endif
  endif
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ‘S‚Ä(‚Å‚Í‚È‚¢‚ª‚¾‚¢‚½‚¢)ƒfƒtƒHƒ‹ƒg‚ÌƒL[ƒ}ƒbƒv‚Ì’è‹`
+# å…¨ã¦(ã§ã¯ãªã„ãŒã ã„ãŸã„)ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã®ã‚­ãƒ¼ãƒãƒƒãƒ—ã®å®šç¾©
 #
 
 keymap	KeymapDefault = &Default
  if ( KBD109 )
-   mod control += ‰p”				# ‰p”‚ğ Control ‚É
-   key *‰p”		= *LControl		#	V
-   mod control += E0‰p”				# ‰p”‚ğ Control ‚É
-   key *E0‰p”		= *LControl		#	V
+   mod control += è‹±æ•°				# è‹±æ•°ã‚’ Control ã«
+   key *è‹±æ•°		= *LControl		#	ã€ƒ
+   mod control += E0è‹±æ•°				# è‹±æ•°ã‚’ Control ã«
+   key *E0è‹±æ•°		= *LControl		#	ã€ƒ
  else
-   mod control += CapsLock			# CapsLock ‚ğ Control ‚É
-   key *CapsLock	= *LControl		#	V
-   mod control += E0CapsLock			# CapsLock ‚ğ Control ‚É
-   key *E0CapsLock	= *LControl		#	V
+   mod control += CapsLock			# CapsLock ã‚’ Control ã«
+   key *CapsLock	= *LControl		#	ã€ƒ
+   mod control += E0CapsLock			# CapsLock ã‚’ Control ã«
+   key *E0CapsLock	= *LControl		#	ã€ƒ
  endif
  if ( GANA )
    if ( KBD109 )
-     mod alt += !!–³•ÏŠ·			# –³•ÏŠ·‚ğ Alt ‚É
-     mod alt += !!E0–³•ÏŠ·			# –³•ÏŠ·‚ğ Alt ‚É
-     key *–³•ÏŠ·	= *–³•ÏŠ·		#	V
-     key *E0–³•ÏŠ·	= *–³•ÏŠ·		#	V
-     key A-–³•ÏŠ·	= –³•ÏŠ·		#	V
-     key A-E0–³•ÏŠ·	= –³•ÏŠ·		#	V
-     key IC-A-K		= –³•ÏŠ·		# IME ‚Å•ÏŠ·’†‚Ì A-K ‚Í–³•ÏŠ·
+     mod alt += !!ç„¡å¤‰æ›			# ç„¡å¤‰æ›ã‚’ Alt ã«
+     mod alt += !!E0ç„¡å¤‰æ›			# ç„¡å¤‰æ›ã‚’ Alt ã«
+     key *ç„¡å¤‰æ›	= *ç„¡å¤‰æ›		#	ã€ƒ
+     key *E0ç„¡å¤‰æ›	= *ç„¡å¤‰æ›		#	ã€ƒ
+     key A-ç„¡å¤‰æ›	= ç„¡å¤‰æ›		#	ã€ƒ
+     key A-E0ç„¡å¤‰æ›	= ç„¡å¤‰æ›		#	ã€ƒ
+     key IC-A-K		= ç„¡å¤‰æ›		# IME ã§å¤‰æ›ä¸­ã® A-K ã¯ç„¡å¤‰æ›
    endif
  endif
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ƒRƒ“ƒgƒ[ƒ‹‚Ìİ’è
+# ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ«ã®è¨­å®š
 #
 
 include	"emacsedit.mayu"
@@ -163,76 +163,76 @@ window	EditControl	/:(Edit|TEdit|RichEdit(20[AW])?)$/ : EmacsEdit
 window	SysListView32	/:SysListView32$/ : EmacsMove
 window	SysTreeView32	/:SysTreeView32$/ : EmacsMove
 window	ComboBox	/:ComboBox(:Edit)?$/ : EmacsEdit
- key M-N M-P		= A-Down		# ƒhƒƒbƒvƒ_ƒEƒ“ƒƒjƒ…[‚ğŠJ‚­
+ key M-N M-P		= A-Down		# ãƒ‰ãƒ­ãƒƒãƒ—ãƒ€ã‚¦ãƒ³ãƒ¡ãƒ‹ãƒ¥ãƒ¼ã‚’é–‹ã
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Windows ‚Ìˆê”Ê“Iİ’è
+# Windows ã®ä¸€èˆ¬çš„è¨­å®š
 #
 
  keyseq $WM_VSCROLL/SB_PAGEUP		= &PostMessage(ToItself, 277, 2, 0)
  keyseq $WM_VSCROLL/SB_PAGEDOWN		= &PostMessage(ToItself, 277, 3, 0)
 
 keymap2	GeneralC-X : EmacsC-X
- key C-S		= C-S			# ã‘‚«•Û‘¶(S)
- key C-W		= LAlt F A		# –¼‘O‚ğ•t‚¯‚Ä•Û‘¶(A)...
- key C-F		= C-O			# ŠJ‚­(O)...
- key K			= C-N			# V‹Kì¬(N)
- key C-C		= LAlt F X		# I—¹(X)
-# key C-C		= A-Q			# I—¹(X)
-# key C-C		= $WindowClose		# I—¹(X)
+ key C-S		= C-S			# ä¸Šæ›¸ãä¿å­˜(S)
+ key C-W		= LAlt F A		# åå‰ã‚’ä»˜ã‘ã¦ä¿å­˜(A)...
+ key C-F		= C-O			# é–‹ã(O)...
+ key K			= C-N			# æ–°è¦ä½œæˆ(N)
+ key C-C		= LAlt F X		# çµ‚äº†(X)
+# key C-C		= A-Q			# çµ‚äº†(X)
+# key C-C		= $WindowClose		# çµ‚äº†(X)
 
 
-## ƒ_ƒCƒAƒƒOƒ{ƒbƒNƒX .........................................................
+## ãƒ€ã‚¤ã‚¢ãƒ­ã‚°ãƒœãƒƒã‚¯ã‚¹ .........................................................
 
 window	DialogBox	/:#32770:/ : Global
  key C-G		= Escape
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# MDI ã‚ÌƒEƒBƒ“ƒhƒE‚Ìİ’è
+# MDI ä¸Šã®ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®è¨­å®š
 #
 
 keymap2 MDI-WindowOperation : Global
- key C-S-L     C-A-L	= &WindowLower(MDI)		# ƒEƒBƒ“ƒhƒE‚ğˆê”Ô‰º‚Ö
- key C-S-R     C-A-R	= &WindowRaise(MDI)		# ƒEƒBƒ“ƒhƒE‚ğˆê”Ôã‚Ö
- key C-S-Z     C-A-Z	= &WindowMaximize(MDI)		# ƒEƒBƒ“ƒhƒE‚ÌÅ‘å‰»
- key C-S-I     C-A-I	= &WindowMinimize(MDI)		# ƒEƒBƒ“ƒhƒE‚ÌÅ¬‰»
- key C-S-X     C-A-X	= &WindowVMaximize(MDI)		# ƒEƒBƒ“ƒhƒE‚ÌcÅ‘å‰»
- key C-S-C     C-A-C	= &WindowHMaximize(MDI)		# ƒEƒBƒ“ƒhƒE‚Ì‰¡Å‘å‰»
- key C-S-Left  C-A-Left	= &WindowMove(-16, 0, MDI)	# ƒEƒBƒ“ƒhƒE‚ÌˆÚ“®
- key C-S-Right C-A-Right= &WindowMove(16, 0, MDI)	#	V
- key C-S-Up    C-A-Up	= &WindowMove(0, -16, MDI)	#	V
- key C-S-Down  C-A-Down	= &WindowMove(0, 16, MDI)	#	V
- key C-S-A-Left		= &WindowMove(-1, 0, MDI)	#	V
- key C-S-A-Right	= &WindowMove(1, 0, MDI)	#	V
- key C-S-A-Up		= &WindowMove(0, -1, MDI)	#	V
- key C-S-A-Down		= &WindowMove(0, 1, MDI)	#	V
- key C-S-A C-S-B C-A-A	= &WindowClingToLeft(MDI)	# ƒEƒBƒ“ƒhƒE¶‚ÉŠñ‚¹‚é
- key C-S-E C-S-F C-A-E	= &WindowClingToRight(MDI)	# ƒEƒBƒ“ƒhƒE‰E‚ÉŠñ‚¹‚é
- key C-S-P     C-A-P	= &WindowClingToTop(MDI)	# ƒEƒBƒ“ƒhƒEã‚ÉŠñ‚¹‚é
- key C-S-N     C-A-N	= &WindowClingToBottom(MDI)	# ƒEƒBƒ“ƒhƒE‰º‚ÉŠñ‚¹‚é
- key C-S-V     C-A-V	= &WindowMoveVisibly(MDI)	# ƒEƒBƒ“ƒhƒEŒ©‚¦‚éˆÊ’u
- key C-S-K     C-A-K	= C-F4				# ƒEƒBƒ“ƒhƒE‚ğ•Â‚¶‚é
+ key C-S-L     C-A-L	= &WindowLower(MDI)		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ä¸€ç•ªä¸‹ã¸
+ key C-S-R     C-A-R	= &WindowRaise(MDI)		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ä¸€ç•ªä¸Šã¸
+ key C-S-Z     C-A-Z	= &WindowMaximize(MDI)		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æœ€å¤§åŒ–
+ key C-S-I     C-A-I	= &WindowMinimize(MDI)		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æœ€å°åŒ–
+ key C-S-X     C-A-X	= &WindowVMaximize(MDI)		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ç¸¦æœ€å¤§åŒ–
+ key C-S-C     C-A-C	= &WindowHMaximize(MDI)		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æ¨ªæœ€å¤§åŒ–
+ key C-S-Left  C-A-Left	= &WindowMove(-16, 0, MDI)	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ç§»å‹•
+ key C-S-Right C-A-Right= &WindowMove(16, 0, MDI)	#	ã€ƒ
+ key C-S-Up    C-A-Up	= &WindowMove(0, -16, MDI)	#	ã€ƒ
+ key C-S-Down  C-A-Down	= &WindowMove(0, 16, MDI)	#	ã€ƒ
+ key C-S-A-Left		= &WindowMove(-1, 0, MDI)	#	ã€ƒ
+ key C-S-A-Right	= &WindowMove(1, 0, MDI)	#	ã€ƒ
+ key C-S-A-Up		= &WindowMove(0, -1, MDI)	#	ã€ƒ
+ key C-S-A-Down		= &WindowMove(0, 1, MDI)	#	ã€ƒ
+ key C-S-A C-S-B C-A-A	= &WindowClingToLeft(MDI)	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦å·¦ã«å¯„ã›ã‚‹
+ key C-S-E C-S-F C-A-E	= &WindowClingToRight(MDI)	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦å³ã«å¯„ã›ã‚‹
+ key C-S-P     C-A-P	= &WindowClingToTop(MDI)	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ä¸Šã«å¯„ã›ã‚‹
+ key C-S-N     C-A-N	= &WindowClingToBottom(MDI)	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ä¸‹ã«å¯„ã›ã‚‹
+ key C-S-V     C-A-V	= &WindowMoveVisibly(MDI)	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦è¦‹ãˆã‚‹ä½ç½®
+ key C-S-K     C-A-K	= C-F4				# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’é–‰ã˜ã‚‹
 
 window	MDI	/:MDIClient:/ : Global
  key C-S-Q	C-A-Q	= &Prefix(MDI-WindowOperation)
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ŠeƒAƒvƒŠƒP[ƒVƒ‡ƒ“‚Ìİ’è
+# å„ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã®è¨­å®š
 #
 
 
-## ‘‹g‚¢‚Ì—JŸT ...............................................................
+## çª“ä½¿ã„ã®æ†‚é¬± ...............................................................
 ## http://mayu.sourceforge.net
 
-# ‰¼‘zƒL[’²¸ƒEƒBƒ“ƒhƒE‚Å‚Í‘S‚ÄƒfƒtƒHƒ‹ƒg
+# ä»®æƒ³ã‚­ãƒ¼èª¿æŸ»ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã§ã¯å…¨ã¦ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆ
 window	MayuInvestigate /mayu\.exe:#32770:mayuFocus$/ : KeymapDefault
 
-# ƒƒOƒEƒBƒ“ƒhƒE Esc ‚Å•Â‚¶‚ç‚ê‚é‚æ‚¤‚É
+# ãƒ­ã‚°ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ Esc ã§é–‰ã˜ã‚‰ã‚Œã‚‹ã‚ˆã†ã«
 window	MayuLog ( /mayu\.exe:#32770:Button/ \
-		&& /ƒƒO - ‘‹g‚¢‚Ì—JŸT/ ) : Global
+		&& /ãƒ­ã‚° - çª“ä½¿ã„ã®æ†‚é¬±/ ) : Global
  key C-G		= $WindowClose
  key Esc		= $WindowClose
 
@@ -247,7 +247,7 @@ window	MayuLog ( /mayu\.exe:#32770:Button/ \
  keyseq $ConsoleWindowClass/select-all	= &PostMessage(ToItself, 274, 65525, 0)
 
 window  ConsoleWindowClass /^ConsoleWindowClass$/ : Global
- key C-S-K     C-A-K	= A-Space C		# ƒEƒBƒ“ƒhƒE‚ğ•Â‚¶‚é
+ key C-S-K     C-A-K	= A-Space C		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’é–‰ã˜ã‚‹
  key S-Insert		= $ConsoleWindowClass/paste
  key S-Prior		= $WM_VSCROLL/SB_PAGEUP
  key S-Next		= $WM_VSCROLL/SB_PAGEDOWN
@@ -261,22 +261,22 @@ window  ConsoleWindowClass /^ConsoleWindowClass$/ : Global
 
 window	ExplorerList /EXPLORER.*:SHELLDLL_DefView:.*SysListView32$/ \
 			: SysListView32
- key S-R		= F2			# –¼‘O‚Ì•ÏX
- key C-S-Z		= &Sync&WindowMaximize	# ƒEƒBƒ“ƒhƒE‚ÌÅ‘å‰»
- key C-A-Z		= C-&WindowMaximize	# ƒEƒBƒ“ƒhƒE‚Ì‘S‰æ–Ê‰»
- key M-E		= $Explorer/show-folder-bar # ƒtƒHƒ‹ƒ_‚ğ•\¦
+ key S-R		= F2			# åå‰ã®å¤‰æ›´
+ key C-S-Z		= &Sync&WindowMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æœ€å¤§åŒ–
+ key C-A-Z		= C-&WindowMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®å…¨ç”»é¢åŒ–
+ key M-E		= $Explorer/show-folder-bar # ãƒ•ã‚©ãƒ«ãƒ€ã‚’è¡¨ç¤º
 
 window	ExplorerTree /EXPLORER.*:BaseBar:.*SysTreeView32$/ : SysTreeView32
- key S-R		= F2			# –¼‘O‚Ì•ÏX
- key C-S-Z		= &Sync&WindowMaximize	# ƒEƒBƒ“ƒhƒE‚ÌÅ‘å‰»
- key C-A-Z		= C-&WindowMaximize	# ƒEƒBƒ“ƒhƒE‚Ì‘S‰æ–Ê‰»
- key M-E		= $Explorer/show-folder-bar # ƒtƒHƒ‹ƒ_‚ğ•\¦
+ key S-R		= F2			# åå‰ã®å¤‰æ›´
+ key C-S-Z		= &Sync&WindowMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æœ€å¤§åŒ–
+ key C-A-Z		= C-&WindowMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®å…¨ç”»é¢åŒ–
+ key M-E		= $Explorer/show-folder-bar # ãƒ•ã‚©ãƒ«ãƒ€ã‚’è¡¨ç¤º
 
 window	InternetExplorer /:Internet Explorer_Server$/ : EmacsEdit
- key C-S-Z		= &Sync&WindowMaximize	# ƒEƒBƒ“ƒhƒE‚ÌÅ‘å‰»
- key C-A-Z		= C-&WindowMaximize	# ƒEƒBƒ“ƒhƒE‚Ì‘S‰æ–Ê‰»
+ key C-S-Z		= &Sync&WindowMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®æœ€å¤§åŒ–
+ key C-A-Z		= C-&WindowMaximize	# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®å…¨ç”»é¢åŒ–
 
-# ˆÈ‰º‚Íƒ`ƒPƒbƒg #18663 ‚ğQÆ‚Ì‚±‚Æ
+# ä»¥ä¸‹ã¯ãƒã‚±ãƒƒãƒˆ #18663 ã‚’å‚ç…§ã®ã“ã¨
 window	IEFrame	/:IEFrame/ : EmacsEdit
 
 window	MicrosoftJava	/:Microsoft VM For Java\(TM\) Host Window Class:/ \
@@ -288,11 +288,11 @@ window	MicrosoftJava	/:Microsoft VM For Java\(TM\) Host Window Class:/ \
 
 keymap Emacsen : Global
  key C-Yen		= &Default
- if ( MAP-ESCAPE-TO-META )			# ESC ‚ª M- ‚É‚È‚é‚Ì‚ğ‘j~‚·‚é
+ if ( MAP-ESCAPE-TO-META )			# ESC ãŒ M- ã«ãªã‚‹ã®ã‚’é˜»æ­¢ã™ã‚‹
    if ( KBD109 ) and ( ! KBD104on109 )
-     key *”¼Šp/‘SŠp	= *Esc
-     key *E0”¼Šp/‘SŠp	= *Esc
-     key *Esc		= *”¼Šp/‘SŠp
+     key *åŠè§’/å…¨è§’	= *Esc
+     key *E0åŠè§’/å…¨è§’	= *Esc
+     key *Esc		= *åŠè§’/å…¨è§’
    else
      key Escape		= &Default
    endif
@@ -311,21 +311,21 @@ window	Emacs	/:Emacs$/ : Emacsen
  keyseq $Notepad/save-as	= &PostMessage(ToParentWindow, 273, 1, 0)
 
 keymap2	NotepadC-X : GeneralC-X
- event prefixed		= &HelpMessage("ƒƒ‚’  C-x-", \
-	"C-x C-s\tã‘‚«•Û‘¶\r\n"	\
-	"C-x C-f\tŠJ‚­\t\r\n"		\
-	"C-x k\t\tV‹Kì¬\r\n"		\
-	"C-x C-c\tI—¹")
+ event prefixed		= &HelpMessage("ãƒ¡ãƒ¢å¸³ C-x-", \
+	"C-x C-s\tä¸Šæ›¸ãä¿å­˜\r\n"	\
+	"C-x C-f\té–‹ã\t\r\n"		\
+	"C-x k\t\tæ–°è¦ä½œæˆ\r\n"		\
+	"C-x C-c\tçµ‚äº†")
  event before-key-down	= &HelpMessage
- key C-S		= $Notepad/save-as	# ã‘‚«•Û‘¶(S)
- key C-F		= $Notepad/open		# ŠJ‚­(O)...
- key K			= $Notepad/new		# V‹Kì¬(N)
- key C-C		= $WindowClose		# ƒƒ‚’ ‚ÌI—¹(X)
+ key C-S		= $Notepad/save-as	# ä¸Šæ›¸ãä¿å­˜(S)
+ key C-F		= $Notepad/open		# é–‹ã(O)...
+ key K			= $Notepad/new		# æ–°è¦ä½œæˆ(N)
+ key C-C		= $WindowClose		# ãƒ¡ãƒ¢å¸³ã®çµ‚äº†(X)
 
 window	Notepad /:Notepad:Edit$/ : EmacsEdit
  if ( !ZXCV ) key C-X	= &Prefix(NotepadC-X)
- key C-S		= F3			# ŒŸõ(F)...
- key M-J		= C-G			# s‚ÖˆÚ“®
+ key C-S		= F3			# æ¤œç´¢(F)...
+ key M-J		= C-G			# è¡Œã¸ç§»å‹•
 
 
 ## ASTEC-X ....................................................................
@@ -335,7 +335,7 @@ window	Notepad /:Notepad:Edit$/ : EmacsEdit
 
 window	ASTEC-X /:ASTEC-X$/ : Global
  key C-Yen		= &Default
- key *IC-IL-C-Yen	= $ToggleIME		# IME‚ªƒIƒ“‚È‚ç‚ÎIME‚ğƒIƒt
+ key *IC-IL-C-Yen	= $ToggleIME		# IMEãŒã‚ªãƒ³ãªã‚‰ã°IMEã‚’ã‚ªãƒ•
 
 
 ## Becky! Internet Mail .......................................................
@@ -351,7 +351,7 @@ window BeckyInternetMail2 /B2\.exe:Becky2ComposeFrame:/ : EmacsEdit
 ## Microsoft Power Point ......................................................
 
 keymap2	PowerPointC-X : GeneralC-X
- key C-C		= $WindowClose		# I—¹(X)
+ key C-C		= $WindowClose		# çµ‚äº†(X)
 
 window	PowerPoint /POWERPNT\.EXE:.*:(paneClassDC|REComboBox20W|RichEdit20W)$/\
 			: EmacsEdit
@@ -389,7 +389,7 @@ window MSPinball /PINBALL\.EXE:1c7c22a0-9576-11ce-bf80-444553540000$/ : Global
 
 window	NetscapeNavigator /Netscape\.exe:/ : Global
  key C-H		= BackSpace		# BackSpace
- key C-S		= C-F			# ŒŸõ
+ key C-S		= C-F			# æ¤œç´¢
 
 
 ## Mozilla ....................................................................
@@ -402,7 +402,7 @@ window	Mozilla /:MozillaWindowClass$/ : EmacsEdit
 ## http://member.nifty.ne.jp/TaN/
 
 window	PersonalDictionary /PDICW32\.EXE:PDICW:ComboBox:Edit/ : EmacsEdit
- key C-K		= S-End S-Delete	# s––‚Ü‚Åíœ
+ key C-K		= S-End S-Delete	# è¡Œæœ«ã¾ã§å‰Šé™¤
  key C-Y		= S-Insert		# PASTE
 
 
@@ -418,18 +418,18 @@ window RealPlayer /realplay.exe:PNGUIClass/ : Global
 ## http://hp.vector.co.jp/authors/VA002416/
 
 window	TeraTerm /TTermPRO\.exe:VTWin32$/ : Global
- key C-Slash		= C-S-HyphenMinus	# C-_ ‚ğ“ü—Í
- key S-Prior		= C-Prior		# ƒXƒNƒ[ƒ‹
- key S-Next		= C-Next		# ƒXƒNƒ[ƒ‹
+ key C-Slash		= C-S-HyphenMinus	# C-_ ã‚’å…¥åŠ›
+ key S-Prior		= C-Prior		# ã‚¹ã‚¯ãƒ­ãƒ¼ãƒ«
+ key S-Next		= C-Next		# ã‚¹ã‚¯ãƒ­ãƒ¼ãƒ«
  key IC-M-X    IL-M-X	= $ToggleIME M-X	# for emacs
  if ( KBD109 )
-   key C-S-ReverseSolidus = C-S-HyphenMinus	# C-_ ‚ğ“ü—Í
+   key C-S-ReverseSolidus = C-S-HyphenMinus	# C-_ ã‚’å…¥åŠ›
  endif
 
 
 ## Waffle .....................................................................
 ## http://sakura.tsg.ne.jp/~tjkawa/witalk2/
-## Emacs •—ƒL[ƒoƒCƒ“ƒfƒBƒ“ƒO‚É‚µ‚Ä‚¨‚­‚±‚Æ
+## Emacs é¢¨ã‚­ãƒ¼ãƒã‚¤ãƒ³ãƒ‡ã‚£ãƒ³ã‚°ã«ã—ã¦ãŠãã“ã¨
 
  keyseq	$WaffleMark/cancel		= Left Right
 
@@ -437,72 +437,72 @@ window	Waffle /WITALK2\.EXE:.*:RichEdit(20A)?$/ : Global
 keymap2	WaffleMark : Waffle = $WaffleMark/cancel &KeymapParent
 
 keymap	Waffle
- key Home		= &Default		# •¶“ª
- key End		= &Default		# •¶––
+ key Home		= &Default		# æ–‡é ­
+ key End		= &Default		# æ–‡æœ«
  key C-Space		= &Prefix(WaffleMark)	# Mark
- key C-A		= &Default		# s“ª
- key C-B		= &Default		# ©
+ key C-A		= &Default		# è¡Œé ­
+ key C-B		= &Default		# â†
  key C-C		= &Default		# (Waffle Prefix)
- key M-B		= &Default		# ©(’PŒê)
- key C-D		= &Default		# íœ
- key M-D		= &Default		# íœ(’PŒê)
- key C-E		= &Default		# s––
- key C-F		= &Default		# ¨
- key M-F		= &Default		# ¨(’PŒê)
+ key M-B		= &Default		# â†(å˜èª)
+ key C-D		= &Default		# å‰Šé™¤
+ key M-D		= &Default		# å‰Šé™¤(å˜èª)
+ key C-E		= &Default		# è¡Œæœ«
+ key C-F		= &Default		# â†’
+ key M-F		= &Default		# â†’(å˜èª)
  key C-G		= &Default		# CANCEL
  key C-H		= &Default		# BS
  key C-J		= &Default		# RETURN
- key C-K		= &Default		# s––‚Ü‚Åíœ
- key M-L		= &Default		# ¬•¶š
+ key C-K		= &Default		# è¡Œæœ«ã¾ã§å‰Šé™¤
+ key M-L		= &Default		# å°æ–‡å­—
  key C-M		= &Default		# RETURN
- key C-N		= &Default		# «
- key C-O		= &Default		# ˆês‘‚â‚·
- key C-P		= &Default		# ª
- key C-Q		= &Prefix(KeymapDefault) # mayu ‚É¶‰E‚³‚ê‚È‚¢ƒL[“ü—Í
- key C-S		= &Default		# ŒŸõ
- key C-T		= &Default		# •¶š“ü‚ê‘Ö‚¦
- key C-V		= Next			# Ÿ•Å (Waffle ‚ÌƒoƒO?)
- key M-V		= &Default		# ‘O•Å
+ key C-N		= &Default		# â†“
+ key C-O		= &Default		# ä¸€è¡Œå¢—ã‚„ã™
+ key C-P		= &Default		# â†‘
+ key C-Q		= &Prefix(KeymapDefault) # mayu ã«å·¦å³ã•ã‚Œãªã„ã‚­ãƒ¼å…¥åŠ›
+ key C-S		= &Default		# æ¤œç´¢
+ key C-T		= &Default		# æ–‡å­—å…¥ã‚Œæ›¿ãˆ
+ key C-V		= Next			# æ¬¡é  (Waffle ã®ãƒã‚°?)
+ key M-V		= &Default		# å‰é 
  key C-W		= &Default		# CUT
  key M-W		= &Default		# COPY
  key C-Y		= &Default		# PASTE
- key M-U		= &Default		# ‘å•¶š
- key S-Home		= &Default		# •¶“ª(‘I‘ğ)
- key S-End		= &Default		# •¶––(‘I‘ğ)
- key S-M-Comma		= &Default		# •¶“ª
- key S-M-Period		= &Default		# •¶––
- key M-BackSpace	= &Default		# BS(’PŒê)
+ key M-U		= &Default		# å¤§æ–‡å­—
+ key S-Home		= &Default		# æ–‡é ­(é¸æŠ)
+ key S-End		= &Default		# æ–‡æœ«(é¸æŠ)
+ key S-M-Comma		= &Default		# æ–‡é ­
+ key S-M-Period		= &Default		# æ–‡æœ«
+ key M-BackSpace	= &Default		# BS(å˜èª)
  key C-Slash		= &Default		# UNDO
 
 keymap2	WaffleMark
- key Home		= S-C-Home	&Prefix(WaffleMark)	# •¶“ª
- key End		= S-C-End	&Prefix(WaffleMark)	# •¶––
- key C-A		= S-Home	&Prefix(WaffleMark)	# s“ª
- key C-B		= S-Left	&Prefix(WaffleMark)	# ©
- key M-B		= S-C-Left	&Prefix(WaffleMark)	# ©(’PŒê)
- key C-E		= S-End	&Prefix(WaffleMark)		# s––
- key C-F		= S-Right	&Prefix(WaffleMark)	# ¨
- key M-F		= S-C-Right	&Prefix(WaffleMark)	# ¨(’PŒê)
- key C-G		= $WaffleMark/cancel &Undefined		# ƒLƒƒƒ“ƒZƒ‹
- key C-N		= S-Down	&Prefix(WaffleMark)	# «
- key C-P		= S-Up		&Prefix(WaffleMark)	# ª
- key C-V		= S-Next	&Prefix(WaffleMark)	# Ÿ•Å
- key M-V		= S-Prior	&Prefix(WaffleMark)	# ‘O•Å
+ key Home		= S-C-Home	&Prefix(WaffleMark)	# æ–‡é ­
+ key End		= S-C-End	&Prefix(WaffleMark)	# æ–‡æœ«
+ key C-A		= S-Home	&Prefix(WaffleMark)	# è¡Œé ­
+ key C-B		= S-Left	&Prefix(WaffleMark)	# â†
+ key M-B		= S-C-Left	&Prefix(WaffleMark)	# â†(å˜èª)
+ key C-E		= S-End	&Prefix(WaffleMark)		# è¡Œæœ«
+ key C-F		= S-Right	&Prefix(WaffleMark)	# â†’
+ key M-F		= S-C-Right	&Prefix(WaffleMark)	# â†’(å˜èª)
+ key C-G		= $WaffleMark/cancel &Undefined		# ã‚­ãƒ£ãƒ³ã‚»ãƒ«
+ key C-N		= S-Down	&Prefix(WaffleMark)	# â†“
+ key C-P		= S-Up		&Prefix(WaffleMark)	# â†‘
+ key C-V		= S-Next	&Prefix(WaffleMark)	# æ¬¡é 
+ key M-V		= S-Prior	&Prefix(WaffleMark)	# å‰é 
  key C-W		= C-W Left Right			# CUT
  key M-W		= M-W Left Right			# COPY
- key S-M-Comma		= S-C-Home	&Prefix(WaffleMark)	# •¶“ª
- key S-M-Period		= S-C-End	&Prefix(WaffleMark)	# •¶––
- key Left		= S-Left	&Prefix(WaffleMark)	# ©
- key Up			= S-Up		&Prefix(WaffleMark)	# ª
- key Right		= S-Right	&Prefix(WaffleMark)	# ¨
- key Down		= S-Down	&Prefix(WaffleMark)	# «
+ key S-M-Comma		= S-C-Home	&Prefix(WaffleMark)	# æ–‡é ­
+ key S-M-Period		= S-C-End	&Prefix(WaffleMark)	# æ–‡æœ«
+ key Left		= S-Left	&Prefix(WaffleMark)	# â†
+ key Up			= S-Up		&Prefix(WaffleMark)	# â†‘
+ key Right		= S-Right	&Prefix(WaffleMark)	# â†’
+ key Down		= S-Down	&Prefix(WaffleMark)	# â†“
 
 
 ## Xyzzy ......................................................................
 ## http://www.jsdlab.co.jp/~kamei/
 
 window Xyzzy /xyzzy\.exe:/ : Global
- key C-S-K     C-A-K	= C-X C-C		# ƒEƒBƒ“ƒhƒE‚ğ•Â‚¶‚é
+ key C-S-K     C-A-K	= C-X C-C		# ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’é–‰ã˜ã‚‹
 
 
 ## Windows Media Player .......................................................
@@ -516,7 +516,7 @@ window WindowsMediaPlayer /mplayer2.*:(Media Player 2|VideoRenderer)/ : Global
 
 ## Windows Mine Sweeper .......................................................
 
-window WindowsMineSweeper /winmine.exe:ƒ}ƒCƒ“ƒXƒC[ƒp$/ : Global
+window WindowsMineSweeper /winmine.exe:ãƒã‚¤ãƒ³ã‚¹ã‚¤ãƒ¼ãƒ‘$/ : Global
  key D-Z		= &VK(RButton)
  key U-Z		= &Ignore
  key D-X		= &VK(MButton)

@@ -1,5 +1,5 @@
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ‘‹g‚¢‚Ì—JŸT - 109.mayu
+ï»¿#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# çª“ä½¿ã„ã®æ†‚é¬± - 109.mayu
 # Copyright (C) 1999-2005, TAGA Nayuta <nayuta@users.sourceforge.net>
 #
 
@@ -12,7 +12,7 @@ define KBD112
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 109 “ú–{ŒêƒL[ƒ{[ƒh’è‹`
+# 109 æ—¥æœ¬èªã‚­ãƒ¼ãƒœãƒ¼ãƒ‰å®šç¾©
 #
 
 def key Drag				= E1-0x00
@@ -65,8 +65,8 @@ def key K				=    0x25
 def key L				=    0x26
 def key Semicolon			=    0x27 # ;+
 def key Colon				=    0x28 # :*
-def key ”¼Šp/‘SŠp Š¿š Kanji		=    0x29 # ”¼Šp/‘SŠp Š¿š
-def key E0”¼Šp/‘SŠp E0Š¿š E0Kanji	= E0-0x29 # ”¼Šp/‘SŠp Š¿š
+def key åŠè§’/å…¨è§’ æ¼¢å­— Kanji		=    0x29 # åŠè§’/å…¨è§’ æ¼¢å­—
+def key E0åŠè§’/å…¨è§’ E0æ¼¢å­— E0Kanji	= E0-0x29 # åŠè§’/å…¨è§’ æ¼¢å­—
 def key LeftShift LShift		=    0x2a
 def key RightSquareBracket CloseBracket	=    0x2b # ]}
 def key Z				=    0x2c
@@ -81,11 +81,11 @@ def key FullStop Period			=    0x34 # .>
 def key Solidus Slash			=    0x35 # /?
 def key RightShift RShift		=    0x36
 def key E0RightShift E0RShift		= E0-0x36
-def key NumAsterisk NumMultiply		=    0x37 # ƒeƒ“ƒL[ *
+def key NumAsterisk NumMultiply		=    0x37 # ãƒ†ãƒ³ã‚­ãƒ¼ *
 def key LeftAlt LAlt LMenu		=    0x38
 def key Space				=    0x39
-def key ‰p” Eisuu			=    0x3a # ‰p” CapsLock Š¿š”Ô†
-def key E0‰p” E0Eisuu			= E0-0x3a # ‰p” CapsLock Š¿š”Ô†
+def key è‹±æ•° Eisuu			=    0x3a # è‹±æ•° CapsLock æ¼¢å­—ç•ªå·
+def key E0è‹±æ•° E0Eisuu			= E0-0x3a # è‹±æ•° CapsLock æ¼¢å­—ç•ªå·
 def key F1				=    0x3b
 def key F2				=    0x3c
 def key F3				=    0x3d
@@ -98,41 +98,41 @@ def key F9				=    0x43
 def key F10				=    0x44
 def key NumLock				=    0x45
 def key ScrollLock Scroll		=    0x46
-def key Num7				=    0x47 # ƒeƒ“ƒL[ 7
-def key Num8				=    0x48 # ƒeƒ“ƒL[ 8
-def key Num9				=    0x49 # ƒeƒ“ƒL[ 9
+def key Num7				=    0x47 # ãƒ†ãƒ³ã‚­ãƒ¼ 7
+def key Num8				=    0x48 # ãƒ†ãƒ³ã‚­ãƒ¼ 8
+def key Num9				=    0x49 # ãƒ†ãƒ³ã‚­ãƒ¼ 9
 
-def key NumHyphenMinus NumMinus		=    0x4a # ƒeƒ“ƒL[ -
-def key Num4				=    0x4b # ƒeƒ“ƒL[ 4
-def key Num5				=    0x4c # ƒeƒ“ƒL[ 5
-def key Num6				=    0x4d # ƒeƒ“ƒL[ 6
-def key NumPlusSign NumPlus		=    0x4e # ƒeƒ“ƒL[ +
-def key Num1				=    0x4f # ƒeƒ“ƒL[ 1
+def key NumHyphenMinus NumMinus		=    0x4a # ãƒ†ãƒ³ã‚­ãƒ¼ -
+def key Num4				=    0x4b # ãƒ†ãƒ³ã‚­ãƒ¼ 4
+def key Num5				=    0x4c # ãƒ†ãƒ³ã‚­ãƒ¼ 5
+def key Num6				=    0x4d # ãƒ†ãƒ³ã‚­ãƒ¼ 6
+def key NumPlusSign NumPlus		=    0x4e # ãƒ†ãƒ³ã‚­ãƒ¼ +
+def key Num1				=    0x4f # ãƒ†ãƒ³ã‚­ãƒ¼ 1
 def key Num2				=    0x50
 def key Num3				=    0x51
 def key Num0				=    0x52
-def key NumFullStop NumPeriod		=    0x53 # ƒeƒ“ƒL[ .
+def key NumFullStop NumPeriod		=    0x53 # ãƒ†ãƒ³ã‚­ãƒ¼ .
 def key SysRq				=    0x54
 
 def key F11				=    0x57
 def key F12				=    0x58
 
-def key ‚Ğ‚ç‚ª‚È Hiragana		=    0x70 # ‚Ğ‚ç‚ª‚È ƒJƒ^ƒJƒi ƒ[ƒ}š
-def key E0‚Ğ‚ç‚ª‚È E0Hiragana		= E0-0x70 # ‚Ğ‚ç‚ª‚È ƒJƒ^ƒJƒi ƒ[ƒ}š
+def key ã²ã‚‰ãŒãª Hiragana		=    0x70 # ã²ã‚‰ãŒãª ã‚«ã‚¿ã‚«ãƒŠ ãƒ­ãƒ¼ãƒå­—
+def key E0ã²ã‚‰ãŒãª E0Hiragana		= E0-0x70 # ã²ã‚‰ãŒãª ã‚«ã‚¿ã‚«ãƒŠ ãƒ­ãƒ¼ãƒå­—
 
-def key ReverseSolidus BackSlash	=    0x73 # __
+def key ReverseSolidus BackSlash	=    0x73 # ï¼¼_
 
-def key •ÏŠ· Convert			=    0x79 # •ÏŠ·(ŸŒó•â) ‘OŒó•â ‘SŒó•â
+def key å¤‰æ› Convert			=    0x79 # å¤‰æ›(æ¬¡å€™è£œ) å‰å€™è£œ å…¨å€™è£œ
 
-def key –³•ÏŠ· NonConvert		=    0x7b # –³•ÏŠ·
-def key E0–³•ÏŠ· E0NonConvert		= E0-0x7b # –³•ÏŠ·
+def key ç„¡å¤‰æ› NonConvert		=    0x7b # ç„¡å¤‰æ›
+def key E0ç„¡å¤‰æ› E0NonConvert		= E0-0x7b # ç„¡å¤‰æ›
 
 def key YenSign Yen			=    0x7d # \|
 
-def key MM/Messanger			= E0-0x05 # (MultiMedia Keyboard) ƒƒbƒZƒ“ƒWƒƒ[
+def key MM/Messanger			= E0-0x05 # (MultiMedia Keyboard) ãƒ¡ãƒƒã‚»ãƒ³ã‚¸ãƒ£ãƒ¼
 
-def key MM/Undo	MM/F2			= E0-0x08 # (MultiMedia Keyboard) F2 Œ³‚É–ß‚·
-def key MM/Redo	MM/F3			= E0-0x07 # (MultiMedia Keyboard) F3 ‚â‚è’¼‚µ
+def key MM/Undo	MM/F2			= E0-0x08 # (MultiMedia Keyboard) F2 å…ƒã«æˆ»ã™
+def key MM/Redo	MM/F3			= E0-0x07 # (MultiMedia Keyboard) F3 ã‚„ã‚Šç›´ã—
 
 def key MediaPrevTrack ScanPreviousTrack PreviousTrack \
 					= E0-0x10 # (MultiMedia Keyboard) |<<
@@ -149,62 +149,62 @@ def key NumEnter NumReturn		= E0-0x1c
 def key RightControl RControl RCtrl	= E0-0x1d
 
 def key VolumeMute Mute			= E0-0x20 # (MultiMedia Keyboard)
-def key MM/Calculator ALCalculator	= E0-0x21 # (MultiMedia Keyboard) “d‘ì
+def key MM/Calculator ALCalculator	= E0-0x21 # (MultiMedia Keyboard) é›»å“
 
 def key MediaPlayPause Play/Pause	= E0-0x22 # (MultiMedia Keyboard) > / ||
-def key MM/SpellCheck	MM/F10		= E0-0x23 # (MultiMedia Keyboard) F10 ƒXƒyƒ‹ƒ`ƒFƒbƒN
-def key MediaStop Stop			= E0-0x24 # (MultiMedia Keyboard) ¡
+def key MM/SpellCheck	MM/F10		= E0-0x23 # (MultiMedia Keyboard) F10 ã‚¹ãƒšãƒ«ãƒã‚§ãƒƒã‚¯
+def key MediaStop Stop			= E0-0x24 # (MultiMedia Keyboard) â– 
 
-# def ignore				= E0-0x2a # ‚È‚É‚±‚ê (–³‹)
+# def ignore				= E0-0x2a # ãªã«ã“ã‚Œ (ç„¡è¦–)
 
 def key VolumeDown VolumeDecrement	= E0-0x2e # (MultiMedia Keyboard) -
 
 def key VolumeUp VolumeIncrement	= E0-0x30 # (MultiMedia Keyboard) +
 
-def key BrowserHome ACHome Internet	= E0-0x32 # (MultiMedia Keyboard) ƒz[ƒ€
+def key BrowserHome ACHome Internet	= E0-0x32 # (MultiMedia Keyboard) ãƒ›ãƒ¼ãƒ 
 
-def key NumSolidus NumSlash		= E0-0x35 # ƒeƒ“ƒL[ /
+def key NumSolidus NumSlash		= E0-0x35 # ãƒ†ãƒ³ã‚­ãƒ¼ /
 
 def key PrintScreen Snapshot		= E0-0x37
 def key RightAlt RAlt RMenu		= E0-0x38
 
-def key MM/Help		MM/F1		= E0-0x3b # (MultiMedia Keyboard) F1 ƒwƒ‹ƒv
-def key MM/MyMusic			= E0-0x3c # (MultiMedia Keyboard) ƒ}ƒCƒ~ƒ…[ƒWƒbƒN
+def key MM/Help		MM/F1		= E0-0x3b # (MultiMedia Keyboard) F1 ãƒ˜ãƒ«ãƒ—
+def key MM/MyMusic			= E0-0x3c # (MultiMedia Keyboard) ãƒã‚¤ãƒŸãƒ¥ãƒ¼ã‚¸ãƒƒã‚¯
 
-def key MM/New		MM/F4		= E0-0x3e # (MultiMedia Keyboard) F4 V‹Kì¬
-def key MM/Open		MM/F5		= E0-0x3f # (MultiMedia Keyboard) F5 ŠJ‚­
-def key MM/Close	MM/F6		= E0-0x40 # (MultiMedia Keyboard) F6 •Â‚¶‚é
-def key MM/Reply	MM/F7		= E0-0x41 # (MultiMedia Keyboard) F7 •ÔM
-def key MM/Forward	MM/F8		= E0-0x42 # (MultiMedia Keyboard) F8 “]‘—
-def key MM/Send		MM/F9		= E0-0x43 # (MultiMedia Keyboard) F9 ‘—M
+def key MM/New		MM/F4		= E0-0x3e # (MultiMedia Keyboard) F4 æ–°è¦ä½œæˆ
+def key MM/Open		MM/F5		= E0-0x3f # (MultiMedia Keyboard) F5 é–‹ã
+def key MM/Close	MM/F6		= E0-0x40 # (MultiMedia Keyboard) F6 é–‰ã˜ã‚‹
+def key MM/Reply	MM/F7		= E0-0x41 # (MultiMedia Keyboard) F7 è¿”ä¿¡
+def key MM/Forward	MM/F8		= E0-0x42 # (MultiMedia Keyboard) F8 è»¢é€
+def key MM/Send		MM/F9		= E0-0x43 # (MultiMedia Keyboard) F9 é€ä¿¡
 
 def key Break				= E0-0x46 # Break
 def key Home				= E0-0x47
-def key ª Up				= E0-0x48
+def key â†‘ Up				= E0-0x48
 def key PageUp Prior			= E0-0x49
 
-def key © Left				= E0-0x4b
-def key MM/MyDocument			= E0-0x4c # (MultiMedia Keyboard) ƒ}ƒCƒhƒLƒ…ƒƒ“ƒg
-def key ¨ Right			= E0-0x4d
+def key â† Left				= E0-0x4b
+def key MM/MyDocument			= E0-0x4c # (MultiMedia Keyboard) ãƒã‚¤ãƒ‰ã‚­ãƒ¥ãƒ¡ãƒ³ãƒˆ
+def key â†’ Right			= E0-0x4d
 
 def key End				= E0-0x4f
-def key « Down				= E0-0x50
+def key â†“ Down				= E0-0x50
 def key PageDown Next			= E0-0x51
 def key Insert				= E0-0x52
 def key Delete Del			= E0-0x53
 
-def key MM/Save		MM/F11		= E0-0x57 # (MultiMedia Keyboard) F11 ã‘‚«•Û‘¶
-def key MM/Print	MM/F12		= E0-0x58 # (MultiMedia Keyboard) F12 ˆóü
+def key MM/Save		MM/F11		= E0-0x57 # (MultiMedia Keyboard) F11 ä¸Šæ›¸ãä¿å­˜
+def key MM/Print	MM/F12		= E0-0x58 # (MultiMedia Keyboard) F12 å°åˆ·
 # def ignore				= E0-0x59 # (Wireless Keyboard) Unknown
 
 def key LeftWindows LWindows LWin	= E0-0x5b
 def key RightWindows RWindows RWin	= E0-0x5c
 def key Applications Apps		= E0-0x5d
-def key PowerOff			= E0-0x5e # Power off  (112 ƒL[ƒ{[ƒh)
-def key Sleep				= E0-0x5f # Sleep      (112 ƒL[ƒ{[ƒh)
+def key PowerOff			= E0-0x5e # Power off  (112 ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰)
+def key Sleep				= E0-0x5f # Sleep      (112 ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰)
 
-def key WakeUp				= E0-0x63 # Wake up    (112 ƒL[ƒ{[ƒh)
-def key MM/MyPicture			= E0-0x64 # (MultiMedia Keyboard) ƒ}ƒCƒsƒNƒ`ƒƒ
+def key WakeUp				= E0-0x63 # Wake up    (112 ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰)
+def key MM/MyPicture			= E0-0x64 # (MultiMedia Keyboard) ãƒã‚¤ãƒ”ã‚¯ãƒãƒ£
 def key BrowserSearch ACSearch		= E0-0x65 # (Internet Explorer)
 def key BrowserFavorites ACBookmarks	= E0-0x66 # (Internet Explorer)
 def key BrowserRefresh ACRefresh	= E0-0x67 # (Internet Explorer)
@@ -212,14 +212,14 @@ def key BrowserStop ACStop		= E0-0x68 # (Internet Explorer)
 def key BrowserForward ACForward	= E0-0x69 # (Internet Explorer)
 def key BrowserBack ACBack		= E0-0x6a # (Internet Explorer)
 def key ALLocalBrowser			= E0-0x6b # (N/A) My Computer 
-def key LaunchMail ALEmailReader Email	= E0-0x6c # (MultiMedia Keyboard) ƒ[ƒ‹
+def key LaunchMail ALEmailReader Email	= E0-0x6c # (MultiMedia Keyboard) ãƒ¡ãƒ¼ãƒ«
 def key LaunchMediaSelect ALConsumerControlConfiguration \
-					= E0-0x6d # (MultiMedia Keyboard) ƒƒfƒBƒA
+					= E0-0x6d # (MultiMedia Keyboard) ãƒ¡ãƒ‡ã‚£ã‚¢
 
 def key Pause				= E1-0x1d 0x45 # Pause
 
-# def overflow				=    0xff # ƒI[ƒo[ƒtƒ[ (–³‹)
-def sync				=    0x7e # &Sync ‚Åg‚¤ƒXƒLƒƒƒ“ƒR[ƒh
+# def overflow				=    0xff # ã‚ªãƒ¼ãƒãƒ¼ãƒ•ãƒ­ãƒ¼ (ç„¡è¦–)
+def sync				=    0x7e # &Sync ã§ä½¿ã†ã‚¹ã‚­ãƒ£ãƒ³ã‚³ãƒ¼ãƒ‰
 
 def mod Shift	= LShift RShift
 def mod Alt	= LAlt RAlt
@@ -227,18 +227,18 @@ def mod Control	= LControl RControl
 def mod Windows	= LWindows RWindows
 mod shift += E0RShift
 key *E0RShift = *LShift
-key *E0‰p” = *‰p”
-key *E0”¼Šp/‘SŠp = *”¼Šp/‘SŠp
-key *E0‚Ğ‚ç‚ª‚È = *‚Ğ‚ç‚ª‚È
-key *E0–³•ÏŠ· = *–³•ÏŠ·
+key *E0è‹±æ•° = *è‹±æ•°
+key *E0åŠè§’/å…¨è§’ = *åŠè§’/å…¨è§’
+key *E0ã²ã‚‰ãŒãª = *ã²ã‚‰ãŒãª
+key *E0ç„¡å¤‰æ› = *ç„¡å¤‰æ›
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ƒL[ƒV[ƒPƒ“ƒX’è‹`
+# ã‚­ãƒ¼ã‚·ãƒ¼ã‚±ãƒ³ã‚¹å®šç¾©
 #
 
-keyseq $ToggleIME		= A-”¼Šp/‘SŠp
-keyseq $CapsLock		= S-‰p”
+keyseq $ToggleIME		= A-åŠè§’/å…¨è§’
+keyseq $CapsLock		= S-è‹±æ•°
 
 keyseq $SPACE			= ~S-*Space			#  
 keyseq $EXCLAMATION_MARK	=  S-*_1			# !
