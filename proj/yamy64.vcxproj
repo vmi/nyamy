@@ -87,6 +87,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\scripter;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader />
@@ -107,6 +108,7 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\scripter;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader />
@@ -123,9 +125,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\cmd_stream_reader.cpp" />
-    <ClCompile Include="..\cmd_stream_writer.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
-    <ClCompile Include="..\config_files.cpp" />
+    <ClCompile Include="..\ctrl_stream_writer.cpp" />
     <ClCompile Include="..\dlgeditsetting.cpp" />
     <ClCompile Include="..\dlginvestigate.cpp" />
     <ClCompile Include="..\dlglog.cpp" />
@@ -139,13 +140,12 @@
     <ClCompile Include="..\keymap.cpp" />
     <ClCompile Include="..\layoutmanager.cpp" />
     <ClCompile Include="..\mayu.cpp" />
-    <ClCompile Include="..\lexer.cpp" />
     <ClCompile Include="..\registry.cpp" />
-    <ClCompile Include="..\setting.cpp" />
-    <ClCompile Include="..\setting_builder.cpp" />
-    <ClCompile Include="..\mayu_parser.cpp" />
-    <ClCompile Include="..\mayu_compiler.cpp" />
+    <ClCompile Include="..\scripter\config_files.cpp" />
+    <ClCompile Include="..\scripter\lexer.cpp" />
+    <ClCompile Include="..\scripter_manager.cpp" />
     <ClCompile Include="..\setting_loader.cpp" />
+    <ClCompile Include="..\setting_processor.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\target.cpp" />
     <ClCompile Include="..\vkeytable.cpp" />
@@ -181,14 +181,16 @@
     <ClInclude Include="..\multithread.h" />
     <ClInclude Include="..\lexer.h" />
     <ClInclude Include="..\registry.h" />
+    <ClInclude Include="..\scripter\config_files.h" />
+    <ClInclude Include="..\scripter\lexer.h" />
     <ClInclude Include="..\setting.h" />
-    <ClInclude Include="..\setting_builder.h" />
     <ClInclude Include="..\ast.h" />
     <ClInclude Include="..\ast_visitor.h" />
     <ClInclude Include="..\mayu_parser.h" />
     <ClInclude Include="..\mayu_compiler.h" />
     <ClInclude Include="..\cmd_stream.h" />
     <ClInclude Include="..\setting_loader.h" />
+    <ClInclude Include="..\setting_processor.h" />
     <ClInclude Include="..\stringtool.h" />
     <ClInclude Include="..\target.h" />
     <ClInclude Include="..\vk2tchar.h" />

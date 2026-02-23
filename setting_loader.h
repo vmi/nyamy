@@ -9,11 +9,8 @@
 #  include "config_files.h"
 #  include "lexer.h"
 #  include "multithread.h"
-#  include "setting_builder.h"
+#  include "setting.h"
 #  include <memory>
-
-
-class Setting;
 
 
 ///
@@ -140,9 +137,7 @@ public:
 	std::unique_ptr<Setting> load(const tstringi &i_filename,
 								  const Symbols &i_initialSymbols);
 
-	/// load setting from a command stream (binary)
-	std::unique_ptr<Setting> loadFromStream(std::istream &in,
-											const Symbols &i_initialSymbols);
+
 };
 
 

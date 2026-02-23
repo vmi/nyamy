@@ -2,9 +2,9 @@
 // lexer.cpp
 
 
-#include "misc.h"
+#include "../misc.h"
 
-#include "errormessage.h"
+#include "../errormessage.h"
 #include "lexer.h"
 #include <cassert>
 

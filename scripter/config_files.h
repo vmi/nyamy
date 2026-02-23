@@ -6,18 +6,15 @@
 #  define _CONFIG_FILES_H
 
 
-#  include "multithread.h"
-#  include "stringtool.h"
+#  include "../multithread.h"
+#  include "../stringtool.h"
+#  include "../symbols.h"
 #  include <list>
-#  include <set>
 #  include <functional>
 
 
 /// home directory path list
 using HomeDirectories = std::list<tstringi>;
-
-/// symbols set
-using Symbols = std::set<tstringi>;
 
 
 /// file system operations for configuration files

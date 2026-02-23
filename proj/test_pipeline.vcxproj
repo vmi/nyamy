@@ -59,6 +59,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..;$(ProjectDir)..\scripter;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader />
@@ -80,6 +81,7 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..;$(ProjectDir)..\scripter;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader />
@@ -97,10 +99,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\cmd_stream_reader.cpp" />
-    <ClCompile Include="..\cmd_stream_writer.cpp" />
+    <ClCompile Include="..\setting_processor.cpp" />
     <ClCompile Include="..\test_pipeline.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
-    <ClCompile Include="..\config_files.cpp" />
     <ClCompile Include="..\dlgeditsetting.cpp" />
     <ClCompile Include="..\dlginvestigate.cpp" />
     <ClCompile Include="..\dlglog.cpp" />
@@ -113,17 +114,18 @@
     <ClCompile Include="..\keyboard.cpp" />
     <ClCompile Include="..\keymap.cpp" />
     <ClCompile Include="..\layoutmanager.cpp" />
-    <ClCompile Include="..\lexer.cpp" />
     <ClCompile Include="..\registry.cpp" />
-    <ClCompile Include="..\setting.cpp" />
-    <ClCompile Include="..\setting_builder.cpp" />
-    <ClCompile Include="..\mayu_parser.cpp" />
-    <ClCompile Include="..\mayu_compiler.cpp" />
     <ClCompile Include="..\setting_loader.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\target.cpp" />
     <ClCompile Include="..\vkeytable.cpp" />
     <ClCompile Include="..\windowstool.cpp" />
+    <!-- scripter/ に移動したファイル -->
+    <ClCompile Include="..\scripter\cmd_stream_writer.cpp" />
+    <ClCompile Include="..\scripter\config_files.cpp" />
+    <ClCompile Include="..\scripter\lexer.cpp" />
+    <ClCompile Include="..\scripter\mayu_parser.cpp" />
+    <ClCompile Include="..\scripter\mayu_compiler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\mayu.rc" />
@@ -137,6 +139,7 @@
     <ClInclude Include="..\cmd_stream.h" />
     <ClInclude Include="..\cmd_stream_reader.h" />
     <ClInclude Include="..\cmd_stream_writer.h" />
+    <ClInclude Include="..\setting_processor.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -2,12 +2,13 @@
 // config_files.cpp
 
 
-#include "misc.h"
+#include "../misc.h"
 
 #include "config_files.h"
-#include "mayu.h"
-#include "registry.h"
-#include "windowstool.h"
+#include "../mayu.h"
+#include "../registry.h"
+#include "../windowstool.h"
+#include "../multithread.h"
 #include <fstream>
 #include <sys/stat.h>
 

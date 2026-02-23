@@ -9,6 +9,7 @@
 
 #include "setting.h"
 #include "setting_loader.h"
+#include "setting_processor.h"
 #include "config_files.h"
 #include "mayu_parser.h"
 #include "mayu_compiler.h"
@@ -202,8 +203,8 @@ static std::unique_ptr<Setting> loadNewPipeline(
 
 	// 3. Interpret command stream
 	cmdBuf.seekg(0);
-	SettingLoader loader(&nullSyncObject, &log);
-	return loader.loadFromStream(cmdBuf, initialSymbols);
+	SettingProcessor processor(&nullSyncObject, &log);
+	return processor.process(cmdBuf, initialSymbols);
 }
 
 

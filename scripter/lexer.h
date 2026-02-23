@@ -5,8 +5,8 @@
 #ifndef _LEXER_H
 #  define _LEXER_H
 
-#  include "misc.h"
-#  include "stringtool.h"
+#  include "../misc.h"
+#  include "../stringtool.h"
 #  include <vector>
 
 

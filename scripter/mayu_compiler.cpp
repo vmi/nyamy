@@ -320,6 +320,8 @@ void MayuCompiler::visit(const AstInclude &node)
 		return;
 	}
 
+	if (m_log) *m_log << _T("  loading: ") << resolvedPath << std::endl;
+
 	MayuParser parser;
 	auto ast = parser.parseFile(resolvedPath, m_configFiles);
 	if (parser.hasErrors()) {

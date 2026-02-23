@@ -22,7 +22,9 @@
 #include "multithread.h"
 #include "registry.h"
 #include "setting.h"
+#include "scripter_manager.h"
 #include "setting_loader.h"
+#include "setting_processor.h"
 #include "target.h"
 #include "windowstool.h"
 #include "fixscancodemap.h"
@@ -86,6 +88,7 @@ class Mayu
 	bool m_isSettingDialogOpened;			/// is setting dialog opened ?
 
 	Engine m_engine;				/// engine
+	std::unique_ptr<ScripterManager> m_scripter;	/// scripter subprocess manager
 
 	bool m_usingSN;		   /// using WTSRegisterSessionNotification() ?
 	time_t m_startTime;				/// mayu started at ...
@@ -94,6 +97,7 @@ class Mayu
 		WM_APP_taskTrayNotify = WM_APP + 101,	///
 		WM_APP_msgStreamNotify = WM_APP + 102,	///
 		WM_APP_escapeNLSKeysFailed = WM_APP + 121,	///
+		WM_APP_scripterSettingReady = WM_APP + 120,	///< scripter generated Setting
 		ID_TaskTrayIcon = 1,			///
 	};
 
@@ -518,6 +522,17 @@ private:
 				return 0;
 				break;
 
+			case WM_APP_scripterSettingReady: {
+				if (!This->m_scripter) break;
+				auto newSetting = This->m_scripter->takeNewSetting();
+				if (!newSetting) break;
+				This->m_log << _T("successfully loaded (scripter).") << std::endl;
+				while (!This->m_engine.setSetting(newSetting.get()))
+					Sleep(1000);
+				This->m_setting = std::move(newSetting);
+				return 0;
+			}
+
 			case WM_COMMAND: {
 				int notify_code = HIWORD(i_wParam);
 				int id = LOWORD(i_wParam);
@@ -756,19 +771,37 @@ private:
 				initialSymbols.insert(__targv[i] + 2);
 		}
 
-		auto newSetting =
-			SettingLoader(&m_log, &m_log).load(_T(""), initialSymbols);
-		if (!newSetting) {
-			ShowWindow(m_hwndLog, SW_SHOW);
-			SetForegroundWindow(m_hwndLog);
-			Acquire a(&m_log, 0);
-			m_log << _T("error: failed to load.") << std::endl;
-			return;
+		// start scripter process on first call
+		if (!m_scripter) {
+			m_scripter = std::make_unique<ScripterManager>(&m_log, &m_log, m_hwndTaskTray);
+			if (!m_scripter->start()) {
+				Acquire a(&m_log, 0);
+				m_log << _T("warning: failed to start scripter process. Using old loader.\n");
+				m_scripter.reset();
+			}
 		}
-		m_log << _T("successfully loaded.") << std::endl;
-		while (!m_engine.setSetting(newSetting.get()))
-			Sleep(1000);
-		m_setting = std::move(newSetting);
+
+		if (m_scripter) {
+			// Requests an asynchronous reload of the scripter process.
+			// The result is notified via WM_APP_scripterSettingReady.	
+			m_scripter->reload(initialSymbols);
+		} else {
+			// If scripter is not running, it falls back to the old loader.
+			Acquire a(&m_log, 0);
+			m_log << _T("use old parser:") << std::endl;
+			auto newSetting = SettingLoader(&m_log, &m_log).load(_T(""), initialSymbols);
+			if (!newSetting) {
+				ShowWindow(m_hwndLog, SW_SHOW);
+				SetForegroundWindow(m_hwndLog);
+				Acquire a2(&m_log, 0);
+				m_log << _T("error: failed to load.") << std::endl;
+				return;
+			}
+			m_log << _T("successfully loaded.") << std::endl;
+			while (!m_engine.setSetting(newSetting.get()))
+				Sleep(1000);
+			m_setting = std::move(newSetting);
+		}
 	}
 
 	// show message (a baloon from the task tray icon)
@@ -1181,6 +1214,7 @@ public:
 			CloseHandle(m_pi.hThread);
 		}
 #endif // _WIN64
+
 	}
 
 	///
@@ -1197,6 +1231,9 @@ public:
 		}
 		CloseHandle(m_hMutexYamyd);
 #endif // _WIN64
+
+		// quit scripter process (send Quit + wait for exit)
+		m_scripter.reset();
 
 		CancelIo(m_hNotifyMailslot);
 		SleepEx(0, TRUE);
