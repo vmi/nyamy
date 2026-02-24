@@ -48,13 +48,7 @@ using int32 = long;				/// signed 32bit
 using u_int8 = unsigned char;			/// unsigned 8bit
 using u_int16 = unsigned short;			/// unsigned 16bit
 using u_int32 = unsigned long;			/// unsigned 32bit
-#if defined(__BORLANDC__)
-using u_int64 = unsigned __int64;			/// unsigned 64bit
-#elif _MSC_VER <= 1300
-using u_int64 = unsigned _int64;			/// unsigned 64bit
-#else
 using u_int64 = unsigned long long;			/// unsigned 64bit
-#endif
 
 
 #  ifdef NDEBUG

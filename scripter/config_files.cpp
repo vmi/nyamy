@@ -100,21 +100,13 @@ void ConfigFiles::getHomeDirectories(HomeDirectories *o_pathes) const
 bool ConfigFiles::readFile(tstring *o_data, const tstringi &i_filename) const
 {
 	// get size of file
-#if 0
-	// bcc's _wstat cannot obtain file size
-	struct _stat sbuf;
-	if (_tstat(i_filename.c_str(), &sbuf) < 0 || sbuf.st_size == 0)
-		return false;
-#else
-	// so, we use _wstati64 for bcc
-	struct stati64_t sbuf;
+	struct _stati64 sbuf;
 	if (_tstati64(i_filename.c_str(), &sbuf) < 0 || sbuf.st_size == 0)
 		return false;
 	// following check is needed to cast sbuf.st_size to size_t safely
 	// this cast occurs because of above workaround for bcc
 	if (sbuf.st_size > UINT_MAX)
 		return false;
-#endif
 
 	// open
 	FILE *fp = _tfopen(i_filename.c_str(), _T("rb"));
