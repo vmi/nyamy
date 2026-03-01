@@ -5,6 +5,7 @@
 #  define _CMD_STREAM_READER_H
 
 #  include "cmd_stream.h"
+#  include <optional>
 
 
 //=============================================================================
@@ -34,6 +35,10 @@ public:
 	CmdEventAssignData readEventAssign();
 	CmdModAssignData readModAssign();
 	CmdKeySeqDefData readKeySeqDef();
+
+	/// Read the next command as a fully-parsed value.
+	/// Returns std::nullopt on EOF or unknown CmdId.
+	std::optional<AnyCmd> readCmd();
 
 	/// Dump the entire command stream to text (replaces BcDisassembler)
 	static void dump(std::istream &in, tostream &out);

@@ -124,6 +124,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\cmd_processor.cpp" />
     <ClCompile Include="..\cmd_stream_reader.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
     <ClCompile Include="..\ctrl_stream_writer.cpp" />
@@ -144,8 +145,8 @@
     <ClCompile Include="..\scripter\config_files.cpp" />
     <ClCompile Include="..\scripter\lexer.cpp" />
     <ClCompile Include="..\scripter_manager.cpp" />
+    <ClCompile Include="..\setting_builder.cpp" />
     <ClCompile Include="..\setting_loader.cpp" />
-    <ClCompile Include="..\setting_processor.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\target.cpp" />
     <ClCompile Include="..\vkeytable.cpp" />
@@ -153,6 +154,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\array.h" />
+    <ClInclude Include="..\cmd_processor.h" />
     <ClInclude Include="..\cmd_stream_reader.h" />
     <ClInclude Include="..\cmd_stream_writer.h" />
     <ClInclude Include="..\compiler_specific.h" />
@@ -189,8 +191,8 @@
     <ClInclude Include="..\mayu_parser.h" />
     <ClInclude Include="..\mayu_compiler.h" />
     <ClInclude Include="..\cmd_stream.h" />
+    <ClInclude Include="..\setting_builder.h" />
     <ClInclude Include="..\setting_loader.h" />
-    <ClInclude Include="..\setting_processor.h" />
     <ClInclude Include="..\stringtool.h" />
     <ClInclude Include="..\target.h" />
     <ClInclude Include="..\vk2tchar.h" />

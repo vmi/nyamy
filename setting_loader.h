@@ -9,7 +9,7 @@
 #  include "config_files.h"
 #  include "lexer.h"
 #  include "multithread.h"
-#  include "setting.h"
+#  include "setting_builder.h"
 #  include <memory>
 
 

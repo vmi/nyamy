@@ -30,7 +30,6 @@ public:
 	void writeEventAssign(const CmdEventAssignData &data);
 	void writeModAssign(const CmdModAssignData &data);
 	void writeKeySeqDef(const CmdKeySeqDefData &data);
-	void writeReset();
 	void writeCommit();
 
 private:

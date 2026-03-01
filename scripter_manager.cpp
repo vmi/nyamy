@@ -5,13 +5,11 @@
 #include "misc.h"
 
 #include "scripter_manager.h"
-#include "cmd_stream.h"
+#include "cmd_processor.h"
 #include "cmd_stream_reader.h"
-#include "errormessage.h"
 #include "stringtool.h"
 
 #include <process.h>
-#include <sstream>
 
 
 const UINT ScripterManager::WM_ScripterSettingReady = WM_APP + 120;
@@ -47,29 +45,25 @@ private:
 
 
 //=============================================================================
-// PipeReadRecordingStreambuf - wraps a Win32 read pipe HANDLE as a std::streambuf
-// and records every consumed byte into a caller-supplied vector.
+// PipeReadStreambuf - wraps a Win32 read pipe HANDLE as a std::streambuf
 //=============================================================================
 
-class PipeReadRecordingStreambuf : public std::streambuf
+class PipeReadStreambuf : public std::streambuf
 {
 public:
-	PipeReadRecordingStreambuf(HANDLE h, std::vector<uint8_t> &record)
-		: m_h(h), m_record(record) {}
+	explicit PipeReadStreambuf(HANDLE h) : m_h(h) {}
 
 protected:
 	int_type underflow() override {
 		DWORD got = 0;
 		if (!ReadFile(m_h, &m_ch, 1, &got, NULL) || got == 0)
 			return traits_type::eof();
-		m_record.push_back(static_cast<uint8_t>(m_ch));
 		setg(&m_ch, &m_ch, &m_ch + 1);
 		return traits_type::to_int_type(m_ch);
 	}
 
 private:
 	HANDLE m_h;
-	std::vector<uint8_t> &m_record;
 	char m_ch = 0;
 };
 
@@ -223,10 +217,6 @@ bool ScripterManager::start()
 void ScripterManager::reload(const Symbols &syms)
 {
 	if (!m_ctrlWriter) return;
-	{
-		std::lock_guard<std::mutex> lk(m_symsMutex);
-		m_currentSyms = syms;
-	}
 	try {
 		m_ctrlWriter->writeReload(syms);
 	} catch (...) {
@@ -258,65 +248,20 @@ unsigned __stdcall ScripterManager::dataThread(void *param)
 
 void ScripterManager::runReader()
 {
-	// buf records all raw bytes of the current session.
-	// Use CmdStreamReader for proper command-level parsing so that data bytes
-	// 0xFE/0xFF inside command payloads (e.g. CmdModifier.dontcares when a
-	// wildcard modifier '*' is used) are not mistaken for Reset/Commit.
-	std::vector<uint8_t> buf;
-	PipeReadRecordingStreambuf rsb(m_hDataRead, buf);
+	PipeReadStreambuf rsb(m_hDataRead);
 	std::istream pipeStream(&rsb);
 	CmdStreamReader reader(pipeStream);
 
-	CmdId cmdId;
-	while (reader.readNext(cmdId)) {
-		try {
-			switch (cmdId) {
-			case CmdId::Reset:
-				buf.clear();
-				break;
-			case CmdId::Commit: {
-				Symbols syms;
-				{
-					std::lock_guard<std::mutex> lk(m_symsMutex);
-					syms = m_currentSyms;
-				}
-				std::string raw(buf.begin(), buf.end());
-				std::istringstream iss(raw, std::ios::binary);
-				auto newSetting =
-					SettingProcessor(m_soLog, m_log).process(iss, syms);
-				if (newSetting) {
-					{
-						std::lock_guard<std::mutex> lk(m_mutex);
-						m_pendingSetting = std::move(newSetting);
-					}
-					PostMessage(m_hwndNotify, WM_ScripterSettingReady, 0, 0);
-				}
-				buf.clear();
-				break;
-			}
-			// For data commands, read and discard the payload.
-			// The bytes are already recorded into buf by PipeReadRecordingStreambuf.
-			case CmdId::DefKeySeq:    reader.readDefKeySeq();    break;
-			case CmdId::DefKey:       reader.readDefKey();       break;
-			case CmdId::DefModifier:  reader.readDefModifier();  break;
-			case CmdId::DefSync:      reader.readDefSync();      break;
-			case CmdId::DefAlias:     reader.readDefAlias();     break;
-			case CmdId::DefSubstitute:reader.readDefSubstitute();break;
-			case CmdId::DefOption:    reader.readDefOption();    break;
-			case CmdId::DefSymbol:    reader.readDefSymbol();    break;
-			case CmdId::KeymapDef:    reader.readKeymapDef();    break;
-			case CmdId::KeyAssign:    reader.readKeyAssign();    break;
-			case CmdId::KeyDefaultMod:reader.readKeyDefaultMod();break;
-			case CmdId::EventAssign:  reader.readEventAssign();  break;
-			case CmdId::ModAssign:    reader.readModAssign();    break;
-			case CmdId::KeySeqDef:    reader.readKeySeqDef();    break;
-			default:
-				return; // unknown command ID: stream is corrupt, stop
-			}
-		} catch (ErrorMessage &) {
-			return; // stream read error: stop
+	CmdProcessor processor(m_soLog, m_log);
+	processor.onCommit([this](std::unique_ptr<Setting> s) {
+		{
+			std::lock_guard<std::mutex> lk(m_mutex);
+			m_pendingSetting = std::move(s);
 		}
-	}
+		PostMessage(m_hwndNotify, WM_ScripterSettingReady, 0, 0);
+	});
+
+	processor.process(reader);
 }
 
 

@@ -24,7 +24,6 @@
 #include "setting.h"
 #include "scripter_manager.h"
 #include "setting_loader.h"
-#include "setting_processor.h"
 #include "target.h"
 #include "windowstool.h"
 #include "fixscancodemap.h"

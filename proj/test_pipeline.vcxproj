@@ -98,8 +98,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\cmd_processor.cpp" />
     <ClCompile Include="..\cmd_stream_reader.cpp" />
-    <ClCompile Include="..\setting_processor.cpp" />
+    <ClCompile Include="..\setting_builder.cpp" />
     <ClCompile Include="..\test_pipeline.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
     <ClCompile Include="..\dlgeditsetting.cpp" />
@@ -136,10 +137,11 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\cmd_processor.h" />
     <ClInclude Include="..\cmd_stream.h" />
     <ClInclude Include="..\cmd_stream_reader.h" />
     <ClInclude Include="..\cmd_stream_writer.h" />
-    <ClInclude Include="..\setting_processor.h" />
+    <ClInclude Include="..\setting_builder.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

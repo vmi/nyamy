@@ -9,7 +9,7 @@
 
 #include "setting.h"
 #include "setting_loader.h"
-#include "setting_processor.h"
+#include "cmd_processor.h"
 #include "config_files.h"
 #include "mayu_parser.h"
 #include "mayu_compiler.h"
@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <vector>
 #include <filesystem>
+#include <future>
 
 namespace fs = std::filesystem;
 
@@ -203,8 +204,13 @@ static std::unique_ptr<Setting> loadNewPipeline(
 
 	// 3. Interpret command stream
 	cmdBuf.seekg(0);
-	SettingProcessor processor(&nullSyncObject, &log);
-	return processor.process(cmdBuf, initialSymbols);
+	CmdStreamReader reader(cmdBuf);
+	CmdProcessor processor(&nullSyncObject, &log);
+	std::promise<std::unique_ptr<Setting>> p;
+	std::future<std::unique_ptr<Setting>> f= p.get_future();
+	processor.onCommit([&p](std::unique_ptr<Setting> s) mutable { p.set_value(std::move(s)); });
+	processor.process(reader);
+	return f.get();
 }
 
 

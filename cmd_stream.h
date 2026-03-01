@@ -10,6 +10,7 @@
 #  define _CMD_STREAM_H
 
 #  include "stringtool.h"
+#  include <variant>
 #  include <vector>
 #  include <cstdint>
 
@@ -33,7 +34,6 @@ enum class CmdId : uint8_t {
 	EventAssign    = 0x23,
 	ModAssign      = 0x24,
 	KeySeqDef      = 0x25,
-	Reset          = 0xFE,
 	Commit         = 0xFF,
 };
 
@@ -210,6 +210,33 @@ struct CmdKeySeqDefData {
 
 	CmdKeySeqDefData() : keySeqIdx(0) {}
 };
+
+
+//=============================================================================
+// AnyCmd variant - a single fully-parsed command from a CmdStream
+//=============================================================================
+
+/// Tag-only struct for the payload-free Commit command
+struct CmdCommit {};
+
+/// A fully-parsed command, covering all CmdId values
+using AnyCmd = std::variant<
+	CmdKeySequence,
+	CmdDefKeyData,
+	CmdDefModifierData,
+	CmdDefSyncData,
+	CmdDefAliasData,
+	CmdDefSubstituteData,
+	CmdDefOptionData,
+	CmdDefSymbolData,
+	CmdKeymapDefData,
+	CmdKeyAssignData,
+	CmdKeyDefaultModData,
+	CmdEventAssignData,
+	CmdModAssignData,
+	CmdKeySeqDefData,
+	CmdCommit
+>;
 
 
 #endif // !_CMD_STREAM_H

@@ -43,7 +43,6 @@ static void doReload(const Symbols &syms, CmdStreamWriter &writer)
 
 	if (!cf.getFilename(_T(""), &path, &regSymbols)) {
 		std::wcerr << L"error: could not find config file." << std::endl;
-		writer.writeReset();
 		return;
 	}
 	for (const auto &s : regSymbols) symbols.insert(s);
@@ -54,7 +53,6 @@ static void doReload(const Symbols &syms, CmdStreamWriter &writer)
 	if (parser.hasErrors()) {
 		for (const auto &msg : parser.getMessages())
 			std::wcerr << msg << std::endl;
-		writer.writeReset();
 		return;
 	}
 
@@ -62,7 +60,6 @@ static void doReload(const Symbols &syms, CmdStreamWriter &writer)
 	compiler.compile(*ast);
 	if (compiler.hasErrors()) {
 		std::wcerr << L"error: compile failed." << std::endl;
-		writer.writeReset();
 		return;
 	}
 

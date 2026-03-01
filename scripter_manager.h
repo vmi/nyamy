@@ -11,7 +11,7 @@
 
 
 #  include "ctrl_stream_writer.h"
-#  include "setting_processor.h"
+#  include "symbols.h"
 #  include "setting.h"
 #  include "multithread.h"
 #  include <memory>
@@ -59,10 +59,6 @@ private:
 	// received setting (shared between threads)
 	std::mutex m_mutex;
 	std::unique_ptr<Setting> m_pendingSetting;
-
-	// symbols (saved for data thread to pass to SettingProcessor)
-	std::mutex m_symsMutex;
-	Symbols m_currentSyms;
 
 	SyncObject *m_soLog;
 	tostream   *m_log;

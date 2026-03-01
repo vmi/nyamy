@@ -19,6 +19,31 @@
 CmdStreamReader::CmdStreamReader(std::istream &in) : m_in(in) {}
 
 
+std::optional<AnyCmd> CmdStreamReader::readCmd()
+{
+	CmdId cmdId;
+	if (!readNext(cmdId)) return std::nullopt;
+	switch (cmdId) {
+	case CmdId::DefKeySeq:     return readDefKeySeq();
+	case CmdId::DefKey:        return readDefKey();
+	case CmdId::DefModifier:   return readDefModifier();
+	case CmdId::DefSync:       return readDefSync();
+	case CmdId::DefAlias:      return readDefAlias();
+	case CmdId::DefSubstitute: return readDefSubstitute();
+	case CmdId::DefOption:     return readDefOption();
+	case CmdId::DefSymbol:     return readDefSymbol();
+	case CmdId::KeymapDef:     return readKeymapDef();
+	case CmdId::KeyAssign:     return readKeyAssign();
+	case CmdId::KeyDefaultMod: return readKeyDefaultMod();
+	case CmdId::EventAssign:   return readEventAssign();
+	case CmdId::ModAssign:     return readModAssign();
+	case CmdId::KeySeqDef:     return readKeySeqDef();
+	case CmdId::Commit:        return CmdCommit{};
+	default:                   return std::nullopt;
+	}
+}
+
+
 bool CmdStreamReader::readNext(CmdId &cmdId)
 {
 	int ch = m_in.get();
@@ -490,7 +515,6 @@ static const _TCHAR *cmdIdToString(CmdId id)
 	case CmdId::EventAssign:  return _T("EventAssign");
 	case CmdId::ModAssign:    return _T("ModAssign");
 	case CmdId::KeySeqDef:    return _T("KeySeqDef");
-	case CmdId::Reset:        return _T("Reset");
 	case CmdId::Commit:       return _T("Commit");
 	default:                  return _T("???");
 	}
@@ -643,8 +667,6 @@ void CmdStreamReader::dump(std::istream &in, tostream &out)
 			out << _T("idx=") << data.keySeqIdx;
 			break;
 		}
-		case CmdId::Reset:
-			break;
 		case CmdId::Commit:
 			break;
 		}
