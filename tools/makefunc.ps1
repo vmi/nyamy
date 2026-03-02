@@ -142,37 +142,6 @@ foreach ($stmt in $statements) {
         
         $null = $sb.AppendLine("    return fd;")
         $null = $sb.AppendLine("  }")
-        $null = $sb.AppendLine("  ")
-        
-        # Load function
-        $null = $sb.AppendLine("  virtual void load(SettingLoader *i_sl)")
-        $null = $sb.AppendLine("  {")
-        
-        if ($argc -eq 0 -or $cleanArgs[0].DefaultValue) {
-            $null = $sb.AppendLine("    if (!i_sl->getOpenParen(false, FunctionData_${name}::getName()))")
-            $null = $sb.AppendLine("      return;")
-        }
-        else {
-            $null = $sb.AppendLine("    i_sl->getOpenParen(true, FunctionData_${name}::getName()); // throw ...")
-        }
-        
-        for ($i = 0; $i -lt $argc; $i++) {
-            $a = $cleanArgs[$i]
-            
-            if ($a.DefaultValue) {
-                $null = $sb.AppendLine("    if (i_sl->getCloseParen(false, FunctionData_${name}::getName()))")
-                $null = $sb.AppendLine("      return;")
-            }
-            if ($i -gt 0) {
-                $null = $sb.AppendLine("    i_sl->getComma(false, FunctionData_${name}::getName()); // throw ...")
-            }
-            $null = $sb.AppendLine("    i_sl->load_ARGUMENT(&m_$($a.ArgName));")
-        }
-        
-        $null = $sb.AppendLine("    i_sl->getCloseParen(true, FunctionData_${name}::getName()); // throw ...")
-        $null = $sb.AppendLine("  }")
-        $null = $sb.AppendLine("")
-        
         # Exec function
         $null = $sb.AppendLine("  virtual void exec(Engine *i_engine, FunctionParam *i_param) const")
         $null = $sb.AppendLine("  {")

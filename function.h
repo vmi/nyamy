@@ -10,7 +10,6 @@
 
 #include "cmd_stream.h"
 
-class SettingLoader;
 class Engine;
 class FunctionParam;
 class Keymap;
@@ -33,8 +32,6 @@ class FunctionData
 public:
 	/// virtual destructor
 	virtual ~FunctionData() = 0;
-	///
-	virtual void load(SettingLoader *i_sl) = 0;
 	///
 	virtual void loadFromCmd(const std::vector<CmdArgument> &i_args,
 								  CmdLoadContext *i_ctx) = 0;

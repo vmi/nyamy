@@ -9,7 +9,6 @@
 #include "mayurc.h"
 #include "misc.h"
 #include "registry.h"
-#include "setting_loader.h"
 #include "vkeytable.h"
 #include "windowstool.h"
 #include <algorithm>
@@ -17,7 +16,7 @@
 
 VKey loadVKeyFromCmd(const CmdArgument &arg)
 {
-	// Replicates load_ARGUMENT(VKey*) logic from setting_loader.cpp.
+	// Mirrors the VKey encoding logic used in the scripter pipeline.
 	// Accepts Number (pre-encoded), String (bare key name), or
 	// TokenSeq (prefix tokens + key name, e.g. ["U-", "D-", "RButton"]).
 	std::vector<tstringi> toks;

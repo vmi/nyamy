@@ -116,7 +116,6 @@
     <ClCompile Include="..\scripter\lexer.cpp" />
     <ClCompile Include="..\scripter_manager.cpp" />
     <ClCompile Include="..\setting_builder.cpp" />
-    <ClCompile Include="..\setting_loader.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\target.cpp" />
     <ClCompile Include="..\vkeytable.cpp" />
@@ -162,7 +161,6 @@
     <ClInclude Include="..\mayu_compiler.h" />
     <ClInclude Include="..\cmd_stream.h" />
     <ClInclude Include="..\setting_builder.h" />
-    <ClInclude Include="..\setting_loader.h" />
     <ClInclude Include="..\stringtool.h" />
     <ClInclude Include="..\target.h" />
     <ClInclude Include="..\vk2tchar.h" />

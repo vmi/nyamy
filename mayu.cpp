@@ -23,7 +23,6 @@
 #include "registry.h"
 #include "setting.h"
 #include "scripter_manager.h"
-#include "setting_loader.h"
 #include "target.h"
 #include "windowstool.h"
 #include "fixscancodemap.h"
@@ -775,32 +774,17 @@ private:
 			m_scripter = std::make_unique<ScripterManager>(&m_log, &m_log, m_hwndTaskTray);
 			if (!m_scripter->start()) {
 				Acquire a(&m_log, 0);
-				m_log << _T("warning: failed to start scripter process. Using old loader.\n");
+				m_log << _T("error: failed to start scripter process.\n");
+				ShowWindow(m_hwndLog, SW_SHOW);
+				SetForegroundWindow(m_hwndLog);
 				m_scripter.reset();
+				return;
 			}
 		}
 
-		if (m_scripter) {
-			// Requests an asynchronous reload of the scripter process.
-			// The result is notified via WM_APP_scripterSettingReady.	
-			m_scripter->reload(initialSymbols);
-		} else {
-			// If scripter is not running, it falls back to the old loader.
-			Acquire a(&m_log, 0);
-			m_log << _T("use old parser:") << std::endl;
-			auto newSetting = SettingLoader(&m_log, &m_log).load(_T(""), initialSymbols);
-			if (!newSetting) {
-				ShowWindow(m_hwndLog, SW_SHOW);
-				SetForegroundWindow(m_hwndLog);
-				Acquire a2(&m_log, 0);
-				m_log << _T("error: failed to load.") << std::endl;
-				return;
-			}
-			m_log << _T("successfully loaded.") << std::endl;
-			while (!m_engine.setSetting(newSetting.get()))
-				Sleep(1000);
-			m_setting = std::move(newSetting);
-		}
+		// Requests an asynchronous reload of the scripter process.
+		// The result is notified via WM_APP_scripterSettingReady.
+		m_scripter->reload(initialSymbols);
 	}
 
 	// show message (a baloon from the task tray icon)
