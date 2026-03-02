@@ -867,7 +867,7 @@ void Engine::funcSync(FunctionParam *i_param)
 	if (!i_param->m_isPressed || m_currentFocusOfThread->m_isConsole)
 		return;
 
-	Key *sync = m_setting->m_keyboard.getSyncKey();
+	Key *sync = m_setting.load(std::memory_order_relaxed)->m_keyboard.getSyncKey();
 	if (sync->getScanCodesSize() == 0)
 		return;
 	const ScanCode *sc = sync->getScanCodes();

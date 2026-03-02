@@ -9,6 +9,7 @@
 #  include "setting.h"
 #  include "msgstream.h"
 #  include "hook.h"
+#  include <atomic>
 #  include <memory>
 #  include <set>
 #  include <queue>
@@ -178,7 +179,7 @@ private:
 	// setting
 	HWND m_hwndAssocWindow;			/** associated window (we post
                                                     message to it) */
-	Setting * volatile m_setting;			/// setting
+	std::atomic<Setting*> m_setting;		/// setting
 
 	// engine thread state
 	HANDLE m_threadHandle;
@@ -321,14 +322,6 @@ private:
 	/// set current keymap
 	void setCurrentKeymap(const Keymap *i_keymap,
 						  bool i_doesAddToHistory = false);
-	/** open mayu device
-	    @return true if mayu device successfully is opened
-	*/
-	bool open();
-
-	/// close mayu device
-	void close();
-
 	/// load/unload [sc]ts4mayu.dll
 	void manageTs4mayu(TCHAR *i_ts4mayuDllName, TCHAR *i_dependDllName,
 					   bool i_load, HMODULE *i_pTs4mayu);

@@ -93,6 +93,13 @@ void MayuCompiler::compile(const AstFile &file)
 {
 	m_hasErrors = false;
 	m_nextKeySeqIdx = 0;
+
+	for (const auto &sym : m_symbols) {
+		CmdDefSymbolData data;
+		data.symbolName = sym;
+		m_writer.writeDefSymbol(data);
+	}
+
 	file.accept(*this);
 }
 

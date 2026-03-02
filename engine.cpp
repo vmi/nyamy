@@ -255,6 +255,7 @@ Modifier Engine::getCurrentModifiers(Key *i_key, bool i_isPressed)
 // generate keyboard event for a key
 void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 {
+	Setting* s = m_setting.load(std::memory_order_relaxed);
 	// check if key is event
 	bool isEvent = false;
 	for (Key **e = Event::events; *e; ++ e)
@@ -279,7 +280,7 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 		if (i_isByAssign)
 			i_key->m_isPressedByAssign = i_doPress;
 
-		Key *sync = m_setting->m_keyboard.getSyncKey();
+		Key *sync = s->m_keyboard.getSyncKey();
 
 		if (!isAlreadyReleased || i_key == sync) {
 			KEYBOARD_INPUT_DATA kid = { 0, 0, 0, 0, 0 };
@@ -330,6 +331,7 @@ void Engine::generateEvents(Current i_c, const Keymap *i_keymap, Key *i_event)
 // genete modifier events
 void Engine::generateModifierEvents(const Modifier &i_mod)
 {
+	Setting* s = m_setting.load(std::memory_order_relaxed);
 	{
 		Acquire a(&m_log, 1);
 		m_log << _T("* Gen Modifiers\t{") << std::endl;
@@ -337,7 +339,7 @@ void Engine::generateModifierEvents(const Modifier &i_mod)
 
 	for (int i = Modifier::Type_begin; i < Modifier::Type_BASIC; ++ i) {
 		Keyboard::Mods &mods =
-			m_setting->m_keyboard.getModifiers(static_cast<Modifier::Type>(i));
+			s->m_keyboard.getModifiers(static_cast<Modifier::Type>(i));
 
 		if (i_mod.isDontcare(static_cast<Modifier::Type>(i)))
 			// no need to process
@@ -372,9 +374,9 @@ void Engine::generateModifierEvents(const Modifier &i_mod)
 				for (Keyboard::Mods::iterator j = mods.begin(); j != mods.end(); ++ j)
 					if ((*j) == m_lastGeneratedKey) {
 						Keyboard::Mods *mods =
-							&m_setting->m_keyboard.getModifiers(Modifier::Type_Shift);
+							&s->m_keyboard.getModifiers(Modifier::Type_Shift);
 						if (mods->size() == 0)
-							mods = &m_setting->m_keyboard.getModifiers(
+							mods = &s->m_keyboard.getModifiers(
 									   Modifier::Type_Control);
 						if (0 < mods->size()) {
 							generateKeyEvent(mods->front(), true, false);
@@ -530,6 +532,7 @@ void Engine::generateKeyboardEvents(const Current &i_c)
 void Engine::beginGeneratingKeyboardEvents(
 	const Current &i_c, bool i_isModifier)
 {
+	Setting* s = m_setting.load(std::memory_order_relaxed);
 	//             (1)             (2)             (3)  (4)   (1)
 	// up/down:    D-              U-              D-   U-    D-
 	// keymap:     m_currentKeymap m_currentKeymap X    X     m_currentKeymap
@@ -542,7 +545,7 @@ void Engine::beginGeneratingKeyboardEvents(
 	= cnew.m_mkey.m_modifier.isPressed(Modifier::Type_Down);
 
 	// substitute
-	ModifiedKey mkey = m_setting->m_keyboard.searchSubstitute(cnew.m_mkey);
+	ModifiedKey mkey = s->m_keyboard.searchSubstitute(cnew.m_mkey);
 	if (mkey.m_key) {
 		cnew.m_mkey = mkey;
 		if (isPhysicallyPressed) {
@@ -741,8 +744,9 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 // pop all pressed key on win32
 void Engine::keyboardResetOnWin32()
 {
+	Setting* s = m_setting.load(std::memory_order_relaxed);
 	for (Keyboard::KeyIterator
-			i = m_setting->m_keyboard.getKeyIterator();  *i; ++ i) {
+			i = s->m_keyboard.getKeyIterator();  *i; ++ i) {
 		if ((*i)->m_isPressedOnWin32)
 			generateKeyEvent((*i), false, true);
 	}
@@ -796,7 +800,8 @@ unsigned int WINAPI Engine::mouseDetour(Engine *i_this, WPARAM i_wParam, LPARAM 
 
 unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 {
-	if (i_mid->flags & LLMHF_INJECTED || !m_isEnabled || !m_setting || !m_setting->m_mouseEvent) {
+	Setting* s = m_setting.load(std::memory_order_acquire);
+	if (i_mid->flags & LLMHF_INJECTED || !m_isEnabled || !s || !s->m_mouseEvent) {
 		return 0;
 	} else {
 		KEYBOARD_INPUT_DATA kid;
@@ -858,8 +863,8 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			LONG dr = 0;
 			dr += (i_mid->pt.x - m_msllHookCurrent.pt.x) * (i_mid->pt.x - m_msllHookCurrent.pt.x);
 			dr += (i_mid->pt.y - m_msllHookCurrent.pt.y) * (i_mid->pt.y - m_msllHookCurrent.pt.y);
-			if (m_buttonPressed && !m_dragging && m_setting->m_dragThreshold &&
-				(m_setting->m_dragThreshold * m_setting->m_dragThreshold < dr)) {
+			if (m_buttonPressed && !m_dragging && s->m_dragThreshold &&
+				(s->m_dragThreshold * s->m_dragThreshold < dr)) {
 				kid.MakeCode = 0;
 				WaitForSingleObject(m_queueMutex, INFINITE);
 				m_dragging = true;
@@ -1022,7 +1027,9 @@ void Engine::keyboardHandler()
 
 		checkFocusWindow();
 
-		if (!m_setting ||	// m_setting has not been loaded
+		std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		Setting* s = m_setting.load(std::memory_order_relaxed);
+		if (!s ||						// m_setting has not been loaded
 				!m_isEnabled) {	// disabled
 			if (m_isLogMode) {
 				Key key;
@@ -1038,8 +1045,6 @@ void Engine::keyboardHandler()
 			updateLastPressedKey(NULL);
 			continue;
 		}
-
-		std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
 		if (!m_currentFocusOfThread ||
 				!m_currentKeymap) {
@@ -1061,9 +1066,9 @@ void Engine::keyboardHandler()
 
 		// search key
 		key.addScanCode(ScanCode(kid.MakeCode, kid.Flags));
-		c.m_mkey = m_setting->m_keyboard.searchKey(key);
+		c.m_mkey = s->m_keyboard.searchKey(key);
 		if (!c.m_mkey.m_key) {
-			c.m_mkey.m_key = m_setting->m_keyboard.searchPrefixKey(key);
+			c.m_mkey.m_key = s->m_keyboard.searchPrefixKey(key);
 			if (c.m_mkey.m_key)
 				continue;
 		}
@@ -1121,7 +1126,7 @@ void Engine::keyboardHandler()
 				if (am == Keymap::AM_oneShotRepeatable	// the key is repeating
 						&& m_oneShotKey.m_key == c.m_mkey.m_key) {
 					if (m_oneShotRepeatableRepeatCount <
-							m_setting->m_oneShotRepeatableDelay) {
+							s->m_oneShotRepeatableDelay) {
 						; // delay
 					} else {
 						Current cnew = c;
@@ -1187,7 +1192,7 @@ void Engine::keyboardHandler()
 
 Engine::Engine(tomsgstream &i_log)
 		: m_hwndAssocWindow(NULL),
-		m_setting(NULL),
+		m_setting(nullptr),
 		m_buttonPressed(false),
 		m_dragging(false),
 		m_keyboardHandler(installKeyboardHook, Engine::keyboardDetour),
@@ -1359,8 +1364,9 @@ bool Engine::setSetting(Setting *i_setting) {
 	if (m_isSynchronizing)
 		return false;
 
-	if (m_setting) {
-		for (Keyboard::KeyIterator i = m_setting->m_keyboard.getKeyIterator();
+	Setting* old = m_setting.load(std::memory_order_relaxed);
+	if (old) {
+		for (Keyboard::KeyIterator i = old->m_keyboard.getKeyIterator();
 				*i; ++ i) {
 			Key *key = i_setting->m_keyboard.searchKey(*(*i));
 			if (key) {
@@ -1378,23 +1384,23 @@ bool Engine::setSetting(Setting *i_setting) {
 					i_setting->m_keyboard.searchKey(*m_lastPressedKey[i]);
 	}
 
-	m_setting = i_setting;
+	m_setting.store(i_setting, std::memory_order_release);
 
 	manageTs4mayu(_T("sts4mayu.dll"), _T("SynCOM.dll"),
-				  m_setting->m_sts4mayu, &m_sts4mayu);
+				  i_setting->m_sts4mayu, &m_sts4mayu);
 	manageTs4mayu(_T("cts4mayu.dll"), _T("TouchPad.dll"),
-				  m_setting->m_cts4mayu, &m_cts4mayu);
+				  i_setting->m_cts4mayu, &m_cts4mayu);
 
-	g_hookData->m_correctKanaLockHandling = m_setting->m_correctKanaLockHandling;
+	g_hookData->m_correctKanaLockHandling = i_setting->m_correctKanaLockHandling;
 	if (m_currentFocusOfThread) {
 		for (FocusOfThreads::iterator i = m_focusOfThreads.begin();
 				i != m_focusOfThreads.end(); i ++) {
 			FocusOfThread *fot = &(*i).second;
-			m_setting->m_keymaps.searchWindow(&fot->m_keymaps,
+			i_setting->m_keymaps.searchWindow(&fot->m_keymaps,
 											  fot->m_className, fot->m_titleName);
 		}
 	}
-	m_setting->m_keymaps.searchWindow(&m_globalFocus.m_keymaps, _T(""), _T(""));
+	i_setting->m_keymaps.searchWindow(&m_globalFocus.m_keymaps, _T(""), _T(""));
 	if (m_globalFocus.m_keymaps.empty()) {
 		Acquire a(&m_log, 0);
 		m_log << _T("internal error: m_globalFocus.m_keymap is empty")
@@ -1547,8 +1553,8 @@ bool Engine::setFocus(HWND i_hwndFocus, DWORD i_threadId,
 	fot->m_className = i_className;
 	fot->m_titleName = i_titleName;
 
-	if (m_setting) {
-		m_setting->m_keymaps.searchWindow(&fot->m_keymaps,
+	if (Setting* s = m_setting.load(std::memory_order_relaxed)) {
+		s->m_keymaps.searchWindow(&fot->m_keymaps,
 										  i_className, i_titleName);
 		ASSERT(0 < fot->m_keymaps.size());
 	} else
