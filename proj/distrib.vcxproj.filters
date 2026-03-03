@@ -15,11 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\tools\makedistrib.js">
-      <Filter>リソース ファイル</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="..\104.mayu">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
@@ -53,5 +48,10 @@
     <CustomBuild Include="..\yamy.ini">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\tools\makedistrib.ps1">
+      <Filter>リソース ファイル</Filter>
+    </None>
   </ItemGroup>
 </Project>

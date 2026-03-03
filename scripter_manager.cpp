@@ -162,11 +162,7 @@ bool ScripterManager::start()
 	              NULL, 0, NULL, 0);
 	tstringi scripterPath = exeDrive;
 	scripterPath += exeDir;
-#ifdef _WIN64
-	scripterPath += _T("yamy-scripter64.exe");
-#else
-	scripterPath += _T("yamy-scripter32.exe");
-#endif
+	scripterPath += _T("yamy-scripter.exe");
 
 	STARTUPINFO si = {};
 	si.cb         = sizeof(si);

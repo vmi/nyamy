@@ -20,6 +20,7 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>ext_lib$(CPUBIT)\$(ConfigurationName)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

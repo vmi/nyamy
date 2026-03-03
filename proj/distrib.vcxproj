@@ -46,12 +46,12 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <PostBuildEvent>
-      <Command>CScript.exe ..\tools\makedistrib.js $(Configuration) $(VERSION)</Command>
+      <Command>..\tools\ps1exec.cmd ..\tools\makedistrib.ps1 $(Configuration) $(VERSION)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <PostBuildEvent>
-      <Command>CScript.exe ..\tools\makedistrib.js $(Configuration) $(VERSION)</Command>
+      <Command>..\tools\ps1exec.cmd ..\tools\makedistrib.ps1 $(Configuration) $(VERSION)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -111,7 +111,6 @@
 </Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
     </CustomBuild>
-    <None Include="..\tools\makedistrib.js" />
     <CustomBuild Include="..\workaround.mayu">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
 </Command>
@@ -152,16 +151,8 @@
       <Project>{da7de112-259f-46ea-8f7d-a4298c5639f3}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="yamy32.vcxproj">
-      <Project>{1e2e95ac-9010-463c-8e23-4ab2d02bea82}</Project>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-    </ProjectReference>
     <ProjectReference Include="yamy32dll.vcxproj">
       <Project>{af8183b3-0ff2-4a6a-8b8d-9bb9baee6dcc}</Project>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-    </ProjectReference>
-    <ProjectReference Include="yamy64.vcxproj">
-      <Project>{039114d8-2442-42b4-8dc5-69a368924ec4}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
     <ProjectReference Include="yamy64dll.vcxproj">
@@ -172,6 +163,9 @@
       <Project>{bf9e2f1c-a900-4f36-b185-12ba6430673d}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\tools\makedistrib.ps1" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
