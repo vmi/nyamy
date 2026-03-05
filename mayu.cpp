@@ -79,8 +79,7 @@ class Mayu
 	static const DWORD SESSION_DISCONNECTED = 1<<1;
 	static const DWORD SESSION_END_QUERIED = 1<<2;
 	DWORD m_sessionState;
-	int m_escapeNlsKeys;
-	FixScancodeMap m_fixScancodeMap;
+	std::unique_ptr<FixScancodeMap> m_fixScancodeMap;
 
 	std::unique_ptr<Setting> m_setting;		/// current setting
 	bool m_isSettingDialogOpened;			/// is setting dialog opened ?
@@ -295,9 +294,9 @@ private:
 			case WM_CREATE:
 				This = reinterpret_cast<Mayu *>(
 						   reinterpret_cast<CREATESTRUCT *>(i_lParam)->lpCreateParams);
-				This->m_fixScancodeMap.init(i_hwnd, WM_APP_escapeNLSKeysFailed);
-				if (This->m_escapeNlsKeys) {
-					This->m_fixScancodeMap.escape(true);
+				if (This->m_fixScancodeMap) {
+					This->m_fixScancodeMap->init(i_hwnd, WM_APP_escapeNLSKeysFailed);
+					This->m_fixScancodeMap->escape(true);
 				}
 #ifdef MAYU64
 				SetWindowLongPtr(i_hwnd, 0, (LONG_PTR)This);
@@ -315,8 +314,8 @@ private:
 			}
 			case WM_QUERYENDSESSION:
 				if (!This->m_sessionState) {
-					if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-						This->m_fixScancodeMap.escape(false);
+					if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
+						This->m_fixScancodeMap->escape(false);
 					}
 				}
 				This->m_sessionState |= Mayu::SESSION_END_QUERIED;
@@ -348,16 +347,16 @@ private:
 				case WTS_CONSOLE_CONNECT:
 					This->m_sessionState &= ~Mayu::SESSION_DISCONNECTED;
 					if (!This->m_sessionState) {
-						if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap.escape(true);
+						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
+							This->m_fixScancodeMap->escape(true);
 						}
 					}
 					m = "WTS_CONSOLE_CONNECT";
 					break;
 				case WTS_CONSOLE_DISCONNECT:
 					if (!This->m_sessionState) {
-						if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap.escape(false);
+						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
+							This->m_fixScancodeMap->escape(false);
 						}
 					}
 					This->m_sessionState |= Mayu::SESSION_DISCONNECTED;
@@ -366,16 +365,16 @@ private:
 				case WTS_REMOTE_CONNECT:
 					This->m_sessionState &= ~Mayu::SESSION_DISCONNECTED;
 					if (!This->m_sessionState) {
-						if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap.escape(true);
+						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
+							This->m_fixScancodeMap->escape(true);
 						}
 					}
 					m = "WTS_REMOTE_CONNECT";
 					break;
 				case WTS_REMOTE_DISCONNECT:
 					if (!This->m_sessionState) {
-						if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap.escape(false);
+						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
+							This->m_fixScancodeMap->escape(false);
 						}
 					}
 					This->m_sessionState |= Mayu::SESSION_DISCONNECTED;
@@ -389,8 +388,8 @@ private:
 					break;
 				case WTS_SESSION_LOCK: {
 					if (!This->m_sessionState) {
-						if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap.escape(false);
+						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
+							This->m_fixScancodeMap->escape(false);
 						}
 					}
 					This->m_sessionState |= Mayu::SESSION_LOCKED;
@@ -400,8 +399,8 @@ private:
 				case WTS_SESSION_UNLOCK: {
 					This->m_sessionState &= ~Mayu::SESSION_LOCKED;
 					if (!This->m_sessionState) {
-						if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap.escape(true);
+						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
+							This->m_fixScancodeMap->escape(true);
 						}
 						if (This->m_engine.getIsEnabled()) {
 							This->m_engine.unlocked();
@@ -507,7 +506,7 @@ private:
 					case YAMY_ERROR_TIMEOUT_INJECTION:
 						ret = This->errorDialogWithCode(IDS_escapeNlsKeysRetry, (int)i_wParam, MB_RETRYCANCEL | MB_ICONSTOP);
 						if (ret == IDRETRY) {
-							This->m_fixScancodeMap.escape(true);
+							This->m_fixScancodeMap->escape(true);
 						}
 						break;
 					default:
@@ -626,10 +625,8 @@ private:
 					}
 					case ID_MENUITEM_disable:
 						This->m_engine.enable(!This->m_engine.getIsEnabled());
-						if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap.escape(true);
-						} else {
-							This->m_fixScancodeMap.escape(false);
+						if (This->m_fixScancodeMap) {
+							This->m_fixScancodeMap->escape(This->m_engine.getIsEnabled());
 						}
 						This->showTasktrayIcon();
 						break;
@@ -718,8 +715,8 @@ private:
 					This->m_usingSN = false;
 				}
 				if (!This->m_sessionState) {
-					if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-						This->m_fixScancodeMap.escape(false);
+					if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
+						This->m_fixScancodeMap->escape(false);
 					}
 				}
 				return 0;
@@ -738,10 +735,8 @@ private:
 					switch (static_cast<MayuIPCCommand>(i_wParam)) {
 					case MayuIPCCommand_Enable:
 						This->m_engine.enable(!!i_lParam);
-						if (This->m_escapeNlsKeys && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap.escape(true);
-						} else {
-							This->m_fixScancodeMap.escape(false);
+						if (This->m_fixScancodeMap) {
+							This->m_fixScancodeMap->escape(This->m_engine.getIsEnabled());
 						}
 						This->showTasktrayIcon();
 						if (i_lParam) {
@@ -1033,7 +1028,10 @@ public:
 			m_sessionState(0),
 			m_engine(m_log) {
 		Registry reg(MAYU_REGISTRY_ROOT);
-		reg.read(L"escapeNLSKeys", &m_escapeNlsKeys, 0);
+		int escapeNlsKeys = 0;
+		reg.read(L"escapeNLSKeys", &escapeNlsKeys, 0);
+		if (escapeNlsKeys)
+			m_fixScancodeMap = std::make_unique<FixScancodeMap>();
 		m_hNotifyMailslot = CreateMailslot(NOTIFY_MAILSLOT_NAME, 0, MAILSLOT_WAIT_FOREVER, (SECURITY_ATTRIBUTES *)NULL);
 		ASSERT(m_hNotifyMailslot != INVALID_HANDLE_VALUE);
 		int err;
@@ -1199,7 +1197,7 @@ public:
 #endif // _WIN64
 		if (m_scripter)
 			m_scripter->sendQuit();            // scripter: send quit + close stdin pipe
-		m_fixScancodeMap.signalQuit();         // FixScancodeMap thread: signal via event
+		if (m_fixScancodeMap) m_fixScancodeMap->signalQuit(); // FixScancodeMap thread: signal via event
 
 		// --- Phase B+C: stop InputHandlers in parallel, then signal engine ---
 		// signalStop() waits for both InputHandlers (up to 3 s, in parallel),
@@ -1215,8 +1213,8 @@ public:
 		if (m_scripter)
 			n += m_scripter->collectHandles(handles + n, 6 - n);
 		handles[n++] = hEngineThread;
-		HANDLE hFsThread = m_fixScancodeMap.detachThread();
-		handles[n++] = hFsThread;
+		HANDLE hFsThread = m_fixScancodeMap ? m_fixScancodeMap->detachThread() : NULL;
+		if (hFsThread) handles[n++] = hFsThread;
 		if (n > 0)
 			WaitForMultipleObjects(n, handles, TRUE, 5000);
 
@@ -1228,7 +1226,7 @@ public:
 		if (m_scripter)
 			m_scripter->closeHandles();
 		m_engine.cleanupAfterStop(hEngineThread);
-		CloseHandle(hFsThread);
+		if (hFsThread) CloseHandle(hFsThread);
 
 		// ~ScripterManager() is now a no-op (handles already closed above)
 		m_scripter.reset();
@@ -1259,7 +1257,7 @@ public:
 		CHECK_TRUE( DestroyIcon(m_tasktrayIcon[1]) );
 		CHECK_TRUE( DestroyIcon(m_tasktrayIcon[0]) );
 
-		if (!(m_sessionState & SESSION_END_QUERIED) && m_escapeNlsKeys) {
+		if (!(m_sessionState & SESSION_END_QUERIED) && m_fixScancodeMap) {
 			DWORD_PTR result;
 			SendMessageTimeout(HWND_BROADCAST, WM_NULL, 0, 0, 0, 1000, &result);
 		}
