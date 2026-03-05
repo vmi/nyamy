@@ -539,6 +539,24 @@ exit:
 
 FixScancodeMap::~FixScancodeMap()
 {
+	if (m_hThread) {
+		SetEvent(m_hQuitEvent);
+		WaitForSingleObject(m_hThread, 3000);
+		CloseHandle(m_hThread);
+	}
+	CloseHandle(m_hFixEvent);
+	CloseHandle(m_hRestoreEvent);
+	CloseHandle(m_hQuitEvent);
+}
+
+void FixScancodeMap::signalQuit()
+{
 	SetEvent(m_hQuitEvent);
-	WaitForSingleObject(m_hThread, INFINITE);
+}
+
+HANDLE FixScancodeMap::detachThread()
+{
+	HANDLE h = m_hThread;
+	m_hThread = NULL;
+	return h;
 }

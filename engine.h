@@ -164,6 +164,13 @@ private:
 
 		int stop();
 
+		/// post WM_QUIT to the thread (non-blocking)
+		void postQuit();
+		/// return the thread handle
+		HANDLE hThread() const { return m_hThread; }
+		/// close and null the thread handle
+		void closeThread();
+
 	private:
 		unsigned m_threadId;
 		HANDLE m_hThread;
@@ -527,6 +534,13 @@ public:
 	void start();
 	///
 	void stop();
+
+	/// parallel shutdown: stop InputHandlers in parallel, signal engine to exit,
+	/// and return the engine thread handle for external WaitForMultipleObjects.
+	/// Must be called before cleanupAfterStop().
+	HANDLE signalStop();
+	/// release engine resources after the engine thread handle has been waited on.
+	void cleanupAfterStop(HANDLE hEngineThread);
 
 	/// pause keyboard handler thread and close device
 	bool pause();

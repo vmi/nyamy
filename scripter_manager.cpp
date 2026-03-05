@@ -108,13 +108,29 @@ ScripterManager::ScripterManager(SyncObject *i_soLog, std::wostream *i_log,
 	, m_hScripterProcess(NULL)
 	, m_hDataThread(NULL)
 	, m_hStderrThread(NULL)
+	, m_quitSent(false)
 {
 }
 
 
 ScripterManager::~ScripterManager()
 {
-	// send quit request to scripter
+	sendQuit();
+
+	// wait for any handles not yet closed by an external WaitForMultipleObjects
+	HANDLE handles[3];
+	DWORD n = collectHandles(handles, 3);
+	if (n > 0)
+		WaitForMultipleObjects(n, handles, TRUE, 2000);
+
+	closeHandles();
+}
+
+void ScripterManager::sendQuit()
+{
+	if (m_quitSent) return;
+	m_quitSent = true;
+
 	if (m_ctrlWriter) {
 		try { m_ctrlWriter->writeQuit(); } catch (...) {}
 	}
@@ -122,29 +138,27 @@ ScripterManager::~ScripterManager()
 	m_ctrlStream.reset();
 	m_ctrlStreambuf.reset();
 
-	// close ctrl pipe (scripter's stdin EOF -> end loop)
+	// closing stdin causes scripter to see EOF and exit its loop
 	if (m_hCtrlWrite != INVALID_HANDLE_VALUE) {
 		CloseHandle(m_hCtrlWrite);
 		m_hCtrlWrite = INVALID_HANDLE_VALUE;
 	}
+}
 
-	// wait for scripter process to exit
-	if (m_hScripterProcess) {
-		WaitForSingleObject(m_hScripterProcess, 5000);
-		CloseHandle(m_hScripterProcess);
-		m_hScripterProcess = NULL;
-	}
+DWORD ScripterManager::collectHandles(HANDLE *buf, DWORD maxCount)
+{
+	DWORD n = 0;
+	if (m_hScripterProcess && n < maxCount) buf[n++] = m_hScripterProcess;
+	if (m_hDataThread      && n < maxCount) buf[n++] = m_hDataThread;
+	if (m_hStderrThread    && n < maxCount) buf[n++] = m_hStderrThread;
+	return n;
+}
 
-	// wait for data / stderr threads to exit
-	HANDLE threads[2] = {};
-	DWORD nThreads = 0;
-	if (m_hDataThread)   threads[nThreads++] = m_hDataThread;
-	if (m_hStderrThread) threads[nThreads++] = m_hStderrThread;
-	if (nThreads > 0)
-		WaitForMultipleObjects(nThreads, threads, TRUE, 5000);
-	if (m_hDataThread)   { CloseHandle(m_hDataThread);   m_hDataThread   = NULL; }
-	if (m_hStderrThread) { CloseHandle(m_hStderrThread); m_hStderrThread = NULL; }
-
+void ScripterManager::closeHandles()
+{
+	if (m_hScripterProcess) { CloseHandle(m_hScripterProcess); m_hScripterProcess = NULL; }
+	if (m_hDataThread)      { CloseHandle(m_hDataThread);      m_hDataThread      = NULL; }
+	if (m_hStderrThread)    { CloseHandle(m_hStderrThread);    m_hStderrThread    = NULL; }
 	if (m_hDataRead   != INVALID_HANDLE_VALUE) { CloseHandle(m_hDataRead);   m_hDataRead   = INVALID_HANDLE_VALUE; }
 	if (m_hStderrRead != INVALID_HANDLE_VALUE) { CloseHandle(m_hStderrRead); m_hStderrRead = INVALID_HANDLE_VALUE; }
 }

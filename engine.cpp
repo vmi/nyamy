@@ -1270,26 +1270,47 @@ void Engine::start() {
 
 
 // stop keyboard handler thread
-void Engine::stop() {
-	m_mouseHandler.stop();
-	m_keyboardHandler.stop();
+// Phase B+C: stop InputHandlers in parallel, signal engine exit.
+// Returns the engine thread handle; caller must WaitForSingleObject/
+// WaitForMultipleObjects on it and then call cleanupAfterStop().
+HANDLE Engine::signalStop() {
+	// Phase B: send WM_QUIT to both InputHandlers simultaneously
+	m_mouseHandler.postQuit();
+	m_keyboardHandler.postQuit();
+	HANDLE iHandles[2] = { m_mouseHandler.hThread(), m_keyboardHandler.hThread() };
+	WaitForMultipleObjects(2, iHandles, TRUE, 3000);
+	m_mouseHandler.closeThread();
+	m_keyboardHandler.closeThread();
 
+	// Phase C: signal engine thread to exit (safe now that hooks are stopped)
 	WaitForSingleObject(m_queueMutex, INFINITE);
 	m_inputQueue.reset();
 	SetEvent(m_readEvent);
 	ReleaseMutex(m_queueMutex);
 
-	WaitForSingleObject(m_threadHandle, 2000);
-	CHECK_TRUE( CloseHandle(m_threadHandle) );
+	// Return engine thread handle for external WaitForMultipleObjects
+	HANDLE h = m_threadHandle;
 	m_threadHandle = NULL;
+	return h;
+}
 
+// Call after the engine thread handle returned by signalStop() has been waited on.
+void Engine::cleanupAfterStop(HANDLE hEngineThread) {
+	CloseHandle(hEngineThread);
 	CHECK_TRUE( CloseHandle(m_readEvent) );
 	m_readEvent = NULL;
-
+	CloseHandle(m_queueMutex);
+	m_queueMutex = NULL;
 	for (ThreadIds::iterator i = m_attachedThreadIds.begin();
 		 i != m_attachedThreadIds.end(); i++) {
 		 PostThreadMessage(*i, WM_NULL, 0, 0);
 	}
+}
+
+void Engine::stop() {
+	HANDLE h = signalStop();
+	WaitForSingleObject(h, 2000);
+	cleanupAfterStop(h);
 }
 
 
@@ -1693,7 +1714,19 @@ int Engine::InputHandler::start(Engine *i_engine)
 
 int Engine::InputHandler::stop()
 {
-	PostThreadMessage(m_threadId, WM_QUIT, 0, 0);
-	WaitForSingleObject(m_hThread, INFINITE);
+	postQuit();
+	WaitForSingleObject(m_hThread, 3000);
+	closeThread();
 	return 0;
+}
+
+void Engine::InputHandler::postQuit()
+{
+	PostThreadMessage(m_threadId, WM_QUIT, 0, 0);
+}
+
+void Engine::InputHandler::closeThread()
+{
+	CloseHandle(m_hThread);
+	m_hThread = NULL;
 }

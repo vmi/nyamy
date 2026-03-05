@@ -1193,16 +1193,44 @@ public:
 		g_hookData->setHwndTaskTray(NULL);
 		CHECK_FALSE( uninstallMessageHook() );
 
+		// --- Phase A: signal all shutdowns simultaneously ---
 #ifdef _WIN64
-		ReleaseMutex(m_hMutexYamyd);
-		if (m_pi.hProcess) {
-			WaitForSingleObject(m_pi.hProcess, 5000);
-			CloseHandle(m_pi.hProcess);
-		}
+		ReleaseMutex(m_hMutexYamyd);       // yamyd exits when it loses the mutex
+#endif // _WIN64
+		if (m_scripter)
+			m_scripter->sendQuit();            // scripter: send quit + close stdin pipe
+		m_fixScancodeMap.signalQuit();         // FixScancodeMap thread: signal via event
+
+		// --- Phase B+C: stop InputHandlers in parallel, then signal engine ---
+		// signalStop() waits for both InputHandlers (up to 3 s, in parallel),
+		// clears the input queue, and signals the engine thread to exit.
+		HANDLE hEngineThread = m_engine.signalStop();
+
+		// --- Phase D: wait for all remaining threads/processes in parallel ---
+		HANDLE handles[6];
+		DWORD n = 0;
+#ifdef _WIN64
+		if (m_pi.hProcess) handles[n++] = m_pi.hProcess;
+#endif // _WIN64
+		if (m_scripter)
+			n += m_scripter->collectHandles(handles + n, 6 - n);
+		handles[n++] = hEngineThread;
+		HANDLE hFsThread = m_fixScancodeMap.detachThread();
+		handles[n++] = hFsThread;
+		if (n > 0)
+			WaitForMultipleObjects(n, handles, TRUE, 5000);
+
+		// --- cleanup handles ---
+#ifdef _WIN64
+		if (m_pi.hProcess) { CloseHandle(m_pi.hProcess); m_pi.hProcess = NULL; }
 		CloseHandle(m_hMutexYamyd);
 #endif // _WIN64
+		if (m_scripter)
+			m_scripter->closeHandles();
+		m_engine.cleanupAfterStop(hEngineThread);
+		CloseHandle(hFsThread);
 
-		// quit scripter process (send Quit + wait for exit)
+		// ~ScripterManager() is now a no-op (handles already closed above)
 		m_scripter.reset();
 
 		CancelIo(m_hNotifyMailslot);
@@ -1231,15 +1259,12 @@ public:
 		CHECK_TRUE( DestroyIcon(m_tasktrayIcon[1]) );
 		CHECK_TRUE( DestroyIcon(m_tasktrayIcon[0]) );
 
-		// stop keyboard handler thread
-		m_engine.stop();
-
-		if (!(m_sessionState & SESSION_END_QUERIED)) {
+		if (!(m_sessionState & SESSION_END_QUERIED) && m_escapeNlsKeys) {
 			DWORD_PTR result;
-			SendMessageTimeout(HWND_BROADCAST, WM_NULL, 0, 0, 0, 3000, &result);
+			SendMessageTimeout(HWND_BROADCAST, WM_NULL, 0, 0, 0, 1000, &result);
 		}
 
-		// remove setting;
+		// remove setting
 		m_setting.reset();
 	}
 

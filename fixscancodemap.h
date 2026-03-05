@@ -79,4 +79,9 @@ public:
 
 	int init(HWND i_hwnd, UINT i_messageOnFail);
 	int escape(bool i_escape);
+
+	/// signal the thread to quit (non-blocking)
+	void signalQuit();
+	/// detach and return the thread handle (sets internal handle to NULL)
+	HANDLE detachThread();
 };

@@ -31,6 +31,13 @@ public:
 	/// start scripter process and establish pipes
 	bool start();
 
+	/// signal quit to scripter process (non-blocking; idempotent)
+	void sendQuit();
+	/// fill buf with active wait handles (process + reader threads); returns count
+	DWORD collectHandles(HANDLE *buf, DWORD maxCount);
+	/// close and null out all process/thread/pipe handles (call after WaitForMultipleObjects)
+	void closeHandles();
+
 	/// send re-compile request to scripter (asynchronous; notifies WM_ScripterSettingReady on completion)
 	void reload(const Symbols &syms);
 
@@ -59,6 +66,8 @@ private:
 	// received setting (shared between threads)
 	std::mutex m_mutex;
 	std::unique_ptr<Setting> m_pendingSetting;
+
+	bool m_quitSent;
 
 	SyncObject *m_soLog;
 	std::wostream   *m_log;
