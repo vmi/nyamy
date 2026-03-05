@@ -1148,7 +1148,7 @@ void Engine::funcLoadSetting(FunctionParam *i_param, const StrExprArg &i_name)
 
 		{
 			Acquire a(&m_log, 0);
-			m_log << L"unknown setting name: " << i_name;
+			m_log << L"unknown setting name: " << i_name << std::endl;
 		}
 		return;
 
@@ -2001,14 +2001,14 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 		CloseHandle(hm);
 	else {
 		Acquire a(&m_log, 0);
-		m_log << L" Error(1): Direct SSTP server does not exist.";
+		m_log << L" Error(1): Direct SSTP server does not exist." << std::endl;
 		return;
 	}
 
 	HANDLE hfm = OpenFileMapping(FILE_MAP_READ, FALSE, L"Sakura");
 	if (!hfm) {
 		Acquire a(&m_log, 0);
-		m_log << L" Error(2): Direct SSTP server does not provide data.";
+		m_log << L" Error(2): Direct SSTP server does not provide data." << std::endl;
 		return;
 	}
 
@@ -2017,7 +2017,7 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 	if (!data) {
 		CloseHandle(hfm);
 		Acquire a(&m_log, 0);
-		m_log << L" Error(3): Direct SSTP server does not provide data.";
+		m_log << L" Error(3): Direct SSTP server does not provide data." << std::endl;
 		return;
 	}
 
@@ -2206,7 +2206,7 @@ void Engine::funcPlugIn(FunctionParam *i_param,
 			delete rawPlugin;
 			Acquire a(&m_log);
 			m_log << std::endl;
-			m_log << L"error: &PlugIn() failed to create thread.";
+			m_log << L"error: &PlugIn() failed to create thread." << std::endl;
 		}
 		return;
 	} else
