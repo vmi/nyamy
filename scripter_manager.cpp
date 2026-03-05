@@ -182,7 +182,7 @@ bool ScripterManager::start()
 	    !CreatePipe(&m_hStderrRead,  &hStderrWrite, &sa, 0)) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << L"ScripterManager: CreatePipe failed\n";
+			*m_log << L"ScripterManager: CreatePipe failed" << std::endl;
 		}
 		return false;
 	}
@@ -213,6 +213,7 @@ bool ScripterManager::start()
 	PROCESS_INFORMATION pi = {};
 	BOOL result = CreateProcess(scripterPath.c_str(), NULL, NULL, NULL, TRUE,
 	                            CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+	DWORD lastErr = GetLastError();
 
 	// handles passed to child process are no longer needed on parent side
 	CloseHandle(hCtrlRead);
@@ -223,7 +224,7 @@ bool ScripterManager::start()
 		if (m_log) {
 			Acquire a(m_soLog, 0);
 			*m_log << L"ScripterManager: failed to start " << scripterPath
-			       << L" (error " << GetLastError() << L")\n";
+			       << L" (error " << lastErr << L")" << std::endl;
 		}
 		return false;
 	}
@@ -243,7 +244,7 @@ bool ScripterManager::start()
 
 	if (m_log) {
 		Acquire a(m_soLog, 0);
-		*m_log << L"ScripterManager: started " << scripterPath << L"\n";
+		*m_log << L"ScripterManager: started " << scripterPath << std::endl;
 	}
 	return true;
 }
@@ -257,7 +258,7 @@ void ScripterManager::reload(const Symbols &syms)
 	} catch (...) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << L"ScripterManager: writeReload failed\n";
+			*m_log << L"ScripterManager: writeReload failed" << std::endl;
 		}
 	}
 }
@@ -321,7 +322,7 @@ void ScripterManager::runStderrReader()
 		if (!line.empty() && line.back() == L'\r') line.pop_back();
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << L"[scripter] " << line << L"\n";
+			*m_log << L"[scripter] " << line << std::endl;
 		}
 	}
 }

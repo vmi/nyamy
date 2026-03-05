@@ -769,7 +769,7 @@ private:
 			m_scripter = std::make_unique<ScripterManager>(&m_log, &m_log, m_hwndTaskTray);
 			if (!m_scripter->start()) {
 				Acquire a(&m_log, 0);
-				m_log << L"error: failed to start scripter process.\n";
+				m_log << L"error: failed to start scripter process." << std::endl;
 				ShowWindow(m_hwndLog, SW_SHOW);
 				SetForegroundWindow(m_hwndLog);
 				m_scripter.reset();
