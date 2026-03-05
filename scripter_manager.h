@@ -25,7 +25,7 @@ class ScripterManager
 {
 public:
 	/// i_hwndNotify: Window to notify Setting completion (mayu's tasktray window)
-	ScripterManager(SyncObject *i_soLog, tostream *i_log, HWND i_hwndNotify);
+	ScripterManager(SyncObject *i_soLog, std::wostream *i_log, HWND i_hwndNotify);
 	~ScripterManager();
 
 	/// start scripter process and establish pipes
@@ -61,7 +61,7 @@ private:
 	std::unique_ptr<Setting> m_pendingSetting;
 
 	SyncObject *m_soLog;
-	tostream   *m_log;
+	std::wostream   *m_log;
 	HWND        m_hwndNotify;
 
 	// background thread entry points

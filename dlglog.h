@@ -29,7 +29,7 @@ enum DlgLogNotify {
 /// parameters for "Investigate" dialog box
 class DlgLogData {
 public:
-	tomsgstream *m_log;				/// log stream
+	womsgstream *m_log;				/// log stream
 	HWND m_hwndTaskTray;				/// tasktray window
 };
 

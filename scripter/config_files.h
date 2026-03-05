@@ -14,7 +14,7 @@
 
 
 /// home directory path list
-using HomeDirectories = std::list<tstringi>;
+using HomeDirectories = std::list<wstringi>;
 
 
 /// file system operations for configuration files
@@ -25,30 +25,30 @@ public:
 	using RetryCallback = std::function<bool()>;
 
 public:
-	ConfigFiles(SyncObject *i_soLog = nullptr, tostream *i_log = nullptr);
+	ConfigFiles(SyncObject *i_soLog = nullptr, std::wostream *i_log = nullptr);
 
 	/// get home directory path
 	void getHomeDirectories(HomeDirectories *o_path) const;
 
 	/// get mayu filename from registry
-	bool getFilenameFromRegistry(tstringi *o_name, tstringi *o_filename,
+	bool getFilenameFromRegistry(wstringi *o_name, wstringi *o_filename,
 								 Symbols *o_symbols) const;
 
 	/// read file contents
-	bool readFile(tstring *o_data, const tstringi &i_filename) const;
+	bool readFile(std::wstring *o_data, const wstringi &i_filename) const;
 
 	/// is the filename readable ?
-	bool isReadable(const tstringi &i_filename, int i_debugLevel = 1) const;
+	bool isReadable(const wstringi &i_filename, int i_debugLevel = 1) const;
 
 	/// get filename
-	bool getFilename(const tstringi &i_name, tstringi *o_path,
+	bool getFilename(const wstringi &i_name, wstringi *o_path,
 					 Symbols *o_symbols,
 					 RetryCallback i_retry = nullptr,
 					 int i_debugLevel = 1) const;
 
 private:
 	SyncObject *m_soLog;
-	tostream *m_log;
+	std::wostream *m_log;
 };
 
 

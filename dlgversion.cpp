@@ -32,24 +32,22 @@ public:
 		setSmallIcon(m_hwnd, IDI_ICON_mayu);
 		setBigIcon(m_hwnd, IDI_ICON_mayu);
 
-		_TCHAR modulebuf[1024];
+		wchar_t modulebuf[1024];
 		CHECK_TRUE( GetModuleFileName(g_hInst, modulebuf,
 									  NUMBER_OF(modulebuf)) );
 
-		_TCHAR buf[1024];
-		_sntprintf(buf, NUMBER_OF(buf), loadString(IDS_version).c_str(),
-				   _T(VERSION)
+		wchar_t buf[1024];
+		_snwprintf(buf, NUMBER_OF(buf), loadString(IDS_version).c_str(),
+				   WIDEN(VERSION)
 #ifndef NDEBUG
-				   _T(" (DEBUG)")
+				   L" (DEBUG)"
 #endif // !NDEBUG
-#ifdef _UNICODE
-				   _T(" (UNICODE)")
-#endif // !_UNICODE
-				   _T(" (PRIVATE VERSION)")
+				   L" (UNICODE)"
+				   L" (PRIVATE VERSION)"
 				   ,
 				   loadString(IDS_homepage).c_str(),
-				   (_T(LOGNAME) _T("@") + toLower(_T(COMPUTERNAME))).c_str(),
-				   _T(__DATE__) _T(" ") _T(__TIME__),
+				   (WIDEN(LOGNAME) L"@" + toLower(WIDEN(COMPUTERNAME))).c_str(),
+				   WIDEN(__DATE__) L" " WIDEN(__TIME__),
 				   getCompilerVersionString().c_str(),
 				   modulebuf);
 

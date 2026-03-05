@@ -141,23 +141,9 @@ public:
 
 	// for stream
 	int sync() {
-		T *begin = pbase();
-		T *end = pptr();
-		T *i;
-		for (i = begin; i < end; ++ i)
-			if (_istlead(*i))
-				++ i;
-		if (i == end) {
-			if (m_msgDebugLevel <= m_debugLevel)
-				m_str += String(begin, end - begin);
-			setp(m_buf, m_buf + SIZE);
-		} else { // end < i
-			if (m_msgDebugLevel <= m_debugLevel)
-				m_str += String(begin, end - begin - 1);
-			m_buf[0] = end[-1];
-			setp(m_buf, m_buf + SIZE);
-			pbump(1);
-		}
+		if (m_msgDebugLevel <= m_debugLevel)
+			m_str += String(pbase(), static_cast<size_t>(pptr() - pbase()));
+		setp(m_buf, m_buf + SIZE);
 		return TR::not_eof(0);
 	}
 
@@ -271,6 +257,6 @@ public:
 };
 
 ///
-using tomsgstream = basic_omsgstream<_TCHAR>;
+using womsgstream = basic_omsgstream<wchar_t>;
 
 #endif // !_MSGSTREAM_H

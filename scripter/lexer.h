@@ -28,16 +28,16 @@ private:
 	u_char m_type;				///
 	bool m_isValueQuoted;				///
 	int m_numericValue;				///
-	tstringi m_stringValue;			///
+	wstringi m_stringValue;			///
 	long m_data;					///
 
 public:
 	///
 	Token(const Token &i_token);
 	///
-	Token(int i_value, const tstringi &i_display);
+	Token(int i_value, const wstringi &i_display);
 	///
-	Token(const tstringi &i_value, bool i_isValueQuoted,
+	Token(const wstringi &i_value, bool i_isValueQuoted,
 		  bool i_isRegexp = false);
 	///
 	Token(Type i_type);
@@ -80,10 +80,10 @@ public:
 	int getNumber() const;
 
 	/// get string value
-	tstringi getString() const;
+	wstringi getString() const;
 
 	/// get regexp value
-	tstringi getRegexp() const;
+	wstringi getRegexp() const;
 
 	/// get data
 	long getData() const {
@@ -95,34 +95,34 @@ public:
 	}
 
 	/// case insensitive equal
-	bool operator==(const tstringi &i_str) const {
+	bool operator==(const wstringi &i_str) const {
 		return *this == i_str.c_str();
 	}
 	///
-	bool operator==(const _TCHAR *i_str) const;
+	bool operator==(const wchar_t *i_str) const;
 	///
-	bool operator!=(const tstringi &i_str) const {
+	bool operator!=(const wstringi &i_str) const {
 		return *this != i_str.c_str();
 	}
 	///
-	bool operator!=(const _TCHAR *i_str) const {
+	bool operator!=(const wchar_t *i_str) const {
 		return !(*this == i_str);
 	}
 
 	/** paren equal
 	    @param i_c '<code>(</code>' or '<code>)</code>' */
-	bool operator==(const _TCHAR i_c) const;
+	bool operator==(const wchar_t i_c) const;
 	/** paren equal
 	    @param i_c '<code>(</code>' or '<code>)</code>' */
-	bool operator!=(const _TCHAR i_c) const {
+	bool operator!=(const wchar_t i_c) const {
 		return !(*this == i_c);
 	}
 
 	/// add string
-	void add(const tstringi &i_str);
+	void add(const wstringi &i_str);
 
 	/// stream output
-	friend tostream &operator<<(tostream &i_ost, const Token &i_token);
+	friend std::wostream &operator<<(std::wostream &i_ost, const Token &i_token);
 };
 
 
@@ -135,7 +135,7 @@ public:
 
 private:
 	///
-	using Prefixes = std::vector<tstringi>;
+	using Prefixes = std::vector<wstringi>;
 
 private:
 	size_t m_lineNumber;				/// current line number
@@ -143,16 +143,16 @@ private:
                                                     of a token */
 
 	size_t m_internalLineNumber;			/// next line number
-	const _TCHAR *m_ptr;				/// read pointer
-	const _TCHAR *m_end;				/// end pointer
+	const wchar_t *m_ptr;				/// read pointer
+	const wchar_t *m_end;				/// end pointer
 
 private:
 	/// get a line
-	bool getLine(tstringi *o_line);
+	bool getLine(wstringi *o_line);
 
 public:
 	///
-	Lexer(const _TCHAR *i_str, size_t i_length);
+	Lexer(const wchar_t *i_str, size_t i_length);
 
 	/** get a parsed line.  if no more lines exist, returns false */
 	bool getLine(Tokens *o_tokens);

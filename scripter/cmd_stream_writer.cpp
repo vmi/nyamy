@@ -54,12 +54,12 @@ void CmdStreamWriter::writeU64(uint64_t v)
 }
 
 
-void CmdStreamWriter::writeString(const tstringi &s)
+void CmdStreamWriter::writeString(const wstringi &s)
 {
 	uint16_t len = static_cast<uint16_t>(s.size());
 	writeU16(len);
 	for (size_t i = 0; i < len; ++i) {
-		_TCHAR ch = s[i];
+		wchar_t ch = s[i];
 		writeU8(static_cast<uint8_t>(ch & 0xFF));
 		writeU8(static_cast<uint8_t>((ch >> 8) & 0xFF));
 	}

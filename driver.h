@@ -9,9 +9,9 @@
 
 
 /// mayu device file name
-#    define MAYU_DEVICE_FILE_NAME _T("\\\\.\\MayuDetour1")
+#    define MAYU_DEVICE_FILE_NAME L"\\\\.\\MayuDetour1"
 ///
-#    define MAYU_DRIVER_NAME _T("mayud")
+#    define MAYU_DRIVER_NAME L"mayud"
 
 /// Ioctl value
 #include "d/ioctl.h"

@@ -21,7 +21,7 @@ class CmdLoadContext
 {
 public:
 	virtual ~CmdLoadContext() = default;
-	virtual const Keymap *resolveKeymap(const tstringi &name) = 0;
+	virtual const Keymap *resolveKeymap(const wstringi &name) = 0;
 	virtual const KeySeq *resolveKeySeq(uint32_t index) = 0;
 	virtual Modifier resolveModifier(const struct CmdModifier &bm) = 0;
 };
@@ -38,19 +38,19 @@ public:
 	///
 	virtual void exec(Engine *i_engine, FunctionParam *i_param) const = 0;
 	///
-	virtual const _TCHAR *getName() const = 0;
+	virtual const wchar_t *getName() const = 0;
 	///
-	virtual tostream &output(tostream &i_ost) const = 0;
+	virtual std::wostream &output(std::wostream &i_ost) const = 0;
 	///
 	virtual FunctionData *clone() const = 0;
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, const FunctionData *i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, const FunctionData *i_data);
 
 
 // create function
-extern FunctionData *createFunctionData(const tstring &i_name);
+extern FunctionData *createFunctionData(const std::wstring &i_name);
 
 ///
 enum VKey {
@@ -60,7 +60,7 @@ enum VKey {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, VKey i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, VKey i_data);
 
 /// Resolve a CmdArgument (String, TokenSeq, or Number) to a VKey value.
 /// Handles prefix tokens E-, U-, D- followed by a key name or number.
@@ -77,10 +77,10 @@ enum ToWindowType {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, ToWindowType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, ToWindowType i_data);
 
 // get value of ToWindowType
-extern bool getTypeValue(ToWindowType *o_type, const tstring &i_name);
+extern bool getTypeValue(ToWindowType *o_type, const std::wstring &i_name);
 
 
 ///
@@ -97,20 +97,20 @@ enum GravityType {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, GravityType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, GravityType i_data);
 
 /// get value of GravityType
-extern bool getTypeValue(GravityType *o_type, const tstring &i_name);
+extern bool getTypeValue(GravityType *o_type, const std::wstring &i_name);
 
 
 /// enum MouseHookType is defined in hook.h
 enum MouseHookType;
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, MouseHookType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, MouseHookType i_data);
 
 /// get value of MouseHookType
-extern bool getTypeValue(MouseHookType *o_type, const tstring &i_name);
+extern bool getTypeValue(MouseHookType *o_type, const std::wstring &i_name);
 
 
 ///
@@ -121,10 +121,10 @@ enum MayuDialogType {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, MayuDialogType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, MayuDialogType i_data);
 
 // get value of MayuDialogType
-bool getTypeValue(MayuDialogType *o_type, const tstring &i_name);
+bool getTypeValue(MayuDialogType *o_type, const std::wstring &i_name);
 
 
 ///
@@ -149,17 +149,17 @@ enum ToggleType {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, ToggleType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, ToggleType i_data);
 
 // get value of ShowCommandType
-extern bool getTypeValue(ToggleType *o_type, const tstring &i_name);
+extern bool getTypeValue(ToggleType *o_type, const std::wstring &i_name);
 
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, ModifierLockType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, ModifierLockType i_data);
 
 // get value of ModifierLockType
-extern bool getTypeValue(ModifierLockType *o_type, const tstring &i_name);
+extern bool getTypeValue(ModifierLockType *o_type, const std::wstring &i_name);
 
 
 ///
@@ -179,10 +179,10 @@ enum ShowCommandType {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, ShowCommandType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, ShowCommandType i_data);
 
 // get value of ShowCommandType
-extern bool getTypeValue(ShowCommandType *o_type, const tstring &i_name);
+extern bool getTypeValue(ShowCommandType *o_type, const std::wstring &i_name);
 
 
 ///
@@ -192,10 +192,10 @@ enum TargetWindowType {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, TargetWindowType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, TargetWindowType i_data);
 
 // get value of ShowCommandType
-extern bool getTypeValue(TargetWindowType *o_type, const tstring &i_name);
+extern bool getTypeValue(TargetWindowType *o_type, const std::wstring &i_name);
 
 
 ///
@@ -205,10 +205,10 @@ enum BooleanType {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, BooleanType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, BooleanType i_data);
 
 // get value of ShowCommandType
-extern bool getTypeValue(BooleanType *o_type, const tstring &i_name);
+extern bool getTypeValue(BooleanType *o_type, const std::wstring &i_name);
 
 
 ///
@@ -218,10 +218,10 @@ enum LogicalOperatorType {
 };
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, LogicalOperatorType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, LogicalOperatorType i_data);
 
 // get value of LogicalOperatorType
-extern bool getTypeValue(LogicalOperatorType *o_type, const tstring &i_name);
+extern bool getTypeValue(LogicalOperatorType *o_type, const std::wstring &i_name);
 
 
 ///
@@ -231,15 +231,15 @@ enum WindowMonitorFromType {
 };
 
 // stream output
-extern tostream &operator<<(tostream &i_ost, WindowMonitorFromType i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, WindowMonitorFromType i_data);
 
 // get value of WindowMonitorFromType
-extern bool getTypeValue(WindowMonitorFromType *o_type, const tstring &i_name);
+extern bool getTypeValue(WindowMonitorFromType *o_type, const std::wstring &i_name);
 
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost,
-								const std::list<tstringq> &i_data);
+extern std::wostream &operator<<(std::wostream &i_ost,
+								const std::list<wstringq> &i_data);
 
 
 /// string type expression
@@ -258,16 +258,16 @@ public:
 	};
 	StrExprArg();
 	StrExprArg(const StrExprArg &i_data);
-	StrExprArg(const tstringq &i_symbol, Type i_type);
+	StrExprArg(const wstringq &i_symbol, Type i_type);
 	~StrExprArg();
 	StrExprArg &operator=(const StrExprArg &i_data);
-	tstringq eval() const;
+	wstringq eval() const;
 	static void setEngine(const Engine *i_engine);
 };
 
 
 /// stream output
-tostream &operator<<(tostream &i_ost, const StrExprArg &i_data);
+std::wostream &operator<<(std::wostream &i_ost, const StrExprArg &i_data);
 
 
 #endif // !_FUNCTION_H

@@ -15,7 +15,7 @@
 class Setting
 {
 public:
-	using Symbols = std::set<tstringi>;		///
+	using Symbols = std::set<wstringi>;		///
 	using Modifiers = std::list<Modifier>;	///
 
 public:
@@ -45,11 +45,11 @@ public:
 namespace Event
 {
 ///
-inline Key prefixed(_T("prefixed"));
+inline Key prefixed(L"prefixed");
 ///
-inline Key before_key_down(_T("before-key-down"));
+inline Key before_key_down(L"before-key-down");
 ///
-inline Key after_key_up(_T("after-key-up"));
+inline Key after_key_up(L"after-key-up");
 ///
 inline Key *events[] = { &prefixed, &before_key_down, &after_key_up, NULL };
 }

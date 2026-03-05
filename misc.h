@@ -85,5 +85,7 @@ using u_int64 = unsigned long long;			/// unsigned 64bit
 /// redefine MIN macro
 #  define MIN(a, b)	(((a) < (b)) ? (a) : (b))
 
+#	define WIDEN2(x) L ## x
+#	define WIDEN(x) WIDEN2(x)
 
 #endif // !_MISC_H

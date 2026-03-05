@@ -25,13 +25,13 @@ HINSTANCE g_hInst = NULL;
 
 
 // load resource string
-tstring loadString(UINT i_id)
+std::wstring loadString(UINT i_id)
 {
-	_TCHAR buf[1024];
+	wchar_t buf[1024];
 	if (LoadString(g_hInst, i_id, buf, NUMBER_OF(buf)))
-		return tstring(buf);
+		return std::wstring(buf);
 	else
-		return _T("");
+		return L"";
 }
 
 
@@ -180,7 +180,7 @@ void asyncResize(HWND i_hwnd, int i_w, int i_h)
 
 
 // get dll version
-DWORD getDllVersion(const _TCHAR *i_dllname)
+DWORD getDllVersion(const wchar_t *i_dllname)
 {
 	DWORD dwVersion = 0;
 
@@ -253,12 +253,12 @@ void editDeleteLine(HWND i_hwnd, size_t i_n)
 	len += 2;
 	int index = Edit_LineIndex(i_hwnd, i_n);
 	Edit_SetSel(i_hwnd, index, index + len);
-	Edit_ReplaceSel(i_hwnd, _T(""));
+	Edit_ReplaceSel(i_hwnd, L"");
 }
 
 
 // insert text at last
-void editInsertTextAtLast(HWND i_hwnd, const tstring &i_text,
+void editInsertTextAtLast(HWND i_hwnd, const std::wstring &i_text,
 						  size_t i_threshold)
 {
 	if (i_text.empty())
@@ -268,7 +268,7 @@ void editInsertTextAtLast(HWND i_hwnd, const tstring &i_text,
 
 	if (i_threshold < len) {
 		Edit_SetSel(i_hwnd, 0, len / 3 * 2);
-		Edit_ReplaceSel(i_hwnd, _T(""));
+		Edit_ReplaceSel(i_hwnd, L"");
 		editDeleteLine(i_hwnd, 0);
 		len = editGetTextBytes(i_hwnd);
 	}
@@ -276,15 +276,15 @@ void editInsertTextAtLast(HWND i_hwnd, const tstring &i_text,
 	Edit_SetSel(i_hwnd, len, len);
 
 	// \n -> \r\n
-	std::vector<_TCHAR> buf(i_text.size() * 2 + 1);
-	_TCHAR *d = buf.data();
-	const _TCHAR *str = i_text.c_str();
-	for (const _TCHAR *s = str; s < str + i_text.size(); ++ s) {
-		if (*s == _T('\n'))
-			*d++ = _T('\r');
+	std::vector<wchar_t> buf(i_text.size() * 2 + 1);
+	wchar_t *d = buf.data();
+	const wchar_t *str = i_text.c_str();
+	for (const wchar_t *s = str; s < str + i_text.size(); ++ s) {
+		if (*s == L'\n')
+			*d++ = L'\r';
 		*d++ = *s;
 	}
-	*d = _T('\0');
+	*d = L'\0';
 
 	Edit_ReplaceSel(i_hwnd, buf.data());
 }
@@ -298,7 +298,7 @@ void editInsertTextAtLast(HWND i_hwnd, const tstring &i_text,
 static BOOL WINAPI initalizeLayerdWindow(
 	HWND i_hwnd, COLORREF i_crKey, BYTE i_bAlpha, DWORD i_dwFlags)
 {
-	HMODULE hModule = GetModuleHandle(_T("user32.dll"));
+	HMODULE hModule = GetModuleHandle(L"user32.dll");
 	if (!hModule) {
 		return FALSE;
 	}
@@ -328,7 +328,7 @@ static HMONITOR WINAPI emulateMonitorFromWindow(HWND hwnd, DWORD dwFlags)
 // initialize MonitorFromWindow API
 static HMONITOR WINAPI initializeMonitorFromWindow(HWND hwnd, DWORD dwFlags)
 {
-	HMODULE hModule = GetModuleHandle(_T("user32.dll"));
+	HMODULE hModule = GetModuleHandle(L"user32.dll");
 	if (!hModule)
 		return FALSE;
 
@@ -368,7 +368,7 @@ static BOOL WINAPI emulateGetMonitorInfo(HMONITOR hMonitor, LPMONITORINFO lpmi)
 static
 BOOL WINAPI initializeGetMonitorInfo(HMONITOR hMonitor, LPMONITORINFO lpmi)
 {
-	HMODULE hModule = GetModuleHandle(_T("user32.dll"));
+	HMODULE hModule = GetModuleHandle(L"user32.dll");
 	if (!hModule)
 		return FALSE;
 
@@ -399,7 +399,7 @@ static BOOL WINAPI emulateEnumDisplayMonitors(
 static BOOL WINAPI initializeEnumDisplayMonitors(
 	HDC hdc, LPRECT lprcClip, MONITORENUMPROC lpfnEnum, LPARAM dwData)
 {
-	HMODULE hModule = GetModuleHandle(_T("user32.dll"));
+	HMODULE hModule = GetModuleHandle(L"user32.dll");
 	if (!hModule)
 		return FALSE;
 
@@ -427,8 +427,8 @@ BOOL (WINAPI *enumDisplayMonitors)
 static BOOL WINAPI
 initializeWTSRegisterSessionNotification(HWND hWnd, DWORD dwFlags)
 {
-	LoadLibrary(_T("wtsapi32.dll"));
-	HMODULE hModule = GetModuleHandle(_T("wtsapi32.dll"));
+	LoadLibrary(L"wtsapi32.dll");
+	HMODULE hModule = GetModuleHandle(L"wtsapi32.dll");
 	if (!hModule) {
 		return FALSE;
 	}
@@ -450,7 +450,7 @@ WTSRegisterSessionNotification_t wtsRegisterSessionNotification
 
 static BOOL WINAPI initializeWTSUnRegisterSessionNotification(HWND hWnd)
 {
-	HMODULE hModule = GetModuleHandle(_T("wtsapi32.dll"));
+	HMODULE hModule = GetModuleHandle(L"wtsapi32.dll");
 	if (!hModule) {
 		return FALSE;
 	}
@@ -472,7 +472,7 @@ WTSUnRegisterSessionNotification_t wtsUnRegisterSessionNotification
 
 static DWORD WINAPI initializeWTSGetActiveConsoleSessionId(void)
 {
-	HMODULE hModule = GetModuleHandle(_T("kernel32.dll"));
+	HMODULE hModule = GetModuleHandle(L"kernel32.dll");
 	if (!hModule) {
 		return FALSE;
 	}
@@ -496,19 +496,19 @@ WTSGetActiveConsoleSessionId_t wtsGetActiveConsoleSessionId
 // Utility
 
 // PathRemoveFileSpec()
-tstring pathRemoveFileSpec(const tstring &i_path)
+std::wstring pathRemoveFileSpec(const std::wstring &i_path)
 {
-	const _TCHAR *str = i_path.c_str();
-	const _TCHAR *b = _tcsrchr(str, _T('\\'));
-	const _TCHAR *s = _tcsrchr(str, _T('/'));
+	const wchar_t *str = i_path.c_str();
+	const wchar_t *b = wcsrchr(str, L'\\');
+	const wchar_t *s = wcsrchr(str, L'/');
 	if (b && s)
-		return tstring(str, MIN(b, s));
+		return std::wstring(str, MIN(b, s));
 	if (b)
-		return tstring(str, b);
+		return std::wstring(str, b);
 	if (s)
-		return tstring(str, s);
-	if (const _TCHAR *c = _tcsrchr(str, _T(':')))
-		return tstring(str, c + 1);
+		return std::wstring(str, s);
+	if (const wchar_t *c = wcsrchr(str, L':'))
+		return std::wstring(str, c + 1);
 	return i_path;
 }
 

@@ -75,22 +75,22 @@ public:
 
 	/// WM_targetNotify
 	BOOL wmTargetNotify(HWND i_hwndTarget) {
-		_TCHAR className[GANA_MAX_ATOM_LENGTH];
+		wchar_t className[GANA_MAX_ATOM_LENGTH];
 		bool ok = false;
 		if (GetClassName(i_hwndTarget, className, NUMBER_OF(className))) {
-			if (_tcsicmp(className, _T("ConsoleWindowClass")) == 0) {
-				_TCHAR titleName[1024];
+			if (_wcsicmp(className, L"ConsoleWindowClass") == 0) {
+				wchar_t titleName[1024];
 				if (GetWindowText(i_hwndTarget, titleName, NUMBER_OF(titleName)) == 0)
-					titleName[0] = _T('\0');
+					titleName[0] = L'\0';
 				{
 					Acquire a(&m_data.m_engine->m_log, 1);
-					m_data.m_engine->m_log << _T("HWND:\t") << std::hex
+					m_data.m_engine->m_log << L"HWND:\t" << std::hex
 					<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_hwndTarget))
 					<< std::dec << std::endl;
 				}
 				Acquire a(&m_data.m_engine->m_log, 0);
-				m_data.m_engine->m_log << _T("CLASS:\t") << className << std::endl;
-				m_data.m_engine->m_log << _T("TITLE:\t") << titleName << std::endl;
+				m_data.m_engine->m_log << L"CLASS:\t" << className << std::endl;
+				m_data.m_engine->m_log << L"TITLE:\t" << titleName << std::endl;
 				ok = true;
 			}
 		}
@@ -106,21 +106,21 @@ public:
 					  bool /* i_isAltDown */, bool i_isKeyup) {
 		Acquire a(&m_data.m_engine->m_log, 0);
 		m_data.m_engine->m_log
-		<< (i_isExtended ? _T(" E-") : _T("   "))
-		<< _T("0x") << std::hex << std::setw(2) << std::setfill(_T('0'))
-		<< i_nVirtKey << std::dec << _T("  &VK( ")
-		<< (i_isExtended ? _T("E-") : _T("  "))
-		<< (i_isKeyup ? _T("U-") : _T("D-"));
+		<< (i_isExtended ? L" E-" : L"   ")
+		<< L"0x" << std::hex << std::setw(2) << std::setfill(L'0')
+		<< i_nVirtKey << std::dec << L"  &VK( "
+		<< (i_isExtended ? L"E-" : L"  ")
+		<< (i_isKeyup ? L"U-" : L"D-");
 
 		for (const VKeyTable *vkt = g_vkeyTable; vkt->m_name; ++ vkt) {
 			if (vkt->m_code == i_nVirtKey) {
-				m_data.m_engine->m_log << vkt->m_name << _T(" )") << std::endl;
+				m_data.m_engine->m_log << vkt->m_name << L" )" << std::endl;
 				return TRUE;
 			}
 		}
-		m_data.m_engine->m_log << _T("0x") << std::hex << std::setw(2)
-		<< std::setfill(_T('0')) << i_nVirtKey << std::dec
-		<< _T(" )") << std::endl;
+		m_data.m_engine->m_log << L"0x" << std::hex << std::setw(2)
+		<< std::setfill(L'0') << i_nVirtKey << std::dec
+		<< L" )" << std::endl;
 		return TRUE;
 	}
 

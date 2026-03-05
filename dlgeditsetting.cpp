@@ -95,16 +95,16 @@ public:
 
 	/// WM_COMMAND
 	BOOL wmCommand(int /* i_notify_code */, int i_id, HWND /* i_hwnd_control */) {
-		_TCHAR buf[GANA_MAX_PATH];
+		wchar_t buf[GANA_MAX_PATH];
 		switch (i_id) {
 		case IDC_BUTTON_browse: {
-			tstring title = loadString(IDS_openMayu);
-			tstring filter = loadString(IDS_openMayuFilter);
+			std::wstring title = loadString(IDS_openMayu);
+			std::wstring filter = loadString(IDS_openMayuFilter);
 			for (size_t i = 0; i < filter.size(); ++ i)
-				if (filter[i] == _T('|'))
-					filter[i] = _T('\0');
+				if (filter[i] == L'|')
+					filter[i] = L'\0';
 
-			_tcscpy(buf, _T(".mayu"));
+			wcscpy(buf, L".mayu");
 			OPENFILENAME of;
 			memset(&of, 0, sizeof(of));
 			of.lStructSize = sizeof(of);

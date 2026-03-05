@@ -43,7 +43,7 @@ KeySeq *SettingBuilder::materializeKeySeq(const CmdKeySequence &cmdKs)
 			break;
 		}
 		case CmdAction::SubSeq: {
-			KeySeq subKs(_T(""));
+			KeySeq subKs(L"");
 			for (const auto &sub : action.subActions) {
 				if (sub.type == CmdAction::Key) {
 					ModifiedKey mkey;

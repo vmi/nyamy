@@ -41,7 +41,7 @@ public:
 	std::optional<AnyCmd> readCmd();
 
 	/// Dump the entire command stream to text (replaces BcDisassembler)
-	static void dump(std::istream &in, tostream &out);
+	static void dump(std::istream &in, std::wostream &out);
 
 private:
 	std::istream &m_in;
@@ -52,7 +52,7 @@ private:
 	uint32_t readU32();
 	int32_t readI32();
 	uint64_t readU64();
-	tstringi readString();
+	wstringi readString();
 	CmdModifier readModifier();
 	CmdScanCode readScanCode();
 	CmdModifiedKey readModifiedKey();
@@ -61,9 +61,9 @@ private:
 	CmdKeySequence readKeySequence();
 
 	// Dump helpers
-	static void dumpModifier(tostream &out, const CmdModifier &mod);
-	static void dumpAction(tostream &out, const CmdAction &action, int indent);
-	static void dumpArgument(tostream &out, const CmdArgument &arg);
+	static void dumpModifier(std::wostream &out, const CmdModifier &mod);
+	static void dumpAction(std::wostream &out, const CmdAction &action, int indent);
+	static void dumpArgument(std::wostream &out, const CmdArgument &arg);
 };
 
 

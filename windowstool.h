@@ -18,7 +18,7 @@ extern HINSTANCE g_hInst;
 // resource
 
 /// load resource string
-extern tstring loadString(UINT i_id);
+extern std::wstring loadString(UINT i_id);
 
 /// load small icon resource (it must be deleted by DestroyIcon())
 extern HICON loadSmallIcon(UINT i_id);
@@ -64,7 +64,7 @@ extern void asyncMoveWindow(HWND i_hwnd, int i_x, int i_y, int i_w, int i_h);
 extern void asyncResize(HWND i_hwnd, int i_w, int i_h);
 
 /// get dll version
-extern DWORD getDllVersion(const _TCHAR *i_dllname);
+extern DWORD getDllVersion(const wchar_t *i_dllname);
 #define PACKVERSION(major, minor) MAKELONG(minor, major)
 
 // workaround of SetForegroundWindow
@@ -130,7 +130,7 @@ extern size_t editGetTextBytes(HWND i_hwnd);
 extern void editDeleteLine(HWND i_hwnd, size_t i_n);
 
 /// insert text at last
-extern void editInsertTextAtLast(HWND i_hwnd, const tstring &i_text,
+extern void editInsertTextAtLast(HWND i_hwnd, const std::wstring &i_text,
 									 size_t i_threshold);
 
 
@@ -173,7 +173,7 @@ extern WTSGetActiveConsoleSessionId_t wtsGetActiveConsoleSessionId;
 // Utility
 
 // PathRemoveFileSpec()
-tstring pathRemoveFileSpec(const tstring &i_path);
+std::wstring pathRemoveFileSpec(const std::wstring &i_path);
 
 // check Windows version i_major.i_minor or later
 BOOL checkWindowsVersion(DWORD i_major, DWORD i_minor);

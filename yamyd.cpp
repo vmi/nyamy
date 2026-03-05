@@ -16,8 +16,8 @@ static LONG WINAPI crashExceptionFilter(EXCEPTION_POINTERS *i_ep)
 
 
 /// main
-int WINAPI _tWinMain(HINSTANCE /* i_hInstance */, HINSTANCE /* i_hPrevInstance */,
-					 LPTSTR /* i_lpszCmdLine */, int /* i_nCmdShow */)
+int WINAPI wWinMain(HINSTANCE /* i_hInstance */, HINSTANCE /* i_hPrevInstance */,
+					 LPWSTR /* i_lpszCmdLine */, int /* i_nCmdShow */)
 {
 	// crash-safe hook cleanup
 	s_prevExceptionFilter = SetUnhandledExceptionFilter(crashExceptionFilter);

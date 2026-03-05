@@ -69,10 +69,35 @@ private:
 
 
 //=============================================================================
+// PipeReadWStreambuf - wraps a Win32 read pipe HANDLE as a std::wstreambuf
+// Reads UTF-16 wchar_t units from a pipe whose write end uses _O_U16TEXT mode
+//=============================================================================
+
+class PipeReadWStreambuf : public std::wstreambuf
+{
+public:
+	explicit PipeReadWStreambuf(HANDLE h) : m_h(h) {}
+
+protected:
+	int_type underflow() override {
+		DWORD got = 0;
+		if (!ReadFile(m_h, &m_ch, sizeof(wchar_t), &got, NULL) || got < sizeof(wchar_t))
+			return traits_type::eof();
+		setg(&m_ch, &m_ch, &m_ch + 1);
+		return traits_type::to_int_type(m_ch);
+	}
+
+private:
+	HANDLE m_h;
+	wchar_t m_ch = 0;
+};
+
+
+//=============================================================================
 // ScripterManager
 //=============================================================================
 
-ScripterManager::ScripterManager(SyncObject *i_soLog, tostream *i_log,
+ScripterManager::ScripterManager(SyncObject *i_soLog, std::wostream *i_log,
                                  HWND i_hwndNotify)
 	: m_soLog(i_soLog)
 	, m_log(i_log)
@@ -143,7 +168,7 @@ bool ScripterManager::start()
 	    !CreatePipe(&m_hStderrRead,  &hStderrWrite, &sa, 0)) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << _T("ScripterManager: CreatePipe failed\n");
+			*m_log << L"ScripterManager: CreatePipe failed\n";
 		}
 		return false;
 	}
@@ -154,15 +179,15 @@ bool ScripterManager::start()
 	SetHandleInformation(m_hStderrRead, HANDLE_FLAG_INHERIT, 0);
 
 	// determine scripter's executable path
-	_TCHAR exePath[GANA_MAX_PATH];
-	_TCHAR exeDrive[GANA_MAX_PATH];
-	_TCHAR exeDir[GANA_MAX_PATH];
+	wchar_t exePath[GANA_MAX_PATH];
+	wchar_t exeDrive[GANA_MAX_PATH];
+	wchar_t exeDir[GANA_MAX_PATH];
 	GetModuleFileName(NULL, exePath, GANA_MAX_PATH);
-	_tsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH,
+	_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH,
 	              NULL, 0, NULL, 0);
-	tstringi scripterPath = exeDrive;
+	wstringi scripterPath = exeDrive;
 	scripterPath += exeDir;
-	scripterPath += _T("yamy-scripter.exe");
+	scripterPath += L"yamy-scripter.exe";
 
 	STARTUPINFO si = {};
 	si.cb         = sizeof(si);
@@ -183,8 +208,8 @@ bool ScripterManager::start()
 	if (!result) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << _T("ScripterManager: failed to start ") << scripterPath
-			       << _T(" (error ") << GetLastError() << _T(")\n");
+			*m_log << L"ScripterManager: failed to start " << scripterPath
+			       << L" (error " << GetLastError() << L")\n";
 		}
 		return false;
 	}
@@ -204,7 +229,7 @@ bool ScripterManager::start()
 
 	if (m_log) {
 		Acquire a(m_soLog, 0);
-		*m_log << _T("ScripterManager: started ") << scripterPath << _T("\n");
+		*m_log << L"ScripterManager: started " << scripterPath << L"\n";
 	}
 	return true;
 }
@@ -218,7 +243,7 @@ void ScripterManager::reload(const Symbols &syms)
 	} catch (...) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << _T("ScripterManager: writeReload failed\n");
+			*m_log << L"ScripterManager: writeReload failed\n";
 		}
 	}
 }
@@ -274,30 +299,15 @@ unsigned __stdcall ScripterManager::stderrThread(void *param)
 
 void ScripterManager::runStderrReader()
 {
-	char lineBuf[2048];
-	std::string partial;
-	DWORD got;
+	PipeReadWStreambuf wsb(m_hStderrRead);
+	std::wistream ws(&wsb);
+	std::wstring line;
 
-	while (ReadFile(m_hStderrRead, lineBuf, sizeof(lineBuf) - 1, &got, NULL) && got > 0) {
-		lineBuf[got] = '\0';
-		partial += lineBuf;
-
-		size_t pos;
-		while ((pos = partial.find('\n')) != std::string::npos) {
-			std::string line = partial.substr(0, pos);
-			if (!line.empty() && line.back() == '\r') line.pop_back();
-			partial.erase(0, pos + 1);
-
-			if (m_log) {
-				Acquire a(m_soLog, 0);
-				*m_log << _T("[scripter] ")
-#ifdef UNICODE
-				       << to_wstring(line)
-#else
-				       << line
-#endif
-				       << _T("\n");
-			}
+	while (std::getline(ws, line)) {
+		if (!line.empty() && line.back() == L'\r') line.pop_back();
+		if (m_log) {
+			Acquire a(m_soLog, 0);
+			*m_log << L"[scripter] " << line << L"\n";
 		}
 	}
 }

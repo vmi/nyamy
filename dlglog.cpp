@@ -21,7 +21,7 @@ class DlgLog : public LayoutManager
 	LOGFONT m_lf;					///
 	HFONT m_hfontOriginal;			///
 	HFONT m_hfont;				///
-	tomsgstream *m_log;				///
+	womsgstream *m_log;				///
 
 public:
 	///
@@ -44,7 +44,7 @@ public:
 		setBigIcon(m_hwnd, IDI_ICON_mayu);
 
 		// set font
-		Registry::read(MAYU_REGISTRY_ROOT, _T("logFont"), &m_lf,
+		Registry::read(MAYU_REGISTRY_ROOT, L"logFont", &m_lf,
 					   loadString(IDS_logFont));
 		m_hfont = CreateFontIndirect(&m_lf);
 		SetWindowFont(m_hwndEdit, m_hfont, false);
@@ -114,7 +114,7 @@ public:
 
 		case IDC_BUTTON_clearLog: {
 			Edit_SetSel(m_hwndEdit, 0, Edit_GetTextLength(m_hwndEdit));
-			Edit_ReplaceSel(m_hwndEdit, _T(""));
+			Edit_ReplaceSel(m_hwndEdit, L"");
 			SendMessage(m_hwndTaskTray, WM_APP_dlglogNotify,
 						DlgLogNotify_logCleared, 0);
 			return TRUE;
@@ -132,7 +132,7 @@ public:
 				SetWindowFont(m_hwnd, hfontNew, true);
 				DeleteObject(m_hfont);
 				m_hfont = hfontNew;
-				Registry::write(MAYU_REGISTRY_ROOT, _T("logFont"), m_lf);
+				Registry::write(MAYU_REGISTRY_ROOT, L"logFont", m_lf);
 			}
 			return TRUE;
 		}

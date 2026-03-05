@@ -51,8 +51,8 @@ private:
 		DWORD m_threadId;				/// thread id
 		HWND m_hwndFocus;				/** window that has focus on
                                                     the thread */
-		tstringi m_className;			/// class name of hwndFocus
-		tstringi m_titleName;			/// title name of hwndFocus
+		wstringi m_className;			/// class name of hwndFocus
+		wstringi m_titleName;			/// title name of hwndFocus
 		bool m_isConsole;				/// is hwndFocus console ?
 		KeymapPtrList m_keymaps;			/// keymaps
 
@@ -92,14 +92,14 @@ private:
 	///
 	class EmacsEditKillLine
 	{
-		tstring m_buf;	/// previous kill-line contents
+		std::wstring m_buf;	/// previous kill-line contents
 
 	public:
 		bool m_doForceReset;	///
 
 	private:
 		///
-		HGLOBAL makeNewKillLineBuf(const _TCHAR *i_data, int *i_retval);
+		HGLOBAL makeNewKillLineBuf(const wchar_t *i_data, int *i_retval);
 
 	public:
 		///
@@ -249,13 +249,13 @@ private:
 	WindowPositions m_windowPositions;		///
 	WindowsWithAlpha m_windowsWithAlpha;		///
 
-	tstring m_helpMessage;			/// for &amp;HelpMessage
-	tstring m_helpTitle;				/// for &amp;HelpMessage
+	std::wstring m_helpMessage;			/// for &amp;HelpMessage
+	std::wstring m_helpTitle;				/// for &amp;HelpMessage
 	int m_variable;				/// for &amp;Variable,
 	///  &amp;Repeat
 
 public:
-	tomsgstream &m_log;				/** log stream (output to log
+	womsgstream &m_log;				/** log stream (output to log
                                                     dialog's edit) */
 
 public:
@@ -370,11 +370,11 @@ private:
 						  ShowCommandType i_showCommand);
 	/// SetForegroundWindow
 	void funcSetForegroundWindow(FunctionParam *i_param,
-								 const tregex &i_windowClassName,
+								 const wregex_stored &i_windowClassName,
 								 LogicalOperatorType i_logicalOp
 								 = LogicalOperatorType_and,
-								 const tregex &i_windowTitleName
-								 = tregex(_T(".*")));
+								 const wregex_stored &i_windowTitleName
+								 = wregex_stored(L".*"));
 	/// load setting
 	void funcLoadSetting(FunctionParam *i_param,
 						 const StrExprArg &i_name = StrExprArg());
@@ -494,9 +494,9 @@ private:
 	void funcRecenter(FunctionParam *i_param);
 	/// Direct SSTP
 	void funcDirectSSTP(FunctionParam *i_param,
-						const tregex &i_name,
+						const wregex_stored &i_name,
 						const StrExprArg &i_protocol,
-						const std::list<tstringq> &i_headers);
+						const std::list<wstringq> &i_headers);
 	/// PlugIn
 	void funcPlugIn(FunctionParam *i_param,
 					const StrExprArg &i_dllName,
@@ -519,7 +519,7 @@ private:
 
 public:
 	///
-	Engine(tomsgstream &i_log);
+	Engine(womsgstream &i_log);
 	///
 	~Engine();
 
@@ -579,8 +579,8 @@ public:
 
 	/// focus
 	bool setFocus(HWND i_hwndFocus, DWORD i_threadId,
-				  const tstringi &i_className,
-				  const tstringi &i_titleName, bool i_isConsole);
+				  const wstringi &i_className,
+				  const wstringi &i_titleName, bool i_isConsole);
 
 	/// lock state
 	bool setLockState(bool i_isNumLockToggled, bool i_isCapsLockToggled,
@@ -604,7 +604,7 @@ public:
 	void shellExecute();
 
 	/// get help message
-	void getHelpMessages(tstring *o_helpMessage, tstring *o_helpTitle);
+	void getHelpMessages(std::wstring *o_helpMessage, std::wstring *o_helpTitle);
 
 	/// command notify
 	template <typename WPARAM_T, typename LPARAM_T>
@@ -620,13 +620,13 @@ public:
 				GetWindowThreadProcessId(m_hwndAssocWindow, NULL))
 			return;	// inhibit the investigation of MADO TSUKAI NO YUUTSU
 
-		const _TCHAR *target = NULL;
+		const wchar_t *target = NULL;
 		int number_target = 0;
 
 		if (i_hwnd == hf)
-			target = _T("ToItself");
+			target = L"ToItself";
 		else if (i_hwnd == GetParent(hf))
-			target = _T("ToParentWindow");
+			target = L"ToParentWindow";
 		else {
 			// Function::toMainWindow
 			HWND h = hf;
@@ -637,7 +637,7 @@ public:
 				h = p;
 			}
 			if (i_hwnd == h)
-				target = _T("ToMainWindow");
+				target = L"ToMainWindow";
 			else {
 				// Function::toOverlappedWindow
 				HWND h = hf;
@@ -652,7 +652,7 @@ public:
 					h = GetParent(h);
 				}
 				if (i_hwnd == h)
-					target = _T("ToOverlappedWindow");
+					target = L"ToOverlappedWindow";
 				else {
 					// number
 					HWND h = hf;
@@ -664,34 +664,34 @@ public:
 			}
 		}
 
-		m_log << _T("&PostMessage(");
+		m_log << L"&PostMessage(";
 		if (target)
 			m_log << target;
 		else
 			m_log << number_target;
-		m_log << _T(", ") << i_message
-		<< _T(", 0x") << std::hex << i_wParam
-		<< _T(", 0x") << i_lParam << _T(") # hwnd = ")
-		<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_hwnd)) << _T(", ")
-		<< _T("message = ") << std::dec;
+		m_log << L", " << i_message
+		<< L", 0x" << std::hex << i_wParam
+		<< L", 0x" << i_lParam << L") # hwnd = "
+		<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_hwnd)) << L", "
+		<< L"message = " << std::dec;
 		if (i_message == WM_COMMAND)
-			m_log << _T("WM_COMMAND, ");
+			m_log << L"WM_COMMAND, ";
 		else if (i_message == WM_SYSCOMMAND)
-			m_log << _T("WM_SYSCOMMAND, ");
+			m_log << L"WM_SYSCOMMAND, ";
 		else
-			m_log << i_message << _T(", ");
-		m_log << _T("wNotifyCode = ") << HIWORD(i_wParam) << _T(", ")
-		<< _T("wID = ") << LOWORD(i_wParam) << _T(", ")
-		<< _T("hwndCtrl = 0x") << std::hex << i_lParam << std::dec << std::endl;
+			m_log << i_message << L", ";
+		m_log << L"wNotifyCode = " << HIWORD(i_wParam) << L", "
+		<< L"wID = " << LOWORD(i_wParam) << L", "
+		<< L"hwndCtrl = 0x" << std::hex << i_lParam << std::dec << std::endl;
 	}
 
 	/// get current window class name
-	const tstringi &getCurrentWindowClassName() const {
+	const wstringi &getCurrentWindowClassName() const {
 		return m_currentFocusOfThread->m_className;
 	}
 
 	/// get current window title name
-	const tstringi &getCurrentWindowTitleName() const {
+	const wstringi &getCurrentWindowTitleName() const {
 		return m_currentFocusOfThread->m_titleName;
 	}
 };

@@ -19,11 +19,11 @@ class AstVisitor;
 
 /// Source location for error reporting
 struct AstSourceLoc {
-	tstringi filename;
+	wstringi filename;
 	size_t line;
 
 	AstSourceLoc() : line(0) {}
-	AstSourceLoc(const tstringi &i_filename, size_t i_line)
+	AstSourceLoc(const wstringi &i_filename, size_t i_line)
 		: filename(i_filename), line(i_line) {}
 };
 
@@ -51,14 +51,14 @@ using AstNodePtr = std::unique_ptr<AstNode>;
 /// Modifier specifier within a modifier sequence
 struct AstModifierSpec {
 	enum Flag { Press, Release, Dontcare };
-	tstringi name;		///< "S-", "C-", "*", "~", etc.
+	wstringi name;		///< "S-", "C-", "*", "~", etc.
 	Flag flag;
 };
 
 
 /// Scan code with optional E0-/E1- extensions
 struct AstScanCode {
-	std::vector<tstringi> extensions;	///< "E0-", "E1-"
+	std::vector<wstringi> extensions;	///< "E0-", "E1-"
 	int scanCode;
 };
 
@@ -66,7 +66,7 @@ struct AstScanCode {
 /// Modified key (modifier sequence + key name)
 struct AstModifiedKey {
 	std::vector<AstModifierSpec> modifiers;
-	tstringi keyName;
+	wstringi keyName;
 };
 
 
@@ -91,7 +91,7 @@ using AstActionPtr = std::unique_ptr<AstAction>;
 class AstActionKey : public AstAction
 {
 public:
-	tstringi keyName;
+	wstringi keyName;
 
 	void accept(AstVisitor &v) const override;
 };
@@ -101,7 +101,7 @@ public:
 class AstActionKeySeqRef : public AstAction
 {
 public:
-	tstringi name;
+	wstringi name;
 
 	void accept(AstVisitor &v) const override;
 };
@@ -122,11 +122,11 @@ public:
 	};
 
 	Kind kind;
-	tstringi stringValue;
+	wstringi stringValue;
 	int numberValue;
 	std::unique_ptr<class AstKeySequence> keySeq;
 	std::vector<AstModifierSpec> modifierSeq;
-	std::vector<tstringi> tokens;		///< for Kind_TokenSeq
+	std::vector<wstringi> tokens;		///< for Kind_TokenSeq
 
 	AstArgument() : kind(Kind_String), numberValue(0) {}
 };
@@ -136,7 +136,7 @@ public:
 class AstActionFuncCall : public AstAction
 {
 public:
-	tstringi functionName;
+	wstringi functionName;
 	std::vector<std::unique_ptr<AstArgument>> arguments;
 
 	void accept(AstVisitor &v) const override;
@@ -193,12 +193,12 @@ public:
 /// Conditional block: if/elseif/else/endif
 struct AstCondBranch {
 	bool isNegated;				///< "!" prefix
-	tstringi symbol;			///< symbol name (empty for "else")
+	wstringi symbol;			///< symbol name (empty for "else")
 
 	/// additional AND conditions (from inline "and ( ... )" on same line)
 	struct AndCond {
 		bool isNegated;
-		tstringi symbol;
+		wstringi symbol;
 	};
 	std::vector<AndCond> andConditions;
 
@@ -224,7 +224,7 @@ public:
 class AstDefineSymbol : public AstNode
 {
 public:
-	tstringi symbol;
+	wstringi symbol;
 
 	void accept(AstVisitor &v) const override;
 };
@@ -234,7 +234,7 @@ public:
 class AstInclude : public AstNode
 {
 public:
-	tstringi filename;
+	wstringi filename;
 
 	void accept(AstVisitor &v) const override;
 };
@@ -245,7 +245,7 @@ class AstDefKey : public AstNode
 {
 public:
 	bool isParenthesized;
-	std::vector<tstringi> names;
+	std::vector<wstringi> names;
 	std::vector<AstScanCode> scanCodes;
 
 	AstDefKey() : isParenthesized(false) {}
@@ -258,8 +258,8 @@ public:
 class AstDefModifier : public AstNode
 {
 public:
-	tstringi modifierName;			///< "shift", "alt", "control", "windows"
-	std::vector<tstringi> keyNames;
+	wstringi modifierName;			///< "shift", "alt", "control", "windows"
+	std::vector<wstringi> keyNames;
 
 	void accept(AstVisitor &v) const override;
 };
@@ -279,8 +279,8 @@ public:
 class AstDefAlias : public AstNode
 {
 public:
-	tstringi aliasName;
-	tstringi keyName;
+	wstringi aliasName;
+	wstringi keyName;
 
 	void accept(AstVisitor &v) const override;
 };
@@ -301,9 +301,9 @@ public:
 class AstDefOption : public AstNode
 {
 public:
-	tstringi optionName;		///< "KL-", "delay-of", "sts4mayu", etc.
-	tstringi qualifier;			///< "!!!" for delay-of, empty otherwise
-	tstringi value;
+	wstringi optionName;		///< "KL-", "delay-of", "sts4mayu", etc.
+	wstringi qualifier;			///< "!!!" for delay-of, empty otherwise
+	wstringi value;
 
 	void accept(AstVisitor &v) const override;
 };
@@ -311,18 +311,18 @@ public:
 
 /// keymap / keymap2 / window definition
 struct AstWindowSpec {
-	tstringi className;			///< regexp
-	tstringi titleName;			///< regexp (may be empty)
-	tstringi op;				///< "&&" or "||" (empty if class-only)
+	wstringi className;			///< regexp
+	wstringi titleName;			///< regexp (may be empty)
+	wstringi op;				///< "&&" or "||" (empty if class-only)
 };
 
 class AstKeymapDef : public AstNode
 {
 public:
-	tstringi keyword;			///< "keymap", "keymap2", "window"
-	tstringi name;
+	wstringi keyword;			///< "keymap", "keymap2", "window"
+	wstringi name;
 	std::unique_ptr<AstWindowSpec> window;
-	tstringi parentName;		///< after ":" (empty if none)
+	wstringi parentName;		///< after ":" (empty if none)
 	std::unique_ptr<AstKeySequence> defaultKeySeq;
 
 	void accept(AstVisitor &v) const override;
@@ -355,7 +355,7 @@ public:
 class AstEventAssign : public AstNode
 {
 public:
-	tstringi eventName;
+	wstringi eventName;
 	std::unique_ptr<AstKeySequence> keySeq;
 
 	void accept(AstVisitor &v) const override;
@@ -364,21 +364,21 @@ public:
 
 /// mod (ASSIGN_MODE MODIFIER_NAME)* MODIFIER_NAME ASSIGN_OP (MODE? KEY)*
 struct AstModAssignPrefix {
-	tstringi assignMode;		///< "!", "!!", "!!!" or empty
-	tstringi modifierName;
+	wstringi assignMode;		///< "!", "!!", "!!!" or empty
+	wstringi modifierName;
 };
 
 struct AstModAssignKey {
-	tstringi assignMode;		///< "!", "!!", "!!!" or empty
-	tstringi keyName;
+	wstringi assignMode;		///< "!", "!!", "!!!" or empty
+	wstringi keyName;
 };
 
 class AstModifierAssign : public AstNode
 {
 public:
 	std::vector<AstModAssignPrefix> prefixes;
-	tstringi mainModifierName;
-	tstringi op;				///< "=", "+=", "-="
+	wstringi mainModifierName;
+	wstringi op;				///< "=", "+=", "-="
 	std::vector<AstModAssignKey> keys;
 
 	void accept(AstVisitor &v) const override;
@@ -389,7 +389,7 @@ public:
 class AstKeySeqDef : public AstNode
 {
 public:
-	tstringi name;
+	wstringi name;
 	std::unique_ptr<AstKeySequence> keySeq;
 
 	void accept(AstVisitor &v) const override;

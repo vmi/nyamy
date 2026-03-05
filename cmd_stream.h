@@ -63,7 +63,7 @@ struct CmdScanCode {
 /// Modified key reference (modifier + key name)
 struct CmdModifiedKey {
 	CmdModifier modifier;
-	tstringi keyName;
+	wstringi keyName;
 };
 
 
@@ -79,11 +79,11 @@ struct CmdArgument {
 	};
 
 	Type type;
-	tstringi stringValue;
+	wstringi stringValue;
 	int32_t numberValue;
 	uint32_t keySeqIndex;
 	CmdModifier modifierValue;
-	std::vector<tstringi> tokens;		///< for TokenSeq
+	std::vector<wstringi> tokens;		///< for TokenSeq
 
 	CmdArgument() : type(String), numberValue(0), keySeqIndex(0) {}
 };
@@ -100,7 +100,7 @@ struct CmdAction {
 
 	Type type;
 	CmdModifier modifier;
-	tstringi name;				///< key name / keyseq name / func name
+	wstringi name;				///< key name / keyseq name / func name
 	std::vector<CmdArgument> arguments;	///< for FuncCall only
 	std::vector<CmdAction> subActions;	///< for SubSeq only
 
@@ -110,7 +110,7 @@ struct CmdAction {
 
 /// Named key sequence (stored in the pool)
 struct CmdKeySequence {
-	tstringi name;
+	wstringi name;
 	uint8_t mode;			///< Modifier::Type_KEYSEQ or Type_ASSIGN
 	std::vector<CmdAction> actions;
 
@@ -123,13 +123,13 @@ struct CmdKeySequence {
 //=============================================================================
 
 struct CmdDefKeyData {
-	std::vector<tstringi> names;
+	std::vector<wstringi> names;
 	std::vector<CmdScanCode> scanCodes;
 };
 
 struct CmdDefModifierData {
-	tstringi modifierName;
-	std::vector<tstringi> keyNames;
+	wstringi modifierName;
+	std::vector<wstringi> keyNames;
 };
 
 struct CmdDefSyncData {
@@ -137,8 +137,8 @@ struct CmdDefSyncData {
 };
 
 struct CmdDefAliasData {
-	tstringi aliasName;
-	tstringi keyName;
+	wstringi aliasName;
+	wstringi keyName;
 };
 
 struct CmdDefSubstituteData {
@@ -149,22 +149,22 @@ struct CmdDefSubstituteData {
 };
 
 struct CmdDefOptionData {
-	tstringi optionName;
-	tstringi qualifier;
-	tstringi value;
+	wstringi optionName;
+	wstringi qualifier;
+	wstringi value;
 };
 
 struct CmdDefSymbolData {
-	tstringi symbolName;
+	wstringi symbolName;
 };
 
 struct CmdKeymapDefData {
-	tstringi keyword;		///< "keymap", "keymap2", "window"
-	tstringi name;
-	tstringi windowClassName;
-	tstringi windowTitleName;
-	tstringi windowOp;		///< "&&", "||", or empty
-	tstringi parentName;
+	wstringi keyword;		///< "keymap", "keymap2", "window"
+	wstringi name;
+	wstringi windowClassName;
+	wstringi windowTitleName;
+	wstringi windowOp;		///< "&&", "||", or empty
+	wstringi parentName;
 	int32_t defaultKeySeqIdx;	///< -1 if none
 
 	CmdKeymapDefData() : defaultKeySeqIdx(-1) {}
@@ -183,7 +183,7 @@ struct CmdKeyDefaultModData {
 };
 
 struct CmdEventAssignData {
-	tstringi eventName;
+	wstringi eventName;
 	uint32_t rhsKeySeqIdx;
 
 	CmdEventAssignData() : rhsKeySeqIdx(0) {}
@@ -191,17 +191,17 @@ struct CmdEventAssignData {
 
 struct CmdModAssignData {
 	struct PrefixMod {
-		tstringi assignMode;
-		tstringi modifierName;
+		wstringi assignMode;
+		wstringi modifierName;
 	};
 	struct KeyEntry {
-		tstringi assignMode;
-		tstringi keyName;
+		wstringi assignMode;
+		wstringi keyName;
 	};
 
 	std::vector<PrefixMod> prefixes;
-	tstringi mainModifierName;
-	tstringi op;			///< "=", "+=", "-="
+	wstringi mainModifierName;
+	wstringi op;			///< "=", "+=", "-="
 	std::vector<KeyEntry> keys;
 };
 

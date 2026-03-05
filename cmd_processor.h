@@ -17,7 +17,7 @@ class CmdProcessor
 public:
 	using CommitCallback = std::function<void(std::unique_ptr<Setting>)>;
 
-	CmdProcessor(SyncObject *soLog, tostream *log);
+	CmdProcessor(SyncObject *soLog, std::wostream *log);
 
 	/// Register a callback invoked each time CmdCommit is received.
 	void onCommit(CommitCallback cb);
@@ -45,12 +45,12 @@ public:
 
 private:
 	void initBuilder();
-	void error(const tstring &msg);
-	static bool lookupModifierType(const tstringi &name, Modifier::Type *o_mt);
-	static Keymap::AssignMode parseAssignMode(const tstringi &s);
+	void error(const std::wstring &msg);
+	static bool lookupModifierType(const wstringi &name, Modifier::Type *o_mt);
+	static Keymap::AssignMode parseAssignMode(const wstringi &s);
 
 	SyncObject *m_soLog;
-	tostream *m_log;
+	std::wostream *m_log;
 	CommitCallback m_commitCallback;
 	std::unique_ptr<SettingBuilder> m_builder;
 };

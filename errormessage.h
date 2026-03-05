@@ -12,7 +12,7 @@
 ///
 class ErrorMessage
 {
-	tstringstream m_ost;				///
+	std::wstringstream m_ost;				///
 
 public:
 	///
@@ -23,7 +23,7 @@ public:
 	}
 
 	/// get error message
-	tstring getMessage() const {
+	std::wstring getMessage() const {
 		return m_ost.str();
 	}
 
@@ -40,7 +40,6 @@ public:
 		return *this;
 	}
 
-#ifdef UNICODE
 	/// add message
 	template<> ErrorMessage &operator<<(const std::string &i_value) {
 		m_ost << to_wstring(i_value);
@@ -53,15 +52,14 @@ public:
 		m_ost << to_wstring(i_value);
 		return *this;
 	}
-#endif
 
 	/// stream output
-	friend tostream &operator<<(tostream &i_ost, const ErrorMessage &i_em);
+	friend std::wostream &operator<<(std::wostream &i_ost, const ErrorMessage &i_em);
 };
 
 
 /// stream output
-inline tostream &operator<<(tostream &i_ost, const ErrorMessage &i_em)
+inline std::wostream &operator<<(std::wostream &i_ost, const ErrorMessage &i_em)
 {
 	return i_ost << i_em.getMessage();
 }

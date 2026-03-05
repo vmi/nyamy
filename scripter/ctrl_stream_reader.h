@@ -31,7 +31,7 @@ private:
 	// Primitive readers (little-endian, same convention as CmdStreamReader)
 	uint8_t readU8();
 	uint16_t readU16();
-	tstringi readString();
+	wstringi readString();
 };
 
 

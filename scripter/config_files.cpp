@@ -14,7 +14,7 @@
 
 
 // constructor
-ConfigFiles::ConfigFiles(SyncObject *i_soLog, tostream *i_log)
+ConfigFiles::ConfigFiles(SyncObject *i_soLog, std::wostream *i_log)
 		: m_soLog(i_soLog),
 		m_log(i_log)
 {
@@ -23,20 +23,20 @@ ConfigFiles::ConfigFiles(SyncObject *i_soLog, tostream *i_log)
 
 // get mayu filename from registry
 bool ConfigFiles::getFilenameFromRegistry(
-	tstringi *o_name, tstringi *o_filename, Symbols *o_symbols) const
+	wstringi *o_name, wstringi *o_filename, Symbols *o_symbols) const
 {
 	Registry reg(MAYU_REGISTRY_ROOT);
 	int index;
-	reg.read(_T(".mayuIndex"), &index, 0);
-	_TCHAR buf[100];
-	_sntprintf(buf, NUMBER_OF(buf), _T(".mayu%d"), index);
+	reg.read(L".mayuIndex", &index, 0);
+	wchar_t buf[100];
+	_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
 
-	tstringi entry;
+	wstringi entry;
 	if (!reg.read(buf, &entry))
 		return false;
 
-	tregex getFilename(_T("^([^;]*);([^;]*);(.*)$"));
-	tsmatch getFilenameResult;
+	wregex_stored getFilename(L"^([^;]*);([^;]*);(.*)$");
+	std::wsmatch getFilenameResult;
 	if (!std::regex_match(entry, getFilenameResult, getFilename))
 		return false;
 
@@ -45,9 +45,9 @@ bool ConfigFiles::getFilenameFromRegistry(
 	if (o_filename)
 		*o_filename = getFilenameResult.str(2);
 	if (o_symbols) {
-		tstringi symbols = getFilenameResult.str(3);
-		tregex symbol(_T("-D([^;]*)(.*)$"));
-		tsmatch symbolResult;
+		wstringi symbols = getFilenameResult.str(3);
+		wregex_stored symbol(L"-D([^;]*)(.*)$");
+		std::wsmatch symbolResult;
 		while (std::regex_search(symbols, symbolResult, symbol)) {
 			o_symbols->insert(symbolResult.str(1));
 			symbols = symbolResult.str(2);
@@ -60,35 +60,35 @@ bool ConfigFiles::getFilenameFromRegistry(
 // get home directory path
 void ConfigFiles::getHomeDirectories(HomeDirectories *o_pathes) const
 {
-	tstringi filename;
+	wstringi filename;
 #ifndef USE_INI
 	if (getFilenameFromRegistry(NULL, &filename, NULL) &&
 			!filename.empty()) {
-		tregex getPath(_T("^(.*[/\\\\])[^/\\\\]*$"));
-		tsmatch getPathResult;
+		wregex_stored getPath(L"^(.*[/\\\\])[^/\\\\]*$");
+		std::wsmatch getPathResult;
 		if (std::regex_match(filename, getPathResult, getPath))
 			o_pathes->push_back(getPathResult.str(1));
 	}
 
-	const _TCHAR *home = _tgetenv(_T("HOME"));
+	const wchar_t *home = _wgetenv(L"HOME");
 	if (home)
 		o_pathes->push_back(home);
 
-	const _TCHAR *homedrive = _tgetenv(_T("HOMEDRIVE"));
-	const _TCHAR *homepath = _tgetenv(_T("HOMEPATH"));
+	const wchar_t *homedrive = _wgetenv(L"HOMEDRIVE");
+	const wchar_t *homepath = _wgetenv(L"HOMEPATH");
 	if (homedrive && homepath)
-		o_pathes->push_back(tstringi(homedrive) + homepath);
+		o_pathes->push_back(wstringi(homedrive) + homepath);
 
-	const _TCHAR *userprofile = _tgetenv(_T("USERPROFILE"));
+	const wchar_t *userprofile = _wgetenv(L"USERPROFILE");
 	if (userprofile)
 		o_pathes->push_back(userprofile);
 
-	_TCHAR buf[GANA_MAX_PATH];
+	wchar_t buf[GANA_MAX_PATH];
 	DWORD len = GetCurrentDirectory(NUMBER_OF(buf), buf);
 	if (0 < len && len < NUMBER_OF(buf))
 		o_pathes->push_back(buf);
 #else //USE_INI
-	_TCHAR buf[GANA_MAX_PATH];
+	wchar_t buf[GANA_MAX_PATH];
 #endif //USE_INI
 
 	if (GetModuleFileName(GetModuleHandle(NULL), buf, NUMBER_OF(buf)))
@@ -97,11 +97,11 @@ void ConfigFiles::getHomeDirectories(HomeDirectories *o_pathes) const
 
 
 // read file contents
-bool ConfigFiles::readFile(tstring *o_data, const tstringi &i_filename) const
+bool ConfigFiles::readFile(std::wstring *o_data, const wstringi &i_filename) const
 {
 	// get size of file
 	struct _stati64 sbuf;
-	if (_tstati64(i_filename.c_str(), &sbuf) < 0 || sbuf.st_size == 0)
+	if (_wstati64(i_filename.c_str(), &sbuf) < 0 || sbuf.st_size == 0)
 		return false;
 	// following check is needed to cast sbuf.st_size to size_t safely
 	// this cast occurs because of above workaround for bcc
@@ -109,7 +109,7 @@ bool ConfigFiles::readFile(tstring *o_data, const tstringi &i_filename) const
 		return false;
 
 	// open
-	FILE *fp = _tfopen(i_filename.c_str(), _T("rb"));
+	FILE *fp = _wfopen(i_filename.c_str(), L"rb");
 	if (!fp)
 		return false;
 
@@ -122,7 +122,6 @@ bool ConfigFiles::readFile(tstring *o_data, const tstringi &i_filename) const
 	buf[static_cast<size_t>(sbuf.st_size)] = 0;			// mbstowcs() requires null
 	// terminated string
 
-#ifdef _UNICODE
 	//
 	if (buf[0] == 0xffU && buf[1] == 0xfeU &&
 			sbuf.st_size % 2 == 0)
@@ -218,7 +217,6 @@ not_UTF_8:
 		fclose(fp);
 		return true;
 	}
-#endif // _UNICODE
 
 	// assume ascii
 	o_data->resize(static_cast<size_t>(sbuf.st_size));
@@ -230,26 +228,22 @@ not_UTF_8:
 
 
 // is the filename readable ?
-bool ConfigFiles::isReadable(const tstringi &i_filename,
+bool ConfigFiles::isReadable(const wstringi &i_filename,
 							 int i_debugLevel) const
 {
 	if (i_filename.empty())
 		return false;
-#ifdef UNICODE
-	tifstream ist(to_string(i_filename).c_str());
-#else
-	tifstream ist(i_filename.c_str());
-#endif
+	std::wifstream ist(to_string(i_filename).c_str());
 	if (ist.good()) {
 		if (m_log && m_soLog) {
 			Acquire a(m_soLog, 0);
-			*m_log << _T("  loading: ") << i_filename << std::endl;
+			*m_log << L"  loading: " << i_filename << std::endl;
 		}
 		return true;
 	} else {
 		if (m_log && m_soLog) {
 			Acquire a(m_soLog, i_debugLevel);
-			*m_log << _T("not found: ") << i_filename << std::endl;
+			*m_log << L"not found: " << i_filename << std::endl;
 		}
 		return false;
 	}
@@ -257,13 +251,13 @@ bool ConfigFiles::isReadable(const tstringi &i_filename,
 
 
 // get filename
-bool ConfigFiles::getFilename(const tstringi &i_name, tstringi *o_path,
+bool ConfigFiles::getFilename(const wstringi &i_name, wstringi *o_path,
 							  Symbols *o_symbols,
 							  RetryCallback i_retry,
 							  int i_debugLevel) const
 {
 	// the default filename is ".mayu"
-	const tstringi &name = i_name.empty() ? tstringi(_T(".mayu")) : i_name;
+	const wstringi &name = i_name.empty() ? wstringi(L".mayu") : i_name;
 
 	bool isFirstTime = true;
 
@@ -279,7 +273,7 @@ bool ConfigFiles::getFilename(const tstringi &i_name, tstringi *o_path,
 					getHomeDirectories(&pathes);
 					for (HomeDirectories::iterator
 							i = pathes.begin(); i != pathes.end(); ++ i) {
-						*o_path = *i + _T("\\") + name;
+						*o_path = *i + L"\\" + name;
 						if (isReadable(*o_path, i_debugLevel))
 							goto add_symbols;
 					}
@@ -305,7 +299,7 @@ add_symbols:
 		HomeDirectories pathes;
 		getHomeDirectories(&pathes);
 		for (HomeDirectories::iterator i = pathes.begin(); i != pathes.end(); ++ i) {
-			*o_path = *i + _T("\\") + name;
+			*o_path = *i + L"\\" + name;
 			if (isReadable(*o_path, i_debugLevel))
 				return true;
 		}

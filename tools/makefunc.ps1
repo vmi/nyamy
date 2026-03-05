@@ -156,21 +156,21 @@ foreach ($stmt in $statements) {
         $null = $sb.AppendLine("")
         
         # GetName
-        $null = $sb.AppendLine("  inline virtual const _TCHAR *getName() const")
+        $null = $sb.AppendLine("  inline virtual const wchar_t *getName() const")
         $null = $sb.AppendLine("  {")
-        $null = $sb.AppendLine("    return _T(`"$name`");")
+        $null = $sb.AppendLine("    return L`"$name`";")
         $null = $sb.AppendLine("  }")
         $null = $sb.AppendLine("")
-        
+
         # Output
-        $null = $sb.AppendLine("  virtual tostream &output(tostream &i_ost) const")
+        $null = $sb.AppendLine("  virtual std::wostream &output(std::wostream &i_ost) const")
         $null = $sb.AppendLine("  {")
-        $null = $sb.AppendLine("    i_ost << _T(`"&`") << getName();")
-        
+        $null = $sb.AppendLine("    i_ost << L`"&`" << getName();")
+
         if ($argc -gt 0) {
-            $null = $sb.AppendLine("    i_ost << _T(`"(`");")
+            $null = $sb.AppendLine("    i_ost << L`"(`";")
         }
-        
+
         for ($i = 0; $i -lt $argc; $i++) {
             $a = $cleanArgs[$i]
             if ($i -eq $argc - 1) {
@@ -178,12 +178,12 @@ foreach ($stmt in $statements) {
                 $null = $sb.AppendLine("    i_ost << m_$($a.ArgName);")
             }
             else {
-                $null = $sb.AppendLine("    i_ost << m_$($a.ArgName) << _T(`", `");")
+                $null = $sb.AppendLine("    i_ost << m_$($a.ArgName) << L`", `";")
             }
         }
-        
+
         if ($argc -gt 0) {
-            $null = $sb.AppendLine("    i_ost << _T(`") `");")
+            $null = $sb.AppendLine("    i_ost << L`") `";")
         }
         $null = $sb.AppendLine("    return i_ost;")
         $null = $sb.AppendLine("  }")
@@ -204,7 +204,7 @@ foreach ($stmt in $statements) {
             # Determine how to convert CmdArgument to the target type
             switch -Regex ($type) {
                 "^bool\s*\*?$" {
-                    $null = $sb.AppendLine("    $member = !(i_args[$i].stringValue == _T(`"false`"));")
+                    $null = $sb.AppendLine("    $member = !(i_args[$i].stringValue == L`"false`");")
                 }
                 "^(int|long)$" {
                     $null = $sb.AppendLine("    $member = static_cast<$type>(i_args[$i].numberValue);")
@@ -221,16 +221,16 @@ foreach ($stmt in $statements) {
                 "^(LONG|UINT|WPARAM|LPARAM|DWORD)$" {
                     $null = $sb.AppendLine("    $member = static_cast<$type>(i_args[$i].numberValue);")
                 }
-                "^tstringq$" {
+                "^wstringq$" {
                     $null = $sb.AppendLine("    $member = i_args[$i].stringValue;")
                 }
-                "^std::list<tstringq>$" {
+                "^std::list<wstringq>$" {
                     # Consume remaining string args from position $i onward
                     $null = $sb.AppendLine("    for (size_t _j = $i; _j < i_args.size(); ++_j)")
                     $null = $sb.AppendLine("      $member.push_back(i_args[_j].stringValue);")
                 }
-                "^tregex$" {
-                    $null = $sb.AppendLine("    $member = tregex(i_args[$i].stringValue, tregex::ECMAScript | tregex::icase);")
+                "^wregex_stored$" {
+                    $null = $sb.AppendLine("    $member = wregex_stored(i_args[$i].stringValue, wregex_stored::ECMAScript | wregex_stored::icase);")
                 }
                 "^VKey$" {
                     $null = $sb.AppendLine("    $member = loadVKeyFromCmd(i_args[$i]);")
@@ -282,7 +282,7 @@ $null = $sb.AppendLine("#ifdef FUNCTION_CREATOR")
 $null = $sb.AppendLine("FunctionCreator functionCreators[] = {")
 
 foreach ($name in $names) {
-    $null = $sb.AppendLine("  { _T(`"$name`"), FunctionData_${name}::create },")
+    $null = $sb.AppendLine("  { L`"$name`", FunctionData_${name}::create },")
 }
 
 $null = $sb.AppendLine("};")

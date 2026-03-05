@@ -34,28 +34,28 @@ class DlgSetting : public LayoutManager
 		item.iItem = i_index;
 
 		item.iSubItem = 0;
-		item.pszText = const_cast<_TCHAR *>(i_data.m_name.c_str());
+		item.pszText = const_cast<wchar_t *>(i_data.m_name.c_str());
 		CHECK_TRUE( ListView_InsertItem(m_hwndMayuPaths, &item) != -1 );
 
 		ListView_SetItemText(m_hwndMayuPaths, i_index, 1,
-							 const_cast<_TCHAR *>(i_data.m_filename.c_str()));
+							 const_cast<wchar_t *>(i_data.m_filename.c_str()));
 		ListView_SetItemText(m_hwndMayuPaths, i_index, 2,
-							 const_cast<_TCHAR *>(i_data.m_symbols.c_str()));
+							 const_cast<wchar_t *>(i_data.m_symbols.c_str()));
 	}
 
 	///
 	void setItem(int i_index, const Data &i_data) {
 		ListView_SetItemText(m_hwndMayuPaths, i_index, 0,
-							 const_cast<_TCHAR *>(i_data.m_name.c_str()));
+							 const_cast<wchar_t *>(i_data.m_name.c_str()));
 		ListView_SetItemText(m_hwndMayuPaths, i_index, 1,
-							 const_cast<_TCHAR *>(i_data.m_filename.c_str()));
+							 const_cast<wchar_t *>(i_data.m_filename.c_str()));
 		ListView_SetItemText(m_hwndMayuPaths, i_index, 2,
-							 const_cast<_TCHAR *>(i_data.m_symbols.c_str()));
+							 const_cast<wchar_t *>(i_data.m_symbols.c_str()));
 	}
 
 	///
 	void getItem(int i_index, Data *o_data) {
-		_TCHAR buf[GANA_MAX_PATH];
+		wchar_t buf[GANA_MAX_PATH];
 		LVITEM item;
 		item.mask = LVIF_TEXT;
 		item.iItem = i_index;
@@ -115,30 +115,30 @@ public:
 		lvc.fmt = LVCFMT_LEFT;
 		lvc.cx = (rc.right - rc.left) / 3;
 
-		tstringi str = loadString(IDS_mayuPathName);
-		lvc.pszText = const_cast<_TCHAR *>(str.c_str());
+		wstringi str = loadString(IDS_mayuPathName);
+		lvc.pszText = const_cast<wchar_t *>(str.c_str());
 		CHECK( 0 ==, ListView_InsertColumn(m_hwndMayuPaths, 0, &lvc) );
 		str = loadString(IDS_mayuPath);
-		lvc.pszText = const_cast<_TCHAR *>(str.c_str());
+		lvc.pszText = const_cast<wchar_t *>(str.c_str());
 		CHECK( 1 ==, ListView_InsertColumn(m_hwndMayuPaths, 1, &lvc) );
 		str = loadString(IDS_mayuSymbols);
-		lvc.pszText = const_cast<_TCHAR *>(str.c_str());
+		lvc.pszText = const_cast<wchar_t *>(str.c_str());
 		CHECK( 2 ==, ListView_InsertColumn(m_hwndMayuPaths, 2, &lvc) );
 
 		Data data;
 		insertItem(0, data);				// TODO: why ?
 
 		// set list view
-		tregex split(_T("^([^;]*);([^;]*);(.*)$"));
-		tstringi dot_mayu;
+		wregex_stored split(L"^([^;]*);([^;]*);(.*)$");
+		wstringi dot_mayu;
 		int i;
 		for (i = 0; i < MAX_MAYU_REGISTRY_ENTRIES; ++ i) {
-			_TCHAR buf[100];
-			_sntprintf(buf, NUMBER_OF(buf), _T(".mayu%d"), i);
+			wchar_t buf[100];
+			_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", i);
 			if (!m_reg.read(buf, &dot_mayu))
 				break;
 
-			tsmatch what;
+			std::wsmatch what;
 			if (std::regex_match(dot_mayu, what, split)) {
 				data.m_name = what.str(1);
 				data.m_filename = what.str(2);
@@ -158,7 +158,7 @@ public:
 
 		// set selection
 		int index;
-		m_reg.read(_T(".mayuIndex"), &index, 0);
+		m_reg.read(L".mayuIndex", &index, 0);
 		setSelectedItem(index);
 
 		// set layout manager
@@ -213,7 +213,7 @@ public:
 
 	/// WM_COMMAND
 	BOOL wmCommand(int /* i_notifyCode */, int i_id, HWND /* i_hwndControl */) {
-		_TCHAR buf[GANA_MAX_PATH];
+		wchar_t buf[GANA_MAX_PATH];
 		switch (i_id) {
 		case IDC_BUTTON_up:
 		case IDC_BUTTON_down: {
@@ -285,21 +285,21 @@ public:
 			int count = ListView_GetItemCount(m_hwndMayuPaths);
 			int index;
 			for (index = 0; index < count; ++ index) {
-				_sntprintf(buf, NUMBER_OF(buf), _T(".mayu%d"), index);
+				_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
 				Data data;
 				getItem(index, &data);
-				m_reg.write(buf, data.m_name + _T(";") +
-							data.m_filename + _T(";") + data.m_symbols);
+				m_reg.write(buf, data.m_name + L";" +
+							data.m_filename + L";" + data.m_symbols);
 			}
 			for (; ; ++ index) {
-				_sntprintf(buf, NUMBER_OF(buf), _T(".mayu%d"), index);
+				_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
 				if (!m_reg.remove(buf))
 					break;
 			}
 			index = getSelectedItem();
 			if (index < 0)
 				index = 0;
-			m_reg.write(_T(".mayuIndex"), index);
+			m_reg.write(L".mayuIndex", index);
 			EndDialog(m_hwnd, 1);
 			return TRUE;
 		}

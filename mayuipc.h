@@ -12,7 +12,7 @@ extern "C"
 #  endif // __cplusplus
 
 ///
-#  define WM_MayuIPC_NAME _T("MayuIPC{46269F4D-D560-40f9-B38B-DB5E280FEF47}")
+#  define WM_MayuIPC_NAME L"MayuIPC{46269F4D-D560-40f9-B38B-DB5E280FEF47}"
 
 	enum MayuIPCCommand {
 		// enable or disable Mayu
@@ -35,7 +35,7 @@ extern "C"
 			}
 		}
 
-		hwnd = FindWindow(_T("mayuTasktray"), NULL);
+		hwnd = FindWindow(L"mayuTasktray", NULL);
 		if (hwnd == NULL) {
 			return FALSE;
 		}

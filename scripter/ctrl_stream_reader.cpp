@@ -28,7 +28,7 @@ uint8_t CtrlStreamReader::readU8()
 {
 	int ch = m_in.get();
 	if (ch == std::char_traits<char>::eof())
-		throw ErrorMessage() << _T("unexpected end of control stream");
+		throw ErrorMessage() << L"unexpected end of control stream";
 	return static_cast<uint8_t>(ch);
 }
 
@@ -41,15 +41,15 @@ uint16_t CtrlStreamReader::readU16()
 }
 
 
-tstringi CtrlStreamReader::readString()
+wstringi CtrlStreamReader::readString()
 {
 	uint16_t len = readU16();
-	tstringi s;
+	wstringi s;
 	s.resize(len);
 	for (uint16_t i = 0; i < len; ++i) {
 		uint8_t lo = readU8();
 		uint8_t hi = readU8();
-		s[i] = static_cast<_TCHAR>(lo | (hi << 8));
+		s[i] = static_cast<wchar_t>(lo | (hi << 8));
 	}
 	return s;
 }

@@ -58,7 +58,7 @@ public:
 
 private:
 	///
-	using Names = std::vector<tstringi>;
+	using Names = std::vector<wstringi>;
 
 public:
 	/// if this key pressed physically
@@ -85,7 +85,7 @@ public:
 			m_scanCodesSize(0) { }
 
 	/// for Event::* only
-	Key(const tstringi &i_name)
+	Key(const wstringi &i_name)
 			: m_isPressed(false),
 			m_isPressedOnWin32(false),
 			m_isPressedByAssign(false),
@@ -95,7 +95,7 @@ public:
 	}
 
 	/// get key name (first name)
-	const tstringi &getName() const {
+	const wstringi &getName() const {
 		return m_names.front();
 	}
 
@@ -109,7 +109,7 @@ public:
 	}
 
 	/// add a name of key
-	void addName(const tstringi &i_name);
+	void addName(const wstringi &i_name);
 
 	/// add a scan code
 	void addScanCode(const ScanCode &i_sc);
@@ -118,9 +118,9 @@ public:
 	Key &initialize();
 
 	/// equation by name
-	bool operator==(const tstringi &i_name) const;
+	bool operator==(const wstringi &i_name) const;
 	///
-	bool operator!=(const tstringi &i_name) const {
+	bool operator!=(const wstringi &i_name) const {
 		return !(*this == i_name);
 	}
 
@@ -131,7 +131,7 @@ public:
 	bool isPrefixScanCode(const Key &i_key) const;
 
 	/// stream output
-	friend tostream &operator<<(tostream &i_ost, const Key &i_key);
+	friend std::wostream &operator<<(std::wostream &i_ost, const Key &i_key);
 
 	/// <
 	bool operator<(const Key &i_key) const {
@@ -282,7 +282,7 @@ public:
 	}
 
 	/// stream output
-	friend tostream &operator<<(tostream &i_ost, const Modifier &i_m);
+	friend std::wostream &operator<<(std::wostream &i_ost, const Modifier &i_m);
 
 	/// <
 	bool operator<(const Modifier &i_m) const {
@@ -293,7 +293,7 @@ public:
 
 
 /// stream output
-tostream &operator<<(tostream &i_ost, Modifier::Type i_type);
+std::wostream &operator<<(std::wostream &i_ost, Modifier::Type i_type);
 
 
 ///
@@ -321,7 +321,7 @@ public:
 	}
 
 	/// stream output
-	friend tostream &operator<<(tostream &i_ost, const ModifiedKey &i_mk);
+	friend std::wostream &operator<<(std::wostream &i_ost, const ModifiedKey &i_mk);
 
 	/// <
 	bool operator<(const ModifiedKey &i_mk) const {
@@ -347,7 +347,7 @@ private:
 		HASHED_KEYS_SIZE = 128,			///
 	};
 	using Keys = std::list<Key>;			///
-	using Aliases = std::map<tstringi, Key *>;	/// key name aliases
+	using Aliases = std::map<wstringi, Key *>;	/// key name aliases
 	///
 	class Substitute
 	{
@@ -406,7 +406,7 @@ public:
 	void addKey(const Key &i_key);
 
 	/// add a key name alias
-	void addAlias(const tstringi &i_aliasName, Key *i_key);
+	void addAlias(const wstringi &i_aliasName, Key *i_key);
 
 	/// add substitute
 	void addSubstitute(const ModifiedKey &i_mkeyFrom,
@@ -427,10 +427,10 @@ public:
 	Key *searchPrefixKey(const Key &i_key);
 
 	/// search a key by name
-	Key *searchKey(const tstringi &i_name);
+	Key *searchKey(const wstringi &i_name);
 
 	/// search a key by non-alias name
-	Key *searchKeyByNonAliasName(const tstringi &i_name);
+	Key *searchKeyByNonAliasName(const wstringi &i_name);
 
 	/// search a substitute
 	ModifiedKey searchSubstitute(const ModifiedKey &i_mkey);

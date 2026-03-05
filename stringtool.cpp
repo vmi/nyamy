@@ -184,237 +184,205 @@ size_t mbslcpy(unsigned char *o_dest, const unsigned char *i_src,
 
 
 /// stream output
-tostream &operator<<(tostream &i_ost, const tstringq &i_data)
+std::wostream &operator<<(std::wostream &i_ost, const wstringq &i_data)
 {
-	i_ost << _T("\"");
-	for (const _TCHAR *s = i_data.c_str(); *s; ++ s) {
+	i_ost << L"\"";
+	for (const wchar_t *s = i_data.c_str(); *s; ++ s) {
 		switch (*s) {
-		case _T('\a'):
-			i_ost << _T("\\a");
+		case L'\a':
+			i_ost << L"\\a";
 			break;
-		case _T('\f'):
-			i_ost << _T("\\f");
+		case L'\f':
+			i_ost << L"\\f";
 			break;
-		case _T('\n'):
-			i_ost << _T("\\n");
+		case L'\n':
+			i_ost << L"\\n";
 			break;
-		case _T('\r'):
-			i_ost << _T("\\r");
+		case L'\r':
+			i_ost << L"\\r";
 			break;
-		case _T('\t'):
-			i_ost << _T("\\t");
+		case L'\t':
+			i_ost << L"\\t";
 			break;
-		case _T('\v'):
-			i_ost << _T("\\v");
+		case L'\v':
+			i_ost << L"\\v";
 			break;
-		case _T('"'):
-			i_ost << _T("\\\"");
+		case L'"':
+			i_ost << L"\\\"";
 			break;
 		default:
-			if (_istlead(*s)) {
-				_TCHAR buf[3] = { s[0], s[1], 0 };
-				i_ost << buf;
-				++ s;
-			} else if (_istprint(*s)) {
-				_TCHAR buf[2] = { *s, 0 };
+	if (iswprint(*s)) {
+				wchar_t buf[2] = { *s, 0 };
 				i_ost << buf;
 			} else {
-				i_ost << _T("\\x");
-				_TCHAR buf[5];
-#ifdef _UNICODE
-				_sntprintf(buf, NUMBER_OF(buf), _T("%04x"), *s);
-#else
-				_sntprintf(buf, NUMBER_OF(buf), _T("%02x"), *s);
-#endif
+				i_ost << L"\\x";
+				wchar_t buf[5];
+				_snwprintf(buf, NUMBER_OF(buf), L"%04x", *s);
 				i_ost << buf;
 			}
 			break;
 		}
 	}
-	i_ost << _T("\"");
+	i_ost << L"\"";
 	return i_ost;
 }
 
 
 // interpret meta characters such as \n
-tstring interpretMetaCharacters(const _TCHAR *i_str, size_t i_len,
-								const _TCHAR *i_quote,
+std::wstring interpretMetaCharacters(const wchar_t *i_str, size_t i_len,
+								const wchar_t *i_quote,
 								bool i_doesUseRegexpBackReference)
 {
 	// interpreted string is always less than i_len
-	std::vector<_TCHAR> result(i_len + 1);
+	std::vector<wchar_t> result(i_len + 1);
 	// destination
-	_TCHAR *d = result.data();
+	wchar_t *d = result.data();
 	// end pointer
-	const _TCHAR *end = i_str + i_len;
+	const wchar_t *end = i_str + i_len;
 
 	while (i_str < end && *i_str) {
-		if (*i_str != _T('\\')) {
-			if (_istlead(*i_str) && *(i_str + 1) && i_str + 1 < end)
-				*d++ = *i_str++;
+		if (*i_str != L'\\') {
 			*d++ = *i_str++;
-		} else if (*(i_str + 1) != _T('\0')) {
+		} else if (*(i_str + 1) != L'\0') {
 			i_str ++;
-			if (i_quote && _tcschr(i_quote, *i_str))
+			if (i_quote && wcschr(i_quote, *i_str))
 				*d++ = *i_str++;
 			else
 				switch (*i_str) {
-				case _T('a'):
-					*d++ = _T('\x07');
+				case L'a':
+					*d++ = L'\x07';
 					i_str ++;
 					break;
-					//case _T('b'): *d++ = _T('\b'); i_str ++; break;
-				case _T('e'):
-					*d++ = _T('\x1b');
+					//case L'b': *d++ = L'\b'; i_str ++; break;
+				case L'e':
+					*d++ = L'\x1b';
 					i_str ++;
 					break;
-				case _T('f'):
-					*d++ = _T('\f');
+				case L'f':
+					*d++ = L'\f';
 					i_str ++;
 					break;
-				case _T('n'):
-					*d++ = _T('\n');
+				case L'n':
+					*d++ = L'\n';
 					i_str ++;
 					break;
-				case _T('r'):
-					*d++ = _T('\r');
+				case L'r':
+					*d++ = L'\r';
 					i_str ++;
 					break;
-				case _T('t'):
-					*d++ = _T('\t');
+				case L't':
+					*d++ = L'\t';
 					i_str ++;
 					break;
-				case _T('v'):
-					*d++ = _T('\v');
+				case L'v':
+					*d++ = L'\v';
 					i_str ++;
 					break;
-					//case _T('?'): *d++ = _T('\x7f'); i_str ++; break;
-					//case _T('_'): *d++ = _T(' '); i_str ++; break;
-					//case _T('\\'): *d++ = _T('\\'); i_str ++; break;
-				case _T('\''):
-					*d++ = _T('\'');
+					//case L'?': *d++ = L'\x7f'; i_str ++; break;
+					//case L'_': *d++ = L' '; i_str ++; break;
+					//case L'\\': *d++ = L'\\'; i_str ++; break;
+				case L'\'':
+					*d++ = L'\'';
 					i_str ++;
 					break;
-				case _T('"'):
-					*d++ = _T('"');
+				case L'"':
+					*d++ = L'"';
 					i_str ++;
 					break;
-				case _T('\\'):
-					*d++ = _T('\\');
+				case L'\\':
+					*d++ = L'\\';
 					i_str ++;
 					break;
-				case _T('c'): // control code, for example '\c[' is escape: '\x1b'
+				case L'c': // control code, for example '\c[' is escape: '\x1b'
 					i_str ++;
 					if (i_str < end && *i_str) {
-						static const _TCHAR *ctrlchar =
-							_T("@ABCDEFGHIJKLMNO")
-							_T("PQRSTUVWXYZ[\\]^_")
-							_T("@abcdefghijklmno")
-							_T("pqrstuvwxyz@@@@?");
-						static const _TCHAR *ctrlcode =
-							_T("\00\01\02\03\04\05\06\07\10\11\12\13\14\15\16\17")
-							_T("\20\21\22\23\24\25\26\27\30\31\32\33\34\35\36\37")
-							_T("\00\01\02\03\04\05\06\07\10\11\12\13\14\15\16\17")
-							_T("\20\21\22\23\24\25\26\27\30\31\32\00\00\00\00\177");
-						if (const _TCHAR *c = _tcschr(ctrlchar, *i_str))
+						static const wchar_t *ctrlchar =
+							L"@ABCDEFGHIJKLMNO"
+							L"PQRSTUVWXYZ[\\]^_"
+							L"@abcdefghijklmno"
+							L"pqrstuvwxyz@@@@?";
+						static const wchar_t *ctrlcode =
+							L"\00\01\02\03\04\05\06\07\10\11\12\13\14\15\16\17"
+							L"\20\21\22\23\24\25\26\27\30\31\32\33\34\35\36\37"
+							L"\00\01\02\03\04\05\06\07\10\11\12\13\14\15\16\17"
+							L"\20\21\22\23\24\25\26\27\30\31\32\00\00\00\00\177";
+						if (const wchar_t *c = wcschr(ctrlchar, *i_str))
 							*d++ = ctrlcode[c - ctrlchar], i_str ++;
 					}
 					break;
-				case _T('x'):
-				case _T('X'): {
+				case L'x':
+				case L'X': {
 					i_str ++;
-					static const _TCHAR *hexchar = _T("0123456789ABCDEFabcdef");
+					static const wchar_t *hexchar = L"0123456789ABCDEFabcdef";
 					static int hexvalue[] = { 0, 1, 2, 3, 4, 5 ,6, 7, 8, 9,
 											  10, 11, 12, 13, 14, 15,
 											  10, 11, 12, 13, 14, 15,
 											};
 					bool brace = false;
-					if (i_str < end && *i_str == _T('{')) {
+					if (i_str < end && *i_str == L'{') {
 						i_str ++;
 						brace = true;
 					}
 					int n = 0;
 					for (; i_str < end && *i_str; i_str ++)
-						if (const _TCHAR *c = _tcschr(hexchar, *i_str))
+						if (const wchar_t *c = wcschr(hexchar, *i_str))
 							n = n * 16 + hexvalue[c - hexchar];
 						else
 							break;
-					if (i_str < end && *i_str == _T('}') && brace)
+					if (i_str < end && *i_str == L'}' && brace)
 						i_str ++;
 					if (0 < n)
-						*d++ = static_cast<_TCHAR>(n);
+						*d++ = static_cast<wchar_t>(n);
 					break;
 				}
-				case _T('1'):
-				case _T('2'):
-				case _T('3'):
-				case _T('4'):
-				case _T('5'):
-				case _T('6'):
-				case _T('7'):
+				case L'1':
+				case L'2':
+				case L'3':
+				case L'4':
+				case L'5':
+				case L'6':
+				case L'7':
 					if (i_doesUseRegexpBackReference)
 						goto case_default;
 					// fall through
-				case _T('0'): {
-					static const _TCHAR *octalchar = _T("01234567");
+				case L'0': {
+					static const wchar_t *octalchar = L"01234567";
 					static int octalvalue[] = { 0, 1, 2, 3, 4, 5 ,6, 7, };
 					int n = 0;
 					for (; i_str < end && *i_str; i_str ++)
-						if (const _TCHAR *c = _tcschr(octalchar, *i_str))
+						if (const wchar_t *c = wcschr(octalchar, *i_str))
 							n = n * 8 + octalvalue[c - octalchar];
 						else
 							break;
 					if (0 < n)
-						*d++ = static_cast<_TCHAR>(n);
+						*d++ = static_cast<wchar_t>(n);
 					break;
 				}
 				default:
 case_default:
-					*d++ = _T('\\');
-					if (_istlead(*i_str) && *(i_str + 1) && i_str + 1 < end)
-						*d++ = *i_str++;
+					*d++ = L'\\';
 					*d++ = *i_str++;
 					break;
 				}
 		}
 	}
-	*d =_T('\0');
+	*d =L'\0';
 	return result.data();
 }
 
 
 // add session id to i_str
-tstring addSessionId(const _TCHAR *i_str)
+std::wstring addSessionId(const wchar_t *i_str)
 {
 	DWORD sessionId;
-	tstring s(i_str);
+	std::wstring s(i_str);
 	if (ProcessIdToSessionId(GetCurrentProcessId(), &sessionId)) {
-		_TCHAR buf[20];
-		_sntprintf(buf, NUMBER_OF(buf), _T("%u"), sessionId);
+		wchar_t buf[20];
+		_snwprintf(buf, NUMBER_OF(buf), L"%u", sessionId);
 		s += buf;
 	}
 	return s;
 }
-
-
-#ifdef _MBCS
-// escape regexp special characters in MBCS trail bytes
-std::string guardRegexpFromMbcs(const char *i_str)
-{
-	size_t len = strlen(i_str);
-	std::vector<char> buf(len * 2 + 1);
-	char *p = buf.data();
-	while (*i_str) {
-		if (_ismbblead(static_cast<u_char>(*i_str)) && i_str[1]) {
-			*p ++ = *i_str ++;
-			if (strchr(".*?+(){}[]^$", *i_str))
-				*p ++ = '\\';
-		}
-		*p ++ = *i_str ++;
-	}
-	return std::string(buf.data(), p);
-}
-#endif // !_MBCS
 
 
 // converter
@@ -442,16 +410,16 @@ std::string to_string(const std::wstring &i_str)
 
 
 /// stream output
-tostream &operator<<(tostream &i_ost, const tregex &i_data)
+std::wostream &operator<<(std::wostream &i_ost, const wregex_stored &i_data)
 {
 	return i_ost << i_data.str();
 }
 
 
 /// get lower string
-tstring toLower(const tstring &i_str)
+std::wstring toLower(const std::wstring &i_str)
 {
-	tstring str(i_str);
+	std::wstring str(i_str);
 	for (size_t i = 0; i < str.size(); ++ i) {
 		if (_ismbblead(str[i]))
 			++ i;

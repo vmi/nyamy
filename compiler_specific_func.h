@@ -10,7 +10,7 @@
 
 
 /// get compiler version string
-tstring getCompilerVersionString();
+std::wstring getCompilerVersionString();
 
 
 #endif // !_COMPILER_SPECIFIC_FUNC_H

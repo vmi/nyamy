@@ -58,10 +58,10 @@ class Mayu
 	HICON m_tasktrayIcon[2];			/// taskbar icon
 	bool m_canUseTasktrayBaloon;			///
 
-	tomsgstream m_log;				/** log stream (output to log
+	womsgstream m_log;				/** log stream (output to log
 						    dialog's edit) */
 #ifdef LOG_TO_FILE
-	tofstream m_logFile;
+	std::wofstream m_logFile;
 #endif // LOG_TO_FILE
 
 	HMENU m_hMenuTaskTray;			/// tasktray menu
@@ -144,7 +144,7 @@ private:
 		wc.hCursor       = NULL;
 		wc.hbrBackground = NULL;
 		wc.lpszMenuName  = NULL;
-		wc.lpszClassName = _T("mayuTasktray");
+		wc.lpszClassName = L"mayuTasktray";
 		return RegisterClass(&wc);
 	}
 
@@ -154,8 +154,8 @@ private:
 		case Notify::Type_setFocus:
 		case Notify::Type_name: {
 			NotifySetFocus *n = (NotifySetFocus *)cd->lpData;
-			n->m_className[NUMBER_OF(n->m_className) - 1] = _T('\0');
-			n->m_titleName[NUMBER_OF(n->m_titleName) - 1] = _T('\0');
+			n->m_className[NUMBER_OF(n->m_className) - 1] = L'\0';
+			n->m_titleName[NUMBER_OF(n->m_titleName) - 1] = L'\0';
 
 			if (n->m_type == Notify::Type_setFocus)
 				m_engine.setFocus(n->getHwnd(), n->m_threadId,
@@ -163,38 +163,38 @@ private:
 
 			{
 				Acquire a(&m_log, 1);
-				m_log << _T("HWND:\t") << std::hex
+				m_log << L"HWND:\t" << std::hex
 				<< n->_m_hwnd /* always 32bit width when log outout */
 				<< std::dec << std::endl;
-				m_log << _T("THREADID:") << static_cast<int>(n->m_threadId)
+				m_log << L"THREADID:" << static_cast<int>(n->m_threadId)
 				<< std::endl;
 			}
 			Acquire a(&m_log, (n->m_type == Notify::Type_name) ? 0 : 1);
-			m_log << _T("CLASS:\t") << n->m_className << std::endl;
-			m_log << _T("TITLE:\t") << n->m_titleName << std::endl;
+			m_log << L"CLASS:\t" << n->m_className << std::endl;
+			m_log << L"TITLE:\t" << n->m_titleName << std::endl;
 
 			bool isMDI = true;
 			HWND hwnd = getToplevelWindow(n->getHwnd(), &isMDI);
 			RECT rc;
 			if (isMDI) {
 				getChildWindowRect(hwnd, &rc);
-				m_log << _T("MDI Window Position/Size: (")
-				<< rc.left << _T(", ") << rc.top << _T(") / (")
-				<< rcWidth(&rc) << _T("x") << rcHeight(&rc) << _T(")")
+				m_log << L"MDI Window Position/Size: ("
+				<< rc.left << L", " << rc.top << L") / ("
+				<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
 				<< std::endl;
 				hwnd = getToplevelWindow(n->getHwnd(), NULL);
 			}
 
 			GetWindowRect(hwnd, &rc);
-			m_log << _T("Toplevel Window Position/Size: (")
-			<< rc.left << _T(", ") << rc.top << _T(") / (")
-			<< rcWidth(&rc) << _T("x") << rcHeight(&rc) << _T(")")
+			m_log << L"Toplevel Window Position/Size: ("
+			<< rc.left << L", " << rc.top << L") / ("
+			<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
 			<< std::endl;
 
 			SystemParametersInfo(SPI_GETWORKAREA, 0, (void *)&rc, FALSE);
-			m_log << _T("Desktop Window Position/Size: (")
-			<< rc.left << _T(", ") << rc.top << _T(") / (")
-			<< rcWidth(&rc) << _T("x") << rcHeight(&rc) << _T(")")
+			m_log << L"Desktop Window Position/Size: ("
+			<< rc.left << L", " << rc.top << L") / ("
+			<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
 			<< std::endl;
 
 			m_log << std::endl;
@@ -212,9 +212,9 @@ private:
 #if 0
 			Acquire a(&m_log, 0);
 			if (n->m_isKanaLockToggled) {
-				m_log << _T("Notify::Type_lockState Kana on  : ");
+				m_log << L"Notify::Type_lockState Kana on  : ";
 			} else {
-				m_log << _T("Notify::Type_lockState Kana off : ");
+				m_log << L"Notify::Type_lockState Kana off : ";
 			}
 			m_log << n->m_debugParam << ", "
 			<< g_hookData->m_correctKanaLockHandling << std::endl;
@@ -273,7 +273,7 @@ private:
 		case Notify::Type_log: {
 			Acquire a(&m_log, 1);
 			NotifyLog *n = (NotifyLog *)cd->lpData;
-			m_log << _T("hook log: ") << n->m_msg << std::endl;
+			m_log << L"hook log: " << n->m_msg << std::endl;
 			break;
 		}
 		}
@@ -412,15 +412,15 @@ private:
 				}
 					//case WTS_SESSION_REMOTE_CONTROL: m = "WTS_SESSION_REMOTE_CONTROL"; break;
 				}
-				This->m_log << _T("WM_WTSESSION_CHANGE(")
+				This->m_log << L"WM_WTSESSION_CHANGE("
 				<< i_wParam << ", " << i_lParam << "): "
 				<< m << std::endl;
 				return TRUE;
 			}
 			case WM_APP_msgStreamNotify: {
-				tomsgstream::StreamBuf *log =
-					reinterpret_cast<tomsgstream::StreamBuf *>(i_lParam);
-				const tstring &str = log->acquireString();
+				womsgstream::StreamBuf *log =
+					reinterpret_cast<womsgstream::StreamBuf *>(i_lParam);
+				const std::wstring &str = log->acquireString();
 #ifdef LOG_TO_FILE
 				This->m_logFile << str << std::flush;
 #endif // LOG_TO_FILE
@@ -451,17 +451,17 @@ private:
 						HMENU hMenuSubSub = GetSubMenu(hMenuSub, 1);
 						Registry reg(MAYU_REGISTRY_ROOT);
 						int mayuIndex;
-						reg.read(_T(".mayuIndex"), &mayuIndex, 0);
+						reg.read(L".mayuIndex", &mayuIndex, 0);
 						while (DeleteMenu(hMenuSubSub, 0, MF_BYPOSITION))
 							;
-						tregex getName(_T("^([^;]*);"));
+						wregex_stored getName(L"^([^;]*);");
 						for (int index = 0; ; index ++) {
-							_TCHAR buf[100];
-							_sntprintf(buf, NUMBER_OF(buf), _T(".mayu%d"), index);
-							tstringi dot_mayu;
+							wchar_t buf[100];
+							_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
+							wstringi dot_mayu;
 							if (!reg.read(buf, &dot_mayu))
 								break;
-							tsmatch what;
+							std::wsmatch what;
 							if (std::regex_search(dot_mayu, what, getName)) {
 								MENUITEMINFO mii;
 								std::memset(&mii, 0, sizeof(mii));
@@ -471,8 +471,8 @@ private:
 								mii.fState =
 									MFS_ENABLED | ((mayuIndex == index) ? MFS_CHECKED : 0);
 								mii.wID = ID_MENUITEM_reloadBegin + index;
-								tstringi name(what.str(1));
-								mii.dwTypeData = const_cast<_TCHAR *>(name.c_str());
+								wstringi name(what.str(1));
+								mii.dwTypeData = const_cast<wchar_t *>(name.c_str());
 								mii.cch = static_cast<UINT>(name.size());
 
 								InsertMenuItem(hMenuSubSub, index, TRUE, &mii);
@@ -498,7 +498,7 @@ private:
 				if (i_lParam) {
 					int ret;
 
-					This->m_log << _T("escape NLS keys done code=") << i_wParam << std::endl;
+					This->m_log << L"escape NLS keys done code=" << i_wParam << std::endl;
 					switch (i_wParam) {
 					case YAMY_SUCCESS:
 					case YAMY_ERROR_RETRY_INJECTION_SUCCESS:
@@ -515,7 +515,7 @@ private:
 						break;
 					}
 				} else {
-					This->m_log << _T("restore NLS keys done with code=") << i_wParam << std::endl;
+					This->m_log << L"restore NLS keys done with code=" << i_wParam << std::endl;
 				}
 				return 0;
 				break;
@@ -524,7 +524,7 @@ private:
 				if (!This->m_scripter) break;
 				auto newSetting = This->m_scripter->takeNewSetting();
 				if (!newSetting) break;
-				This->m_log << _T("successfully loaded (scripter).") << std::endl;
+				This->m_log << L"successfully loaded (scripter)." << std::endl;
 				while (!This->m_engine.setSetting(newSetting.get()))
 					Sleep(1000);
 				This->m_setting = std::move(newSetting);
@@ -539,7 +539,7 @@ private:
 					default:
 						if (ID_MENUITEM_reloadBegin <= id) {
 							Registry reg(MAYU_REGISTRY_ROOT);
-							reg.write(_T(".mayuIndex"), id - ID_MENUITEM_reloadBegin);
+							reg.write(L".mayuIndex", id - ID_MENUITEM_reloadBegin);
 							This->load();
 						}
 						break;
@@ -579,17 +579,17 @@ private:
 						BYTE keys[256];
 						ret = GetKeyboardState(keys);
 						if (ret == 0) {
-							This->m_log << _T("Check Keystate Failed(%d)")
+							This->m_log << L"Check Keystate Failed(%d)"
 							<< GetLastError() << std::endl;
 						} else {
-							This->m_log << _T("Check Keystate: ") << std::endl;
+							This->m_log << L"Check Keystate: " << std::endl;
 							for (int i = 0; i < 0xff; i++) {
 								USHORT asyncKey;
 								asyncKey = GetAsyncKeyState(i);
 								This->m_log << std::hex;
 								if (asyncKey & 0x8000) {
-									This->m_log << _T("  ") << VK2TCHAR[i]
-									<< _T("(0x") << i << _T("): pressed!")
+									This->m_log << L"  " << VK2TCHAR[i]
+									<< L"(0x" << i << L"): pressed!"
 									<< std::endl;
 								}
 								if (i == 0x14 || // VK_CAPTITAL
@@ -599,8 +599,8 @@ private:
 										i == 0x91    // VK_SCROLL
 								   ) {
 									if (keys[i] & 1) {
-										This->m_log << _T("  ") << VK2TCHAR[i]
-										<< _T("(0x") << i << _T("): locked!")
+										This->m_log << L"  " << VK2TCHAR[i]
+										<< L"(0x" << i << L"): locked!"
 										<< std::endl;
 									}
 								}
@@ -615,12 +615,12 @@ private:
 						SetForegroundWindow(This->m_hwndVersion);
 						break;
 					case ID_MENUITEM_help: {
-						_TCHAR buf[GANA_MAX_PATH];
+						wchar_t buf[GANA_MAX_PATH];
 						CHECK_TRUE( GetModuleFileName(g_hInst, buf, NUMBER_OF(buf)) );
-						tstringi helpFilename = pathRemoveFileSpec(buf);
-						helpFilename += _T("\\");
+						wstringi helpFilename = pathRemoveFileSpec(buf);
+						helpFilename += L"\\";
 						helpFilename += loadString(IDS_helpFilename);
-						ShellExecute(NULL, _T("open"), helpFilename.c_str(),
+						ShellExecute(NULL, L"open", helpFilename.c_str(),
 									 NULL, NULL, SW_SHOWNORMAL);
 						break;
 					}
@@ -686,8 +686,8 @@ private:
 					setForegroundWindow(reinterpret_cast<HWND>(i_lParam));
 					{
 						Acquire a(&This->m_log, 1);
-						This->m_log << _T("setForegroundWindow(0x")
-						<< std::hex << i_lParam << std::dec << _T(")")
+						This->m_log << L"setForegroundWindow(0x"
+						<< std::hex << i_lParam << std::dec << L")"
 						<< std::endl;
 					}
 					break;
@@ -728,10 +728,10 @@ private:
 				if (i_message == This->m_WM_TaskbarRestart) {
 					if (This->showTasktrayIcon(true)) {
 						Acquire a(&This->m_log, 0);
-						This->m_log << _T("Tasktray icon is updated.") << std::endl;
+						This->m_log << L"Tasktray icon is updated." << std::endl;
 					} else {
 						Acquire a(&This->m_log, 1);
-						This->m_log << _T("Tasktray icon already exists.") << std::endl;
+						This->m_log << L"Tasktray icon already exists." << std::endl;
 					}
 					return 0;
 				} else if (i_message == This->m_WM_MayuIPC) {
@@ -746,11 +746,11 @@ private:
 						This->showTasktrayIcon();
 						if (i_lParam) {
 							Acquire a(&This->m_log, 1);
-							This->m_log << _T("Enabled by another application.")
+							This->m_log << L"Enabled by another application."
 							<< std::endl;
 						} else {
 							Acquire a(&This->m_log, 1);
-							This->m_log << _T("Disabled by another application.")
+							This->m_log << L"Disabled by another application."
 							<< std::endl;
 						}
 						break;
@@ -765,8 +765,8 @@ private:
 		// set symbol
 		Symbols initialSymbols;
 		for (int i = 1; i < __argc; ++ i) {
-			if (__targv[i][0] == _T('-') && __targv[i][1] == _T('D'))
-				initialSymbols.insert(__targv[i] + 2);
+			if (__wargv[i][0] == L'-' && __wargv[i][1] == L'D')
+				initialSymbols.insert(__wargv[i] + 2);
 		}
 
 		// start scripter process on first call
@@ -774,7 +774,7 @@ private:
 			m_scripter = std::make_unique<ScripterManager>(&m_log, &m_log, m_hwndTaskTray);
 			if (!m_scripter->start()) {
 				Acquire a(&m_log, 0);
-				m_log << _T("error: failed to start scripter process.\n");
+				m_log << L"error: failed to start scripter process.\n";
 				ShowWindow(m_hwndLog, SW_SHOW);
 				SetForegroundWindow(m_hwndLog);
 				m_scripter.reset();
@@ -791,14 +791,14 @@ private:
 	void showHelpMessage(bool i_doesShow = true) {
 		if (m_canUseTasktrayBaloon) {
 			if (i_doesShow) {
-				tstring helpMessage, helpTitle;
+				std::wstring helpMessage, helpTitle;
 				m_engine.getHelpMessages(&helpMessage, &helpTitle);
 				tcslcpy(m_ni.szInfo, helpMessage.c_str(), NUMBER_OF(m_ni.szInfo));
 				tcslcpy(m_ni.szInfoTitle, helpTitle.c_str(),
 						NUMBER_OF(m_ni.szInfoTitle));
 				m_ni.dwInfoFlags = NIIF_INFO;
 			} else
-				m_ni.szInfo[0] = m_ni.szInfoTitle[0] = _T('\0');
+				m_ni.szInfo[0] = m_ni.szInfoTitle[0] = L'\0';
 			CHECK_TRUE( Shell_NotifyIcon(NIM_MODIFY, &m_ni) );
 		}
 	}
@@ -806,7 +806,7 @@ private:
 	// change the task tray icon
 	bool showTasktrayIcon(bool i_doesAdd = false) {
 		m_ni.hIcon  = m_tasktrayIcon[m_engine.getIsEnabled() ? 1 : 0];
-		m_ni.szInfo[0] = m_ni.szInfoTitle[0] = _T('\0');
+		m_ni.szInfo[0] = m_ni.szInfoTitle[0] = L'\0';
 		if (i_doesAdd) {
 			// http://support.microsoft.com/kb/418138/JA/
 			int guard = 60;
@@ -826,49 +826,47 @@ private:
 		time_t now;
 		time(&now);
 
-		_TCHAR starttimebuf[1024];
-		_TCHAR timebuf[1024];
+		wchar_t starttimebuf[1024];
+		wchar_t timebuf[1024];
 
-		_tcsftime(timebuf, NUMBER_OF(timebuf), _T("%#c"), localtime(&now));
-		_tcsftime(starttimebuf, NUMBER_OF(starttimebuf), _T("%#c"),
+		wcsftime(timebuf, NUMBER_OF(timebuf), L"%#c", localtime(&now));
+		wcsftime(starttimebuf, NUMBER_OF(starttimebuf), L"%#c",
 				  localtime(&m_startTime));
 
 		Acquire a(&m_log, 0);
-		m_log << _T("------------------------------------------------------------") << std::endl;
-		m_log << loadString(IDS_mayu) << _T(" ") _T(VERSION);
+		m_log << L"------------------------------------------------------------" << std::endl;
+		m_log << loadString(IDS_mayu) << L" " WIDEN(VERSION);
 #ifndef NDEBUG
-		m_log << _T(" (DEBUG)");
+		m_log << L" (DEBUG)";
 #endif
-#ifdef _UNICODE
-		m_log << _T(" (UNICODE)");
-#endif
+		m_log << L" (UNICODE)";
 		m_log << std::endl;
-		m_log << _T("  built by ")
-		<< _T(LOGNAME) << _T("@") << toLower(_T(COMPUTERNAME))
-		<< _T(" (") << _T(__DATE__) <<  _T(" ")
-		<< _T(__TIME__) << _T(", ")
-		<< getCompilerVersionString() << _T(")") << std::endl;
-		_TCHAR modulebuf[1024];
+		m_log << L"  built by "
+		<< WIDEN(LOGNAME) << L"@" << toLower(WIDEN(COMPUTERNAME))
+		<< L" (" << WIDEN(__DATE__) <<  L" "
+		<< WIDEN(__TIME__) << L", "
+		<< getCompilerVersionString() << L")" << std::endl;
+		wchar_t modulebuf[1024];
 		CHECK_TRUE( GetModuleFileName(g_hInst, modulebuf,
 									  NUMBER_OF(modulebuf)) );
-		m_log << _T("started at ") << starttimebuf << std::endl;
+		m_log << L"started at " << starttimebuf << std::endl;
 		m_log << modulebuf << std::endl;
-		m_log << _T("------------------------------------------------------------") << std::endl;
+		m_log << L"------------------------------------------------------------" << std::endl;
 
 		if (i_isCleared) {
-			m_log << _T("log was cleared at ") << timebuf << std::endl;
+			m_log << L"log was cleared at " << timebuf << std::endl;
 		} else {
-			m_log << _T("log begins at ") << timebuf << std::endl;
+			m_log << L"log begins at " << timebuf << std::endl;
 		}
 	}
 
 	int errorDialogWithCode(UINT ids, int code, UINT style = MB_OK | MB_ICONSTOP)
 	{
-		_TCHAR title[1024];
-		_TCHAR text[1024];
+		wchar_t title[1024];
+		wchar_t text[1024];
 
-		_sntprintf_s(title, NUMBER_OF(title), _TRUNCATE, loadString(IDS_mayu).c_str());
-		_sntprintf_s(text, NUMBER_OF(text), _TRUNCATE, loadString(ids).c_str(), code);
+		_snwprintf_s(title, NUMBER_OF(title), _TRUNCATE, loadString(IDS_mayu).c_str());
+		_snwprintf_s(text, NUMBER_OF(text), _TRUNCATE, loadString(ids).c_str(), code);
  		return MessageBox((HWND)NULL, text, title, style);
 	}
 
@@ -1026,16 +1024,16 @@ public:
 			: m_hwndTaskTray(NULL),
 			m_mutex(i_mutex),
 			m_hwndLog(NULL),
-			m_WM_TaskbarRestart(RegisterWindowMessage(_T("TaskbarCreated"))),
+			m_WM_TaskbarRestart(RegisterWindowMessage(L"TaskbarCreated")),
 			m_WM_MayuIPC(RegisterWindowMessage(WM_MayuIPC_NAME)),
 			m_canUseTasktrayBaloon(
-				PACKVERSION(5, 0) <= getDllVersion(_T("shlwapi.dll"))),
+				PACKVERSION(5, 0) <= getDllVersion(L"shlwapi.dll")),
 			m_log(WM_APP_msgStreamNotify),
 			m_isSettingDialogOpened(false),
 			m_sessionState(0),
 			m_engine(m_log) {
 		Registry reg(MAYU_REGISTRY_ROOT);
-		reg.read(_T("escapeNLSKeys"), &m_escapeNlsKeys, 0);
+		reg.read(L"escapeNLSKeys", &m_escapeNlsKeys, 0);
 		m_hNotifyMailslot = CreateMailslot(NOTIFY_MAILSLOT_NAME, 0, MAILSLOT_WAIT_FOREVER, (SECURITY_ATTRIBUTES *)NULL);
 		ASSERT(m_hNotifyMailslot != INVALID_HANDLE_VALUE);
 		int err;
@@ -1067,8 +1065,8 @@ public:
 #endif
 
 		// create windows, dialogs
-		tstringi title = loadString(IDS_mayu);
-		m_hwndTaskTray = CreateWindow(_T("mayuTasktray"), title.c_str(),
+		wstringi title = loadString(IDS_mayu);
+		m_hwndTaskTray = CreateWindow(L"mayuTasktray", title.c_str(),
 									  WS_OVERLAPPEDWINDOW,
 									  CW_USEDEFAULT, CW_USEDEFAULT,
 									  CW_USEDEFAULT, CW_USEDEFAULT,
@@ -1099,20 +1097,20 @@ public:
 		m_hwndVersion =
 			CreateDialogParam(g_hInst, MAKEINTRESOURCE(IDD_DIALOG_version),
 							  NULL, dlgVersion_dlgProc,
-							  (LPARAM)_T(""));
+							  (LPARAM)L"");
 		CHECK_TRUE( m_hwndVersion );
 
 		// attach log
 #ifdef LOG_TO_FILE
-		tstring path;
-		_TCHAR exePath[GANA_MAX_PATH];
-		_TCHAR exeDrive[GANA_MAX_PATH];
-		_TCHAR exeDir[GANA_MAX_PATH];
+		std::wstring path;
+		wchar_t exePath[GANA_MAX_PATH];
+		wchar_t exeDrive[GANA_MAX_PATH];
+		wchar_t exeDir[GANA_MAX_PATH];
 		GetModuleFileName(NULL, exePath, GANA_MAX_PATH);
-		_tsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH, NULL, 0, NULL, 0);
+		_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH, NULL, 0, NULL, 0);
 		path = exeDrive;
 		path += exeDir;
-		path += _T("mayu.log");
+		path += L"mayu.log";
 		m_logFile.open(path.c_str(), std::ios::app);
 		m_logFile.imbue(std::locale("japanese"));
 #endif // LOG_TO_FILE
@@ -1132,7 +1130,7 @@ public:
 		m_ni.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 		m_ni.hIcon  = m_tasktrayIcon[1];
 		m_ni.uCallbackMessage = WM_APP_taskTrayNotify;
-		tstring tip = loadString(IDS_mayu);
+		std::wstring tip = loadString(IDS_mayu);
 		tcslcpy(m_ni.szTip, tip.c_str(), NUMBER_OF(m_ni.szTip));
 		if (m_canUseTasktrayBaloon) {
 			m_ni.cbSize = NOTIFYICONDATA_V3_SIZE;
@@ -1156,16 +1154,16 @@ public:
 		// create mutex to block yamyd
 		m_hMutexYamyd = CreateMutex((SECURITY_ATTRIBUTES *)NULL, TRUE, MUTEX_YAMYD_BLOCKER);
 
-		tstring yamydPath;
-		_TCHAR exePath[GANA_MAX_PATH];
-		_TCHAR exeDrive[GANA_MAX_PATH];
-		_TCHAR exeDir[GANA_MAX_PATH];
+		std::wstring yamydPath;
+		wchar_t exePath[GANA_MAX_PATH];
+		wchar_t exeDrive[GANA_MAX_PATH];
+		wchar_t exeDir[GANA_MAX_PATH];
 
 		GetModuleFileName(NULL, exePath, GANA_MAX_PATH);
-		_tsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH, NULL, 0, NULL, 0);
+		_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH, NULL, 0, NULL, 0);
 		yamydPath = exeDrive;
 		yamydPath += exeDir;
-		yamydPath += _T("yamyd32");
+		yamydPath += L"yamyd32";
 
 		BOOL result = CreateProcess(yamydPath.c_str(), NULL, NULL, NULL, FALSE,
 							   NORMAL_PRIORITY_CLASS, 0, NULL, &m_si, &m_pi);
@@ -1179,8 +1177,8 @@ public:
 					   text, sizeof(text)/sizeof(text[0]));
 			LoadString(GetModuleHandle(NULL), IDS_mayu,
 					   title, sizeof(title)/sizeof(title[0]));
-			_stprintf_s(buf, sizeof(buf)/sizeof(buf[0]),
-						text, _T("yamyd32"), GetLastError());
+			swprintf_s(buf, sizeof(buf)/sizeof(buf[0]),
+						text, L"yamyd32", GetLastError());
 	 		MessageBox((HWND)NULL, buf, title, MB_OK | MB_ICONSTOP);
 		} else {
 			CloseHandle(m_pi.hThread);
@@ -1298,45 +1296,45 @@ public:
 void convertRegistry()
 {
 	Registry reg(MAYU_REGISTRY_ROOT);
-	tstringi dot_mayu;
+	wstringi dot_mayu;
 	bool doesAdd = false;
 	DWORD index;
-	if (reg.read(_T(".mayu"), &dot_mayu)) {
-		reg.write(_T(".mayu0"), _T(";") + dot_mayu + _T(";"));
-		reg.remove(_T(".mayu"));
+	if (reg.read(L".mayu", &dot_mayu)) {
+		reg.write(L".mayu0", L";" + dot_mayu + L";");
+		reg.remove(L".mayu");
 		doesAdd = true;
 		index = 0;
-	} else if (!reg.read(_T(".mayu0"), &dot_mayu)) {
-		reg.write(_T(".mayu0"), loadString(IDS_readFromHomeDirectory) + _T(";;"));
+	} else if (!reg.read(L".mayu0", &dot_mayu)) {
+		reg.write(L".mayu0", loadString(IDS_readFromHomeDirectory) + L";;");
 		doesAdd = true;
 		index = 1;
 	}
 	if (doesAdd) {
-		Registry commonreg(HKEY_LOCAL_MACHINE, _T("Software\\GANAware\\mayu"));
-		tstringi dir, layout;
-		if (commonreg.read(_T("dir"), &dir) &&
-				commonreg.read(_T("layout"), &layout)) {
-			tstringi tmp = _T(";") + dir + _T("\\dot.mayu");
-			if (layout == _T("109")) {
-				reg.write(_T(".mayu1"), loadString(IDS_109Emacs) + tmp
-						  + _T(";-DUSE109") _T(";-DUSEdefault"));
-				reg.write(_T(".mayu2"), loadString(IDS_104on109Emacs) + tmp
-						  + _T(";-DUSE109") _T(";-DUSEdefault") _T(";-DUSE104on109"));
-				reg.write(_T(".mayu3"), loadString(IDS_109) + tmp
-						  + _T(";-DUSE109"));
-				reg.write(_T(".mayu4"), loadString(IDS_104on109) + tmp
-						  + _T(";-DUSE109") _T(";-DUSE104on109"));
+		Registry commonreg(HKEY_LOCAL_MACHINE, L"Software\\GANAware\\mayu");
+		wstringi dir, layout;
+		if (commonreg.read(L"dir", &dir) &&
+				commonreg.read(L"layout", &layout)) {
+			wstringi tmp = L";" + dir + L"\\dot.mayu";
+			if (layout == L"109") {
+				reg.write(L".mayu1", loadString(IDS_109Emacs) + tmp
+						  + L";-DUSE109" L";-DUSEdefault");
+				reg.write(L".mayu2", loadString(IDS_104on109Emacs) + tmp
+						  + L";-DUSE109" L";-DUSEdefault" L";-DUSE104on109");
+				reg.write(L".mayu3", loadString(IDS_109) + tmp
+						  + L";-DUSE109");
+				reg.write(L".mayu4", loadString(IDS_104on109) + tmp
+						  + L";-DUSE109" L";-DUSE104on109");
 			} else {
-				reg.write(_T(".mayu1"), loadString(IDS_104Emacs) + tmp
-						  + _T(";-DUSE104") _T(";-DUSEdefault"));
-				reg.write(_T(".mayu2"), loadString(IDS_109on104Emacs) + tmp
-						  + _T(";-DUSE104") _T(";-DUSEdefault") _T(";-DUSE109on104"));
-				reg.write(_T(".mayu3"), loadString(IDS_104) + tmp
-						  + _T(";-DUSE104"));
-				reg.write(_T(".mayu4"), loadString(IDS_109on104) + tmp
-						  + _T(";-DUSE104") _T(";-DUSE109on104"));
+				reg.write(L".mayu1", loadString(IDS_104Emacs) + tmp
+						  + L";-DUSE104" L";-DUSEdefault");
+				reg.write(L".mayu2", loadString(IDS_109on104Emacs) + tmp
+						  + L";-DUSE104" L";-DUSEdefault" L";-DUSE109on104");
+				reg.write(L".mayu3", loadString(IDS_104) + tmp
+						  + L";-DUSE104");
+				reg.write(L".mayu4", loadString(IDS_109on104) + tmp
+						  + L";-DUSE104" L";-DUSE109on104");
 			}
-			reg.write(_T(".mayuIndex"), index);
+			reg.write(L".mayuIndex", index);
 		}
 	}
 }
@@ -1354,8 +1352,8 @@ static LONG WINAPI crashExceptionFilter(EXCEPTION_POINTERS *i_ep)
 }
 
 
-int WINAPI _tWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
-					 LPTSTR /* i_lpszCmdLine */, int /* i_nCmdShow */)
+int WINAPI wWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
+					 LPWSTR /* i_lpszCmdLine */, int /* i_nCmdShow */)
 {
 	g_hInst = i_hInstance;
 
@@ -1363,7 +1361,7 @@ int WINAPI _tWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
 	s_prevExceptionFilter = SetUnhandledExceptionFilter(crashExceptionFilter);
 
 	// set locale
-	CHECK_TRUE( _tsetlocale(LC_ALL, _T("")) );
+	CHECK_TRUE( _wsetlocale(LC_ALL, L"") );
 
 	// common controls
 #if defined(_WIN95)
@@ -1385,10 +1383,10 @@ int WINAPI _tWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
 							   MUTEX_MAYU_EXCLUSIVE_RUNNING);
 	if (GetLastError() == ERROR_ALREADY_EXISTS) {
 		// another mayu already running
-		tstring text = loadString(IDS_mayuAlreadyExists);
-		tstring title = loadString(IDS_mayu);
+		std::wstring text = loadString(IDS_mayuAlreadyExists);
+		std::wstring title = loadString(IDS_mayu);
 		if (g_hookData) {
-			UINT WM_TaskbarRestart = RegisterWindowMessage(_T("TaskbarCreated"));
+			UINT WM_TaskbarRestart = RegisterWindowMessage(L"TaskbarCreated");
 			PostMessage(g_hookData->getHwndTaskTray(),
 						WM_TaskbarRestart, 0, 0);
 		}
@@ -1399,7 +1397,7 @@ int WINAPI _tWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
 	try {
 		Mayu(mutex).messageLoop();
 	} catch (ErrorMessage &i_e) {
-		tstring title = loadString(IDS_mayu);
+		std::wstring title = loadString(IDS_mayu);
 		MessageBox((HWND)NULL, i_e.getMessage().c_str(), title.c_str(),
 				   MB_OK | MB_ICONSTOP);
 	}

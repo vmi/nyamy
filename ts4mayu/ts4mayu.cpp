@@ -1,6 +1,5 @@
 #include <windows.h>
 #include <process.h>
-#include <tchar.h>
 #include "../driver.h"
 #ifdef STS4MAYU
 #include "SynKit.h"

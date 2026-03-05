@@ -44,12 +44,12 @@ restart:
 					if (j != m_focusOfThreads.end()) {
 						FocusOfThread *fot = &((*j).second);
 						Acquire a(&m_log, 1);
-						m_log << _T("RemoveThread") << std::endl;
-						m_log << _T("\tHWND:\t") << std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(fot->m_hwndFocus))
+						m_log << L"RemoveThread" << std::endl;
+						m_log << L"\tHWND:\t" << std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(fot->m_hwndFocus))
 						<< std::dec << std::endl;
-						m_log << _T("\tTHREADID:") << fot->m_threadId << std::endl;
-						m_log << _T("\tCLASS:\t") << fot->m_className << std::endl;
-						m_log << _T("\tTITLE:\t") << fot->m_titleName << std::endl;
+						m_log << L"\tTHREADID:" << fot->m_threadId << std::endl;
+						m_log << L"\tCLASS:\t" << fot->m_className << std::endl;
+						m_log << L"\tTITLE:\t" << fot->m_titleName << std::endl;
 						m_log << std::endl;
 						m_focusOfThreads.erase(j);
 					}
@@ -70,15 +70,15 @@ restart:
 					checkShow(m_hwndFocus);
 
 					Acquire a(&m_log, 1);
-					m_log << _T("FocusChanged") << std::endl;
-					m_log << _T("\tHWND:\t")
+					m_log << L"FocusChanged" << std::endl;
+					m_log << L"\tHWND:\t"
 					<< std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(m_currentFocusOfThread->m_hwndFocus))
 					<< std::dec << std::endl;
-					m_log << _T("\tTHREADID:")
+					m_log << L"\tTHREADID:"
 					<< m_currentFocusOfThread->m_threadId << std::endl;
-					m_log << _T("\tCLASS:\t")
+					m_log << L"\tCLASS:\t"
 					<< m_currentFocusOfThread->m_className << std::endl;
-					m_log << _T("\tTITLE:\t")
+					m_log << L"\tTITLE:\t"
 					<< m_currentFocusOfThread->m_titleName << std::endl;
 					m_log << std::endl;
 					return;
@@ -86,19 +86,19 @@ restart:
 			}
 		}
 
-		_TCHAR className[GANA_MAX_ATOM_LENGTH];
+		wchar_t className[GANA_MAX_ATOM_LENGTH];
 		if (GetClassName(hwndFore, className, NUMBER_OF(className))) {
-			if (_tcsicmp(className, _T("ConsoleWindowClass")) == 0) {
-				_TCHAR titleName[1024];
+			if (_wcsicmp(className, L"ConsoleWindowClass") == 0) {
+				wchar_t titleName[1024];
 				if (GetWindowText(hwndFore, titleName, NUMBER_OF(titleName)) == 0)
-					titleName[0] = _T('\0');
+					titleName[0] = L'\0';
 				setFocus(hwndFore, threadId, className, titleName, true);
 				Acquire a(&m_log, 1);
-				m_log << _T("HWND:\t") << std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(hwndFore))
+				m_log << L"HWND:\t" << std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(hwndFore))
 				<< std::dec << std::endl;
-				m_log << _T("THREADID:") << threadId << std::endl;
-				m_log << _T("CLASS:\t") << className << std::endl;
-				m_log << _T("TITLE:\t") << titleName << std::endl << std::endl;
+				m_log << L"THREADID:" << threadId << std::endl;
+				m_log << L"CLASS:\t" << className << std::endl;
+				m_log << L"TITLE:\t" << titleName << std::endl << std::endl;
 				goto restart;
 			}
 		}
@@ -107,13 +107,13 @@ restart:
 	std::lock_guard<std::recursive_mutex> lock(m_mutex);
 	if (m_globalFocus.m_keymaps.empty()) {
 		Acquire a(&m_log, 1);
-		m_log << _T("NO GLOBAL FOCUS") << std::endl;
+		m_log << L"NO GLOBAL FOCUS" << std::endl;
 		m_currentFocusOfThread = NULL;
 		setCurrentKeymap(NULL);
 	} else {
 		if (m_currentFocusOfThread != &m_globalFocus) {
 			Acquire a(&m_log, 1);
-			m_log << _T("GLOBAL FOCUS") << std::endl;
+			m_log << L"GLOBAL FOCUS" << std::endl;
 			m_currentFocusOfThread = &m_globalFocus;
 			setCurrentKeymap(m_globalFocus.m_keymaps.front());
 		}
@@ -149,7 +149,7 @@ bool Engine::fixModifierKey(ModifiedKey *io_mkey, Keymap::AssignMode *o_am)
 			if (io_mkey->m_key == (*j).m_key) { // is io_mkey a modifier ?
 				{
 					Acquire a(&m_log, 1);
-					m_log << _T("* Modifier Key") << std::endl;
+					m_log << L"* Modifier Key" << std::endl;
 				}
 				// set dontcare for this modifier
 				io_mkey->m_modifier.dontcare(static_cast<Modifier::Type>(i));
@@ -171,13 +171,13 @@ void Engine::outputToLog(const Key *i_key, const ModifiedKey &i_mkey,
 
 	// output scan codes
 	for (i = 0; i < i_key->getScanCodesSize(); ++ i) {
-		if (i_key->getScanCodes()[i].m_flags & ScanCode::E0) m_log << _T("E0-");
-		if (i_key->getScanCodes()[i].m_flags & ScanCode::E1) m_log << _T("E1-");
+		if (i_key->getScanCodes()[i].m_flags & ScanCode::E0) m_log << L"E0-";
+		if (i_key->getScanCodes()[i].m_flags & ScanCode::E1) m_log << L"E1-";
 		if (!(i_key->getScanCodes()[i].m_flags & ScanCode::E0E1))
-			m_log << _T("   ");
-		m_log << _T("0x") << std::hex << std::setw(2) << std::setfill(_T('0'))
+			m_log << L"   ";
+		m_log << L"0x" << std::hex << std::setw(2) << std::setfill(L'0')
 		<< static_cast<int>(i_key->getScanCodes()[i].m_scan)
-		<< std::dec << _T(" ");
+		<< std::dec << L" ";
 	}
 
 	if (!i_mkey.m_key) { // key corresponds to no phisical key
@@ -185,7 +185,7 @@ void Engine::outputToLog(const Key *i_key, const ModifiedKey &i_mkey,
 		return;
 	}
 
-	m_log << _T("  ") << i_mkey << std::endl;
+	m_log << L"  " << i_mkey << std::endl;
 }
 
 
@@ -299,9 +299,9 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 
 	{
 		Acquire a(&m_log, 1);
-		m_log << _T("\t\t    =>\t");
+		m_log << L"\t\t    =>\t";
 		if (isAlreadyReleased)
-			m_log << _T("(already released) ");
+			m_log << L"(already released) ";
 	}
 	ModifiedKey mkey(i_key);
 	mkey.m_modifier.on(Modifier::Type_Up, !i_doPress);
@@ -320,7 +320,7 @@ void Engine::generateEvents(Current i_c, const Keymap *i_keymap, Key *i_event)
 				i_c.m_keymap->searchAssignment(i_c.m_mkey)) {
 		{
 			Acquire a(&m_log, 1);
-			m_log << std::endl << _T("           ")
+			m_log << std::endl << L"           "
 			<< i_event->getName() << std::endl;
 		}
 		generateKeySeqEvents(i_c, keyAssign->m_keySeq, Part_all);
@@ -334,7 +334,7 @@ void Engine::generateModifierEvents(const Modifier &i_mod)
 	Setting* s = m_setting.load(std::memory_order_relaxed);
 	{
 		Acquire a(&m_log, 1);
-		m_log << _T("* Gen Modifiers\t{") << std::endl;
+		m_log << L"* Gen Modifiers\t{" << std::endl;
 	}
 
 	for (int i = Modifier::Type_begin; i < Modifier::Type_BASIC; ++ i) {
@@ -395,7 +395,7 @@ void Engine::generateModifierEvents(const Modifier &i_mod)
 
 	{
 		Acquire a(&m_log, 1);
-		m_log << _T("\t\t}") << std::endl;
+		m_log << L"\t\t}" << std::endl;
 	}
 }
 
@@ -452,7 +452,7 @@ void Engine::generateActionEvents(const Current &i_c, const Action *i_a,
 
 		{
 			Acquire a(&m_log, 1);
-			m_log << _T("\t\t     >\t") << af->m_functionData.get();
+			m_log << L"\t\t     >\t" << af->m_functionData.get();
 		}
 
 		FunctionParam param;
@@ -505,7 +505,7 @@ void Engine::generateKeyboardEvents(const Current &i_c)
 	if (++ m_generateKeyboardEventsRecursionGuard ==
 			MAX_GENERATE_KEYBOARD_EVENTS_RECURSION_COUNT) {
 		Acquire a(&m_log);
-		m_log << _T("error: too deep keymap recursion.  there may be a loop.")
+		m_log << L"error: too deep keymap recursion.  there may be a loop."
 		<< std::endl;
 		return;
 	}
@@ -565,7 +565,7 @@ void Engine::beginGeneratingKeyboardEvents(
 
 		{
 			Acquire a(&m_log, 1);
-			m_log << _T("* substitute") << std::endl;
+			m_log << L"* substitute" << std::endl;
 		}
 		outputToLog(mkey.m_key, cnew.m_mkey, 1);
 	}
@@ -696,9 +696,9 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 			POINT pt;
 
 			if (GetCursorPos(&pt) && (hwnd = WindowFromPoint(pt))) {
-				_TCHAR className[GANA_MAX_ATOM_LENGTH];
+				wchar_t className[GANA_MAX_ATOM_LENGTH];
 				if (GetClassName(hwnd, className, NUMBER_OF(className))) {
-					if (_tcsicmp(className, _T("ConsoleWindowClass")) == 0) {
+					if (_wcsicmp(className, L"ConsoleWindowClass") == 0) {
 						SetForegroundWindow(hwnd);
 					}
 				}
@@ -763,9 +763,9 @@ unsigned int Engine::keyboardDetour(KBDLLHOOKSTRUCT *i_kid)
 #if 0
 	Acquire a(&m_log, 1);
 	m_log << std::hex
-	<< _T("keyboardDetour: vkCode=") << i_kid->vkCode
-	<< _T(" scanCode=") << i_kid->scanCode
-	<< _T(" flags=") << i_kid->flags << std::endl;
+	<< L"keyboardDetour: vkCode=" << i_kid->vkCode
+	<< L" scanCode=" << i_kid->scanCode
+	<< L" flags=" << i_kid->flags << std::endl;
 #endif
 	if ((i_kid->flags & LLKHF_INJECTED) || !m_isEnabled) {
 		return 0;
@@ -1009,9 +1009,9 @@ void Engine::keyboardHandler()
 						} else
 							m_currentLock.off(Modifier::Type_Touchpad);
 						Acquire a(&m_log, 1);
-						m_log << _T("touchpad: ") << message.wParam
-						<< _T(".") << (message.lParam & 0xffff)
-						<< _T(".") << (message.lParam >> 16 & 0xffff)
+						m_log << L"touchpad: " << message.wParam
+						<< L"." << (message.lParam & 0xffff)
+						<< L"." << (message.lParam >> 16 & 0xffff)
 						<< std::endl;
 						break;
 					}
@@ -1051,10 +1051,10 @@ void Engine::keyboardHandler()
 			injectInput(&kid, NULL);
 			Acquire a(&m_log, 0);
 			if (!m_currentFocusOfThread)
-				m_log << _T("internal error: m_currentFocusOfThread == NULL")
+				m_log << L"internal error: m_currentFocusOfThread == NULL"
 				<< std::endl;
 			if (!m_currentKeymap)
-				m_log << _T("internal error: m_currentKeymap == NULL")
+				m_log << L"internal error: m_currentKeymap == NULL"
 				<< std::endl;
 			updateLastPressedKey(NULL);
 			continue;
@@ -1108,7 +1108,7 @@ void Engine::keyboardHandler()
 		} else if (am == Keymap::AM_true) {
 			{
 				Acquire a(&m_log, 1);
-				m_log << _T("* true modifier") << std::endl;
+				m_log << L"* true modifier" << std::endl;
 			}
 			// true modifier doesn't generate scan code
 			outputToLog(&key, c.m_mkey, 1);
@@ -1116,9 +1116,9 @@ void Engine::keyboardHandler()
 			{
 				Acquire a(&m_log, 1);
 				if (am == Keymap::AM_oneShot)
-					m_log << _T("* one shot modifier") << std::endl;
+					m_log << L"* one shot modifier" << std::endl;
 				else
-					m_log << _T("* one shot repeatable modifier") << std::endl;
+					m_log << L"* one shot repeatable modifier" << std::endl;
 			}
 			// oneShot modifier doesn't generate scan code
 			outputToLog(&key, c.m_mkey, 1);
@@ -1172,7 +1172,7 @@ void Engine::keyboardHandler()
 		if (m_currentKeyPressCount <= 0) {
 			{
 				Acquire a(&m_log, 1);
-				m_log << _T("* No key is pressed") << std::endl;
+				m_log << L"* No key is pressed" << std::endl;
 			}
 			generateModifierEvents(Modifier());
 			if (0 < m_currentKeyPressCountOnWin32)
@@ -1190,7 +1190,7 @@ void Engine::keyboardHandler()
 }
 
 
-Engine::Engine(tomsgstream &i_log)
+Engine::Engine(womsgstream &i_log)
 		: m_hwndAssocWindow(NULL),
 		m_setting(nullptr),
 		m_buttonPressed(false),
@@ -1218,7 +1218,7 @@ Engine::Engine(tomsgstream &i_log)
 		m_variable(0),
 		m_log(i_log) {
 	BOOL (WINAPI *pChangeWindowMessageFilter)(UINT, DWORD) =
-		reinterpret_cast<BOOL (WINAPI*)(UINT, DWORD)>(GetProcAddress(GetModuleHandle(_T("user32.dll")), "ChangeWindowMessageFilter"));
+		reinterpret_cast<BOOL (WINAPI*)(UINT, DWORD)>(GetProcAddress(GetModuleHandle(L"user32.dll"), "ChangeWindowMessageFilter"));
 
 	if(pChangeWindowMessageFilter != NULL) {
 		pChangeWindowMessageFilter(WM_COPYDATA, MSGFLT_ADD);
@@ -1295,9 +1295,9 @@ void Engine::stop() {
 
 bool Engine::prepairQuit() {
 	// terminate and unload DLL for ThumbSense support if loaded
-	manageTs4mayu(_T("sts4mayu.dll"), _T("SynCOM.dll"),
+	manageTs4mayu(L"sts4mayu.dll", L"SynCOM.dll",
 				  false, &m_sts4mayu);
-	manageTs4mayu(_T("cts4mayu.dll"), _T("TouchPad.dll"),
+	manageTs4mayu(L"cts4mayu.dll", L"TouchPad.dll",
 				  false, &m_cts4mayu);
 	return true;
 }
@@ -1327,30 +1327,30 @@ void Engine::manageTs4mayu(TCHAR *i_ts4mayuDllName,
 			if (pTs4mayuTerm() == true)
 				FreeLibrary(*i_pTs4mayu);
 			*i_pTs4mayu = NULL;
-			m_log << i_ts4mayuDllName <<_T(" unloaded") << std::endl;
+			m_log << i_ts4mayuDllName <<L" unloaded" << std::endl;
 		}
 	} else {
 		if (*i_pTs4mayu) {
-			m_log << i_ts4mayuDllName << _T(" already loaded") << std::endl;
+			m_log << i_ts4mayuDllName << L" already loaded" << std::endl;
 		} else {
 			if (SearchPath(NULL, i_dependDllName, NULL, 0, NULL, NULL) == 0) {
-				m_log << _T("load ") << i_ts4mayuDllName
-				<< _T(" failed: can't find ") << i_dependDllName
+				m_log << L"load " << i_ts4mayuDllName
+				<< L" failed: can't find " << i_dependDllName
 				<< std::endl;
 			} else {
 				*i_pTs4mayu = LoadLibrary(i_ts4mayuDllName);
 				if (*i_pTs4mayu == NULL) {
-					m_log << _T("load ") << i_ts4mayuDllName
-					<< _T(" failed: can't find it") << std::endl;
+					m_log << L"load " << i_ts4mayuDllName
+					<< L" failed: can't find it" << std::endl;
 				} else {
 					bool (WINAPI *pTs4mayuInit)(UINT);
 
 					pTs4mayuInit = (bool (WINAPI*)(UINT))GetProcAddress(*i_pTs4mayu, "ts4mayuInit");
 					if (pTs4mayuInit(m_threadId) == true)
-						m_log << i_ts4mayuDllName <<_T(" loaded") << std::endl;
+						m_log << i_ts4mayuDllName <<L" loaded" << std::endl;
 					else
 						m_log << i_ts4mayuDllName
-						<<_T(" load failed: can't initialize") << std::endl;
+						<<L" load failed: can't initialize" << std::endl;
 				}
 			}
 		}
@@ -1386,9 +1386,9 @@ bool Engine::setSetting(Setting *i_setting) {
 
 	m_setting.store(i_setting, std::memory_order_release);
 
-	manageTs4mayu(_T("sts4mayu.dll"), _T("SynCOM.dll"),
+	manageTs4mayu(L"sts4mayu.dll", L"SynCOM.dll",
 				  i_setting->m_sts4mayu, &m_sts4mayu);
-	manageTs4mayu(_T("cts4mayu.dll"), _T("TouchPad.dll"),
+	manageTs4mayu(L"cts4mayu.dll", L"TouchPad.dll",
 				  i_setting->m_cts4mayu, &m_cts4mayu);
 
 	g_hookData->m_correctKanaLockHandling = i_setting->m_correctKanaLockHandling;
@@ -1400,10 +1400,10 @@ bool Engine::setSetting(Setting *i_setting) {
 											  fot->m_className, fot->m_titleName);
 		}
 	}
-	i_setting->m_keymaps.searchWindow(&m_globalFocus.m_keymaps, _T(""), _T(""));
+	i_setting->m_keymaps.searchWindow(&m_globalFocus.m_keymaps, L"", L"");
 	if (m_globalFocus.m_keymaps.empty()) {
 		Acquire a(&m_log, 0);
-		m_log << _T("internal error: m_globalFocus.m_keymap is empty")
+		m_log << L"internal error: m_globalFocus.m_keymap is empty"
 		<< std::endl;
 	}
 	m_currentFocusOfThread = &m_globalFocus;
@@ -1509,7 +1509,7 @@ void Engine::checkShow(HWND i_hwnd) {
 
 // focus
 bool Engine::setFocus(HWND i_hwndFocus, DWORD i_threadId,
-					  const tstringi &i_className, const tstringi &i_titleName,
+					  const wstringi &i_className, const wstringi &i_titleName,
 					  bool i_isConsole) {
 	std::lock_guard<std::recursive_mutex> lock(m_mutex);
 	if (m_isSynchronizing)
@@ -1601,10 +1601,10 @@ bool Engine::setShow(bool i_isMaximized, bool i_isMinimized,
 	}
 	m_currentLock.on(max, i_isMaximized);
 	m_currentLock.on(min, i_isMinimized);
-	m_log << _T("Set show to ") << (i_isMaximized ? _T("Maximized") :
-									i_isMinimized ? _T("Minimized") : _T("Normal"));
+	m_log << L"Set show to " << (i_isMaximized ? L"Maximized" :
+									i_isMinimized ? L"Minimized" : L"Normal");
 	if (i_isMDI == true) {
-		m_log << _T(" (MDI)");
+		m_log << L" (MDI)";
 	}
 	m_log << std::endl;
 	return true;
@@ -1640,7 +1640,7 @@ bool Engine::threadDetachNotify(DWORD i_threadId) {
 
 
 // get help message
-void Engine::getHelpMessages(tstring *o_helpMessage, tstring *o_helpTitle) {
+void Engine::getHelpMessages(std::wstring *o_helpMessage, std::wstring *o_helpTitle) {
 	std::lock_guard<std::recursive_mutex> lock(m_mutex);
 	*o_helpMessage = m_helpMessage;
 	*o_helpTitle = m_helpTitle;

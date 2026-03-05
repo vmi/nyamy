@@ -6,7 +6,6 @@
 #  define _STRINGTOOL_H
 
 #  include "misc.h"
-#  include <tchar.h>
 #  include <cctype>
 #  include <string>
 #  include <iosfwd>
@@ -16,97 +15,81 @@
 #  include <stdio.h>				// for snprintf
 
 
-/// string for generic international text
-using tstring = std::basic_string<_TCHAR>;
-/// istream for generic international text
-using tistream = std::basic_istream<_TCHAR>;
-/// ostream for generic international text
-using tostream = std::basic_ostream<_TCHAR>;
-/// streambuf for for generic international text
-using tstreambuf = std::basic_streambuf<_TCHAR>;
-/// stringstream for generic international text
-using tstringstream = std::basic_stringstream<_TCHAR>;
-/// ifstream for generic international text
-using tifstream = std::basic_ifstream<_TCHAR>;
-/// ofstream for generic international text
-using tofstream = std::basic_ofstream<_TCHAR>;
-/// basic_regex for generic international text
-class tregex : public std::basic_regex<_TCHAR> {
+/// basic_regex with stored pattern (wchar_t variant)
+class wregex_stored : public std::wregex {
 private:
-    tstring m_pattern;
+    std::wstring m_pattern;
 
 public:
-	tregex() : std::basic_regex<_TCHAR>(), m_pattern() {
+	wregex_stored() : std::wregex(), m_pattern() {
     }
 
-	tregex(const _TCHAR* i_pattern,
+	wregex_stored(const wchar_t* i_pattern,
 		std::regex::flag_type i_flags = (std::regex::ECMAScript))
-		: std::basic_regex<_TCHAR>(i_pattern, i_flags),
+		: std::wregex(i_pattern, i_flags),
 		m_pattern(i_pattern) {
 	}
 
-	tregex(const tstring &i_pattern,
+	wregex_stored(const std::wstring &i_pattern,
 		std::regex::flag_type i_flags = (std::regex::ECMAScript))
-		: std::basic_regex<_TCHAR>(i_pattern, i_flags),
+		: std::wregex(i_pattern, i_flags),
 		m_pattern(i_pattern) {
 	}
 
-	tregex& assign(const _TCHAR* i_pattern,
+	wregex_stored& assign(const wchar_t* i_pattern,
 		std::regex::flag_type i_flags = (std::regex::ECMAScript)) {
-		std::basic_regex<_TCHAR>::assign(i_pattern, i_flags);
+		std::wregex::assign(i_pattern, i_flags);
 		m_pattern = i_pattern;
 		return *this;
     }
 
-	tregex& assign(const tstring &i_pattern,
+	wregex_stored& assign(const std::wstring &i_pattern,
 		std::regex::flag_type i_flags = (std::regex::ECMAScript)) {
-		std::basic_regex<_TCHAR>::assign(i_pattern, i_flags);
+		std::wregex::assign(i_pattern, i_flags);
 		m_pattern = i_pattern;
 		return *this;
     }
 
-	const tstring &str() const {
+	const std::wstring &str() const {
 		return m_pattern;
     }
 
 };
-/// match_results for generic international text
-using tsmatch = std::match_results<tstring::const_iterator>;
 
 
 /// string with custom stream output
-class tstringq : public tstring
+class wstringq : public std::wstring
 {
 public:
 	///
-	tstringq() { }
+	wstringq() { }
 	///
-	tstringq(const tstringq &i_str) : tstring(i_str) { }
+	wstringq(const wstringq &i_str) : std::wstring(i_str) { }
 	///
-	tstringq(const tstring &i_str) : tstring(i_str) { }
+	wstringq(const std::wstring &i_str) : std::wstring(i_str) { }
 	///
-	tstringq(const _TCHAR *i_str) : tstring(i_str) { }
+	wstringq(const wchar_t *i_str) : std::wstring(i_str) { }
 	///
-	tstringq(const _TCHAR *i_str, size_t i_n) : tstring(i_str, i_n) { }
+	wstringq(const wchar_t *i_str, size_t i_n) : std::wstring(i_str, i_n) { }
 	///
-	tstringq(const _TCHAR *i_str, size_t i_pos, size_t i_n)
-			: tstring(i_str, i_pos, i_n) { }
+	wstringq(const wchar_t *i_str, size_t i_pos, size_t i_n)
+			: std::wstring(i_str, i_pos, i_n) { }
 	///
-	tstringq(size_t i_n, _TCHAR i_c) : tstring(i_n, i_c) { }
+	wstringq(size_t i_n, wchar_t i_c) : std::wstring(i_n, i_c) { }
 };
 
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, const tstringq &i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, const wstringq &i_data);
 
 
 /// interpret meta characters such as \n
-tstring interpretMetaCharacters(const _TCHAR *i_str, size_t i_len,
-								const _TCHAR *i_quote = NULL,
+std::wstring interpretMetaCharacters(const wchar_t *i_str, size_t i_len,
+								const wchar_t *i_quote = NULL,
 								bool i_doesUseRegexpBackReference = false);
 
 /// add session id to i_str
-tstring addSessionId(const _TCHAR *i_str);
+std::wstring addSessionId(const wchar_t *i_str);
 
 /// copy
 size_t strlcpy(char *o_dest, const char *i_src, size_t i_destSize);
@@ -132,8 +115,6 @@ inline size_t tcslcpy(wchar_t *o_dest, const wchar_t *i_src, size_t i_destSize)
 	return wcslcpy(o_dest, i_src, i_destSize);
 }
 
-// escape regexp special characters in MBCS trail bytes
-std::string guardRegexpFromMbcs(const char *i_str);
 /// converter
 std::wstring to_wstring(const std::string &i_str);
 /// converter
@@ -143,94 +124,94 @@ std::string to_UTF_8(const std::wstring &i_str);
 
 
 /// case insensitive string
-class tstringi : public tstring
+class wstringi : public std::wstring
 {
 public:
 	///
-	tstringi() { }
+	wstringi() { }
 	///
-	tstringi(const tstringi &i_str) : tstring(i_str) { }
+	wstringi(const wstringi &i_str) : std::wstring(i_str) { }
 	///
-	tstringi(const tstring &i_str) : tstring(i_str) { }
+	wstringi(const std::wstring &i_str) : std::wstring(i_str) { }
 	///
-	tstringi(const _TCHAR *i_str) : tstring(i_str) { }
+	wstringi(const wchar_t *i_str) : std::wstring(i_str) { }
 	///
-	tstringi(const _TCHAR *i_str, size_t i_n) : tstring(i_str, i_n) { }
+	wstringi(const wchar_t *i_str, size_t i_n) : std::wstring(i_str, i_n) { }
 	///
-	tstringi(const _TCHAR *i_str, size_t i_pos, size_t i_n)
-			: tstring(i_str, i_pos, i_n) { }
+	wstringi(const wchar_t *i_str, size_t i_pos, size_t i_n)
+			: std::wstring(i_str, i_pos, i_n) { }
 	///
-	tstringi(size_t i_n, _TCHAR i_c) : tstring(i_n, i_c) { }
+	wstringi(size_t i_n, wchar_t i_c) : std::wstring(i_n, i_c) { }
 	///
-	int compare(const tstringi &i_str) const {
+	int compare(const wstringi &i_str) const {
 		return compare(i_str.c_str());
 	}
 	///
-	int compare(const tstring &i_str) const {
+	int compare(const std::wstring &i_str) const {
 		return compare(i_str.c_str());
 	}
 	///
-	int compare(const _TCHAR *i_str) const {
-		return _tcsicmp(c_str(), i_str);
+	int compare(const wchar_t *i_str) const {
+		return _wcsicmp(c_str(), i_str);
 	}
 	///
-	tstring &getString() {
+	std::wstring &getString() {
 		return *this;
 	}
 	///
-	const tstring &getString() const {
+	const std::wstring &getString() const {
 		return *this;
 	}
 };
 
 /// case insensitive string comparison
-inline bool operator<(const tstringi &i_str1, const _TCHAR *i_str2)
+inline bool operator<(const wstringi &i_str1, const wchar_t *i_str2)
 {
 	return i_str1.compare(i_str2) < 0;
 }
 /// case insensitive string comparison
-inline bool operator<(const _TCHAR *i_str1, const tstringi &i_str2)
+inline bool operator<(const wchar_t *i_str1, const wstringi &i_str2)
 {
 	return 0 < i_str2.compare(i_str1);
 }
 /// case insensitive string comparison
-inline bool operator<(const tstringi &i_str1, const tstring &i_str2)
+inline bool operator<(const wstringi &i_str1, const std::wstring &i_str2)
 {
 	return i_str1.compare(i_str2) < 0;
 }
 /// case insensitive string comparison
-inline bool operator<(const tstring &i_str1, const tstringi &i_str2)
+inline bool operator<(const std::wstring &i_str1, const wstringi &i_str2)
 {
 	return 0 < i_str2.compare(i_str1);
 }
 /// case insensitive string comparison
-inline bool operator<(const tstringi &i_str1, const tstringi &i_str2)
+inline bool operator<(const wstringi &i_str1, const wstringi &i_str2)
 {
 	return i_str1.compare(i_str2) < 0;
 }
 
 /// case insensitive string comparison
-inline bool operator==(const _TCHAR *i_str1, const tstringi &i_str2)
+inline bool operator==(const wchar_t *i_str1, const wstringi &i_str2)
 {
 	return i_str2.compare(i_str1) == 0;
 }
 /// case insensitive string comparison
-inline bool operator==(const tstringi &i_str1, const _TCHAR *i_str2)
+inline bool operator==(const wstringi &i_str1, const wchar_t *i_str2)
 {
 	return i_str1.compare(i_str2) == 0;
 }
 /// case insensitive string comparison
-inline bool operator==(const tstring &i_str1, const tstringi &i_str2)
+inline bool operator==(const std::wstring &i_str1, const wstringi &i_str2)
 {
 	return i_str2.compare(i_str1) == 0;
 }
 /// case insensitive string comparison
-inline bool operator==(const tstringi &i_str1, const tstring &i_str2)
+inline bool operator==(const wstringi &i_str1, const std::wstring &i_str2)
 {
 	return i_str1.compare(i_str2) == 0;
 }
 /// case insensitive string comparison
-inline bool operator==(const tstringi &i_str1, const tstringi &i_str2)
+inline bool operator==(const wstringi &i_str1, const wstringi &i_str2)
 {
 	return i_str1.compare(i_str2) == 0;
 }
@@ -241,37 +222,37 @@ inline bool operator==(const tstringi &i_str1, const tstringi &i_str2)
 
 
 /// case insensitive string comparison
-inline bool operator!=(const _TCHAR *i_str1, const tstringi &i_str2)
+inline bool operator!=(const wchar_t *i_str1, const wstringi &i_str2)
 {
 	return i_str2.compare(i_str1) != 0;
 }
 /// case insensitive string comparison
-inline bool operator!=(const tstringi &i_str1, const _TCHAR *i_str2)
+inline bool operator!=(const wstringi &i_str1, const wchar_t *i_str2)
 {
 	return i_str1.compare(i_str2) != 0;
 }
 /// case insensitive string comparison
-inline bool operator!=(const tstring &i_str1, const tstringi &i_str2)
+inline bool operator!=(const std::wstring &i_str1, const wstringi &i_str2)
 {
 	return i_str2.compare(i_str1) != 0;
 }
 /// case insensitive string comparison
-inline bool operator!=(const tstringi &i_str1, const tstring &i_str2)
+inline bool operator!=(const wstringi &i_str1, const std::wstring &i_str2)
 {
 	return i_str1.compare(i_str2) != 0;
 }
 /// case insensitive string comparison
-inline bool operator!=(const tstringi &i_str1, const tstringi &i_str2)
+inline bool operator!=(const wstringi &i_str1, const wstringi &i_str2)
 {
 	return i_str1.compare(i_str2) != 0;
 }
 
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, const tregex &i_data);
+extern std::wostream &operator<<(std::wostream &i_ost, const wregex_stored &i_data);
 
 /// get lower string
-extern tstring toLower(const tstring &i_str);
+extern std::wstring toLower(const std::wstring &i_str);
 
 
 #endif // !_STRINGTOOL_H

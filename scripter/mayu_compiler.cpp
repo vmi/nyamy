@@ -17,50 +17,50 @@
 //=============================================================================
 
 static const struct {
-	const _TCHAR *name;
+	const wchar_t *name;
 	Modifier::Type type;
 } g_modifierMap[] = {
-	{ _T("S-"),   Modifier::Type_Shift },
-	{ _T("A-"),   Modifier::Type_Alt },
-	{ _T("M-"),   Modifier::Type_Alt },
-	{ _T("C-"),   Modifier::Type_Control },
-	{ _T("W-"),   Modifier::Type_Windows },
-	{ _T("U-"),   Modifier::Type_Up },
-	{ _T("D-"),   Modifier::Type_Down },
-	{ _T("R-"),   Modifier::Type_Repeat },
-	{ _T("IL-"),  Modifier::Type_ImeLock },
-	{ _T("IC-"),  Modifier::Type_ImeComp },
-	{ _T("I-"),   Modifier::Type_ImeComp },
-	{ _T("NL-"),  Modifier::Type_NumLock },
-	{ _T("CL-"),  Modifier::Type_CapsLock },
-	{ _T("SL-"),  Modifier::Type_ScrollLock },
-	{ _T("KL-"),  Modifier::Type_KanaLock },
-	{ _T("MAX-"), Modifier::Type_Maximized },
-	{ _T("MIN-"), Modifier::Type_Minimized },
-	{ _T("MMAX-"), Modifier::Type_MdiMaximized },
-	{ _T("MMIN-"), Modifier::Type_MdiMinimized },
-	{ _T("T-"),   Modifier::Type_Touchpad },
-	{ _T("TS-"),  Modifier::Type_TouchpadSticky },
-	{ _T("M0-"),  Modifier::Type_Mod0 },
-	{ _T("M1-"),  Modifier::Type_Mod1 },
-	{ _T("M2-"),  Modifier::Type_Mod2 },
-	{ _T("M3-"),  Modifier::Type_Mod3 },
-	{ _T("M4-"),  Modifier::Type_Mod4 },
-	{ _T("M5-"),  Modifier::Type_Mod5 },
-	{ _T("M6-"),  Modifier::Type_Mod6 },
-	{ _T("M7-"),  Modifier::Type_Mod7 },
-	{ _T("M8-"),  Modifier::Type_Mod8 },
-	{ _T("M9-"),  Modifier::Type_Mod9 },
-	{ _T("L0-"),  Modifier::Type_Lock0 },
-	{ _T("L1-"),  Modifier::Type_Lock1 },
-	{ _T("L2-"),  Modifier::Type_Lock2 },
-	{ _T("L3-"),  Modifier::Type_Lock3 },
-	{ _T("L4-"),  Modifier::Type_Lock4 },
-	{ _T("L5-"),  Modifier::Type_Lock5 },
-	{ _T("L6-"),  Modifier::Type_Lock6 },
-	{ _T("L7-"),  Modifier::Type_Lock7 },
-	{ _T("L8-"),  Modifier::Type_Lock8 },
-	{ _T("L9-"),  Modifier::Type_Lock9 },
+	{ L"S-",   Modifier::Type_Shift },
+	{ L"A-",   Modifier::Type_Alt },
+	{ L"M-",   Modifier::Type_Alt },
+	{ L"C-",   Modifier::Type_Control },
+	{ L"W-",   Modifier::Type_Windows },
+	{ L"U-",   Modifier::Type_Up },
+	{ L"D-",   Modifier::Type_Down },
+	{ L"R-",   Modifier::Type_Repeat },
+	{ L"IL-",  Modifier::Type_ImeLock },
+	{ L"IC-",  Modifier::Type_ImeComp },
+	{ L"I-",   Modifier::Type_ImeComp },
+	{ L"NL-",  Modifier::Type_NumLock },
+	{ L"CL-",  Modifier::Type_CapsLock },
+	{ L"SL-",  Modifier::Type_ScrollLock },
+	{ L"KL-",  Modifier::Type_KanaLock },
+	{ L"MAX-", Modifier::Type_Maximized },
+	{ L"MIN-", Modifier::Type_Minimized },
+	{ L"MMAX-", Modifier::Type_MdiMaximized },
+	{ L"MMIN-", Modifier::Type_MdiMinimized },
+	{ L"T-",   Modifier::Type_Touchpad },
+	{ L"TS-",  Modifier::Type_TouchpadSticky },
+	{ L"M0-",  Modifier::Type_Mod0 },
+	{ L"M1-",  Modifier::Type_Mod1 },
+	{ L"M2-",  Modifier::Type_Mod2 },
+	{ L"M3-",  Modifier::Type_Mod3 },
+	{ L"M4-",  Modifier::Type_Mod4 },
+	{ L"M5-",  Modifier::Type_Mod5 },
+	{ L"M6-",  Modifier::Type_Mod6 },
+	{ L"M7-",  Modifier::Type_Mod7 },
+	{ L"M8-",  Modifier::Type_Mod8 },
+	{ L"M9-",  Modifier::Type_Mod9 },
+	{ L"L0-",  Modifier::Type_Lock0 },
+	{ L"L1-",  Modifier::Type_Lock1 },
+	{ L"L2-",  Modifier::Type_Lock2 },
+	{ L"L3-",  Modifier::Type_Lock3 },
+	{ L"L4-",  Modifier::Type_Lock4 },
+	{ L"L5-",  Modifier::Type_Lock5 },
+	{ L"L6-",  Modifier::Type_Lock6 },
+	{ L"L7-",  Modifier::Type_Lock7 },
+	{ L"L8-",  Modifier::Type_Lock8 },
+	{ L"L9-",  Modifier::Type_Lock9 },
 };
 
 
@@ -73,7 +73,7 @@ MayuCompiler::MayuCompiler(
 	const Symbols &initialSymbols,
 	ConfigFiles &configFiles,
 	SyncObject *soLog,
-	tostream *log)
+	std::wostream *log)
 	: m_symbols(initialSymbols),
 	  m_configFiles(configFiles),
 	  m_soLog(soLog),
@@ -108,13 +108,13 @@ void MayuCompiler::compile(const AstFile &file)
 // Helpers
 //=============================================================================
 
-void MayuCompiler::error(const AstSourceLoc &loc, const tstring &msg)
+void MayuCompiler::error(const AstSourceLoc &loc, const std::wstring &msg)
 {
 	m_hasErrors = true;
 	if (m_log && m_soLog) {
 		Acquire a(m_soLog);
-		*m_log << loc.filename << _T("(") << loc.line
-			   << _T(") : error: ") << msg << std::endl;
+		*m_log << loc.filename << L"(" << loc.line
+			   << L") : error: " << msg << std::endl;
 	}
 }
 
@@ -130,7 +130,7 @@ CmdModifier MayuCompiler::compileModifierSpecs(
 	for (const auto &spec : specs) {
 		// Find the modifier type
 		for (size_t i = 0; i < NUMBER_OF(g_modifierMap); ++i) {
-			if (_tcsicmp(spec.name.c_str(), g_modifierMap[i].name) == 0) {
+			if (_wcsicmp(spec.name.c_str(), g_modifierMap[i].name) == 0) {
 				Modifier::Type mt = g_modifierMap[i].type;
 				uint64_t bit = static_cast<uint64_t>(1) << mt;
 				explicitBits |= bit;
@@ -156,7 +156,7 @@ CmdModifier MayuCompiler::compileModifierSpecs(
 	// modifier bit that was not explicitly specified.  This replicates the old
 	// pipeline's "trailing flag" behaviour (e.g. bare * before a key name).
 	for (const auto &spec : specs) {
-		if (spec.name == _T("*") || spec.name == _T("~")) {
+		if (spec.name == L"*" || spec.name == L"~") {
 			const uint64_t allBits =
 				(static_cast<uint64_t>(1) << Modifier::Type_ASSIGN) - 1;
 			const uint64_t unspecBits = allBits & ~explicitBits;
@@ -181,9 +181,9 @@ CmdScanCode MayuCompiler::compileScanCode(const AstScanCode &sc)
 	bsc.scan = static_cast<uint16_t>(sc.scanCode);
 	bsc.flags = 0;
 	for (const auto &ext : sc.extensions) {
-		if (_tcsicmp(ext.c_str(), _T("E0-")) == 0)
+		if (_wcsicmp(ext.c_str(), L"E0-") == 0)
 			bsc.flags |= ScanCode::E0;
-		else if (_tcsicmp(ext.c_str(), _T("E1-")) == 0)
+		else if (_wcsicmp(ext.c_str(), L"E1-") == 0)
 			bsc.flags |= ScanCode::E1;
 	}
 	return bsc;
@@ -319,15 +319,15 @@ void MayuCompiler::visit(const AstDefineSymbol &node)
 void MayuCompiler::visit(const AstInclude &node)
 {
 	// Resolve the include filename to a full path via home directories
-	tstringi resolvedPath;
+	wstringi resolvedPath;
 	if (!m_configFiles.getFilename(node.filename, &resolvedPath, nullptr)) {
 		error(node.m_loc,
-			  _T("include file not found: `") + node.filename + _T("'."));
+			  L"include file not found: `" + node.filename + L"'.");
 		m_hasErrors = true;
 		return;
 	}
 
-	if (m_log) *m_log << _T("  loading: ") << resolvedPath << std::endl;
+	if (m_log) *m_log << L"  loading: " << resolvedPath << std::endl;
 
 	MayuParser parser;
 	auto ast = parser.parseFile(resolvedPath, m_configFiles);
@@ -338,7 +338,7 @@ void MayuCompiler::visit(const AstInclude &node)
 				*m_log << msg << std::endl;
 		}
 		error(node.m_loc,
-			  _T("errors in included file `") + node.filename + _T("'."));
+			  L"errors in included file `" + node.filename + L"'.");
 		m_hasErrors = true;
 	}
 	if (ast) {

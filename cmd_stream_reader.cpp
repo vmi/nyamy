@@ -58,7 +58,7 @@ uint8_t CmdStreamReader::readU8()
 {
 	int ch = m_in.get();
 	if (ch == std::char_traits<char>::eof())
-		throw ErrorMessage() << _T("unexpected end of command stream");
+		throw ErrorMessage() << L"unexpected end of command stream";
 	return static_cast<uint8_t>(ch);
 }
 
@@ -95,15 +95,15 @@ uint64_t CmdStreamReader::readU64()
 }
 
 
-tstringi CmdStreamReader::readString()
+wstringi CmdStreamReader::readString()
 {
 	uint16_t len = readU16();
-	tstringi s;
+	wstringi s;
 	s.reserve(len);
 	for (uint16_t i = 0; i < len; ++i) {
 		uint8_t lo = readU8();
 		uint8_t hi = readU8();
-		s.push_back(static_cast<_TCHAR>(lo | (hi << 8)));
+		s.push_back(static_cast<wchar_t>(lo | (hi << 8)));
 	}
 	return s;
 }
@@ -369,125 +369,125 @@ CmdKeySeqDefData CmdStreamReader::readKeySeqDef()
 
 static const struct {
 	Modifier::Type type;
-	const _TCHAR *name;
+	const wchar_t *name;
 } g_modNameTable[] = {
-	{ Modifier::Type_Shift,          _T("S-") },
-	{ Modifier::Type_Alt,            _T("A-") },
-	{ Modifier::Type_Control,        _T("C-") },
-	{ Modifier::Type_Windows,        _T("W-") },
-	{ Modifier::Type_Up,             _T("U-") },
-	{ Modifier::Type_Down,           _T("D-") },
-	{ Modifier::Type_Repeat,         _T("R-") },
-	{ Modifier::Type_ImeLock,        _T("IL-") },
-	{ Modifier::Type_ImeComp,        _T("IC-") },
-	{ Modifier::Type_NumLock,        _T("NL-") },
-	{ Modifier::Type_CapsLock,       _T("CL-") },
-	{ Modifier::Type_ScrollLock,     _T("SL-") },
-	{ Modifier::Type_KanaLock,       _T("KL-") },
-	{ Modifier::Type_Maximized,      _T("MAX-") },
-	{ Modifier::Type_Minimized,      _T("MIN-") },
-	{ Modifier::Type_MdiMaximized,   _T("MMAX-") },
-	{ Modifier::Type_MdiMinimized,   _T("MMIN-") },
-	{ Modifier::Type_Touchpad,       _T("T-") },
-	{ Modifier::Type_TouchpadSticky, _T("TS-") },
-	{ Modifier::Type_Mod0,           _T("M0-") },
-	{ Modifier::Type_Mod1,           _T("M1-") },
-	{ Modifier::Type_Mod2,           _T("M2-") },
-	{ Modifier::Type_Mod3,           _T("M3-") },
-	{ Modifier::Type_Mod4,           _T("M4-") },
-	{ Modifier::Type_Mod5,           _T("M5-") },
-	{ Modifier::Type_Mod6,           _T("M6-") },
-	{ Modifier::Type_Mod7,           _T("M7-") },
-	{ Modifier::Type_Mod8,           _T("M8-") },
-	{ Modifier::Type_Mod9,           _T("M9-") },
-	{ Modifier::Type_Lock0,          _T("L0-") },
-	{ Modifier::Type_Lock1,          _T("L1-") },
-	{ Modifier::Type_Lock2,          _T("L2-") },
-	{ Modifier::Type_Lock3,          _T("L3-") },
-	{ Modifier::Type_Lock4,          _T("L4-") },
-	{ Modifier::Type_Lock5,          _T("L5-") },
-	{ Modifier::Type_Lock6,          _T("L6-") },
-	{ Modifier::Type_Lock7,          _T("L7-") },
-	{ Modifier::Type_Lock8,          _T("L8-") },
-	{ Modifier::Type_Lock9,          _T("L9-") },
+	{ Modifier::Type_Shift,          L"S-" },
+	{ Modifier::Type_Alt,            L"A-" },
+	{ Modifier::Type_Control,        L"C-" },
+	{ Modifier::Type_Windows,        L"W-" },
+	{ Modifier::Type_Up,             L"U-" },
+	{ Modifier::Type_Down,           L"D-" },
+	{ Modifier::Type_Repeat,         L"R-" },
+	{ Modifier::Type_ImeLock,        L"IL-" },
+	{ Modifier::Type_ImeComp,        L"IC-" },
+	{ Modifier::Type_NumLock,        L"NL-" },
+	{ Modifier::Type_CapsLock,       L"CL-" },
+	{ Modifier::Type_ScrollLock,     L"SL-" },
+	{ Modifier::Type_KanaLock,       L"KL-" },
+	{ Modifier::Type_Maximized,      L"MAX-" },
+	{ Modifier::Type_Minimized,      L"MIN-" },
+	{ Modifier::Type_MdiMaximized,   L"MMAX-" },
+	{ Modifier::Type_MdiMinimized,   L"MMIN-" },
+	{ Modifier::Type_Touchpad,       L"T-" },
+	{ Modifier::Type_TouchpadSticky, L"TS-" },
+	{ Modifier::Type_Mod0,           L"M0-" },
+	{ Modifier::Type_Mod1,           L"M1-" },
+	{ Modifier::Type_Mod2,           L"M2-" },
+	{ Modifier::Type_Mod3,           L"M3-" },
+	{ Modifier::Type_Mod4,           L"M4-" },
+	{ Modifier::Type_Mod5,           L"M5-" },
+	{ Modifier::Type_Mod6,           L"M6-" },
+	{ Modifier::Type_Mod7,           L"M7-" },
+	{ Modifier::Type_Mod8,           L"M8-" },
+	{ Modifier::Type_Mod9,           L"M9-" },
+	{ Modifier::Type_Lock0,          L"L0-" },
+	{ Modifier::Type_Lock1,          L"L1-" },
+	{ Modifier::Type_Lock2,          L"L2-" },
+	{ Modifier::Type_Lock3,          L"L3-" },
+	{ Modifier::Type_Lock4,          L"L4-" },
+	{ Modifier::Type_Lock5,          L"L5-" },
+	{ Modifier::Type_Lock6,          L"L6-" },
+	{ Modifier::Type_Lock7,          L"L7-" },
+	{ Modifier::Type_Lock8,          L"L8-" },
+	{ Modifier::Type_Lock9,          L"L9-" },
 };
 
 
-void CmdStreamReader::dumpModifier(tostream &out, const CmdModifier &mod)
+void CmdStreamReader::dumpModifier(std::wostream &out, const CmdModifier &mod)
 {
-	out << _T("{");
+	out << L"{";
 	bool first = true;
 	for (size_t i = 0; i < NUMBER_OF(g_modNameTable); ++i) {
 		uint64_t bit = static_cast<uint64_t>(1) << g_modNameTable[i].type;
 		if (mod.dontcares & bit) {
-			if (!first) out << _T(" ");
-			out << _T("*") << g_modNameTable[i].name;
+			if (!first) out << L" ";
+			out << L"*" << g_modNameTable[i].name;
 			first = false;
 		} else if (mod.modifiers & bit) {
-			if (!first) out << _T(" ");
+			if (!first) out << L" ";
 			out << g_modNameTable[i].name;
 			first = false;
 		}
 	}
-	out << _T("}");
+	out << L"}";
 }
 
 
-void CmdStreamReader::dumpArgument(tostream &out, const CmdArgument &arg)
+void CmdStreamReader::dumpArgument(std::wostream &out, const CmdArgument &arg)
 {
 	switch (arg.type) {
 	case CmdArgument::String:
-		out << _T("\"") << arg.stringValue << _T("\"");
+		out << L"\"" << arg.stringValue << L"\"";
 		break;
 	case CmdArgument::Number:
 		out << arg.numberValue;
 		break;
 	case CmdArgument::Regexp:
-		out << _T("/") << arg.stringValue << _T("/");
+		out << L"/" << arg.stringValue << L"/";
 		break;
 	case CmdArgument::KeySeqIdx:
-		out << _T("@") << arg.keySeqIndex;
+		out << L"@" << arg.keySeqIndex;
 		break;
 	case CmdArgument::ModSeq:
-		out << _T("mod");
+		out << L"mod";
 		dumpModifier(out, arg.modifierValue);
 		break;
 	}
 }
 
 
-void CmdStreamReader::dumpAction(tostream &out, const CmdAction &action,
+void CmdStreamReader::dumpAction(std::wostream &out, const CmdAction &action,
 								 int indent)
 {
 	for (int i = 0; i < indent; ++i)
-		out << _T("  ");
+		out << L"  ";
 
 	switch (action.type) {
 	case CmdAction::Key:
-		out << _T("KEY mod=");
+		out << L"KEY mod=";
 		dumpModifier(out, action.modifier);
-		out << _T(" \"") << action.name << _T("\"");
+		out << L" \"" << action.name << L"\"";
 		break;
 	case CmdAction::KeySeqRef:
-		out << _T("REF mod=");
+		out << L"REF mod=";
 		dumpModifier(out, action.modifier);
-		out << _T(" $") << action.name;
+		out << L" $" << action.name;
 		break;
 	case CmdAction::FuncCall:
-		out << _T("FUNC mod=");
+		out << L"FUNC mod=";
 		dumpModifier(out, action.modifier);
-		out << _T(" &") << action.name;
+		out << L" &" << action.name;
 		if (!action.arguments.empty()) {
-			out << _T("(");
+			out << L"(";
 			for (size_t i = 0; i < action.arguments.size(); ++i) {
-				if (i > 0) out << _T(", ");
+				if (i > 0) out << L", ";
 				dumpArgument(out, action.arguments[i]);
 			}
-			out << _T(")");
+			out << L")";
 		}
 		break;
 	case CmdAction::SubSeq:
-		out << _T("SUBSEQ mod=");
+		out << L"SUBSEQ mod=";
 		dumpModifier(out, action.modifier);
 		out << std::endl;
 		for (const auto &sub : action.subActions)
@@ -498,50 +498,50 @@ void CmdStreamReader::dumpAction(tostream &out, const CmdAction &action,
 }
 
 
-static const _TCHAR *cmdIdToString(CmdId id)
+static const wchar_t *cmdIdToString(CmdId id)
 {
 	switch (id) {
-	case CmdId::DefKeySeq:    return _T("DefKeySeq");
-	case CmdId::DefKey:       return _T("DefKey");
-	case CmdId::DefModifier:  return _T("DefModifier");
-	case CmdId::DefSync:      return _T("DefSync");
-	case CmdId::DefAlias:     return _T("DefAlias");
-	case CmdId::DefSubstitute:return _T("DefSubstitute");
-	case CmdId::DefOption:    return _T("DefOption");
-	case CmdId::DefSymbol:    return _T("DefSymbol");
-	case CmdId::KeymapDef:    return _T("KeymapDef");
-	case CmdId::KeyAssign:    return _T("KeyAssign");
-	case CmdId::KeyDefaultMod:return _T("KeyDefaultMod");
-	case CmdId::EventAssign:  return _T("EventAssign");
-	case CmdId::ModAssign:    return _T("ModAssign");
-	case CmdId::KeySeqDef:    return _T("KeySeqDef");
-	case CmdId::Commit:       return _T("Commit");
-	default:                  return _T("???");
+	case CmdId::DefKeySeq:    return L"DefKeySeq";
+	case CmdId::DefKey:       return L"DefKey";
+	case CmdId::DefModifier:  return L"DefModifier";
+	case CmdId::DefSync:      return L"DefSync";
+	case CmdId::DefAlias:     return L"DefAlias";
+	case CmdId::DefSubstitute:return L"DefSubstitute";
+	case CmdId::DefOption:    return L"DefOption";
+	case CmdId::DefSymbol:    return L"DefSymbol";
+	case CmdId::KeymapDef:    return L"KeymapDef";
+	case CmdId::KeyAssign:    return L"KeyAssign";
+	case CmdId::KeyDefaultMod:return L"KeyDefaultMod";
+	case CmdId::EventAssign:  return L"EventAssign";
+	case CmdId::ModAssign:    return L"ModAssign";
+	case CmdId::KeySeqDef:    return L"KeySeqDef";
+	case CmdId::Commit:       return L"Commit";
+	default:                  return L"???";
 	}
 }
 
 
-void CmdStreamReader::dump(std::istream &in, tostream &out)
+void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 {
 	CmdStreamReader reader(in);
 	CmdId cmdId;
 	uint32_t cmdIndex = 0;
 	uint32_t keySeqIndex = 0;
 
-	out << _T("; Command stream dump") << std::endl << std::endl;
+	out << L"; Command stream dump" << std::endl << std::endl;
 
 	while (reader.readNext(cmdId)) {
-		out << _T("  ")
-			<< std::setw(4) << std::setfill(_T('0')) << cmdIndex
-			<< _T(": ");
-		out << std::setw(14) << std::setfill(_T(' ')) << std::left
+		out << L"  "
+			<< std::setw(4) << std::setfill(L'0') << cmdIndex
+			<< L": ";
+		out << std::setw(14) << std::setfill(L' ') << std::left
 			<< cmdIdToString(cmdId);
 
 		switch (cmdId) {
 		case CmdId::DefKeySeq: {
 			CmdKeySequence ks = reader.readKeySequence();
-			out << _T("[") << keySeqIndex << _T("] name=\"")
-				<< ks.name << _T("\" mode=") << (int)ks.mode
+			out << L"[" << keySeqIndex << L"] name=\""
+				<< ks.name << L"\" mode=" << (int)ks.mode
 				<< std::endl;
 			for (const auto &action : ks.actions)
 				dumpAction(out, action, 3);
@@ -550,121 +550,121 @@ void CmdStreamReader::dump(std::istream &in, tostream &out)
 		}
 		case CmdId::DefKey: {
 			auto data = reader.readDefKey();
-			out << _T("names=[");
+			out << L"names=[";
 			for (size_t j = 0; j < data.names.size(); ++j) {
-				if (j > 0) out << _T(", ");
-				out << _T("\"") << data.names[j] << _T("\"");
+				if (j > 0) out << L", ";
+				out << L"\"" << data.names[j] << L"\"";
 			}
-			out << _T("] scancodes=[");
+			out << L"] scancodes=[";
 			for (size_t j = 0; j < data.scanCodes.size(); ++j) {
-				if (j > 0) out << _T(", ");
-				out << _T("0x") << std::hex << data.scanCodes[j].scan
+				if (j > 0) out << L", ";
+				out << L"0x" << std::hex << data.scanCodes[j].scan
 					<< std::dec;
 				if (data.scanCodes[j].flags)
-					out << _T("(flags=") << data.scanCodes[j].flags
-						<< _T(")");
+					out << L"(flags=" << data.scanCodes[j].flags
+						<< L")";
 			}
-			out << _T("]");
+			out << L"]";
 			break;
 		}
 		case CmdId::DefModifier: {
 			auto data = reader.readDefModifier();
-			out << _T("mod=\"") << data.modifierName << _T("\" keys=[");
+			out << L"mod=\"" << data.modifierName << L"\" keys=[";
 			for (size_t j = 0; j < data.keyNames.size(); ++j) {
-				if (j > 0) out << _T(", ");
-				out << _T("\"") << data.keyNames[j] << _T("\"");
+				if (j > 0) out << L", ";
+				out << L"\"" << data.keyNames[j] << L"\"";
 			}
-			out << _T("]");
+			out << L"]";
 			break;
 		}
 		case CmdId::DefSync: {
 			auto data = reader.readDefSync();
-			out << _T("scancodes=[");
+			out << L"scancodes=[";
 			for (size_t j = 0; j < data.scanCodes.size(); ++j) {
-				if (j > 0) out << _T(", ");
-				out << _T("0x") << std::hex << data.scanCodes[j].scan
+				if (j > 0) out << L", ";
+				out << L"0x" << std::hex << data.scanCodes[j].scan
 					<< std::dec;
 			}
-			out << _T("]");
+			out << L"]";
 			break;
 		}
 		case CmdId::DefAlias: {
 			auto data = reader.readDefAlias();
-			out << _T("alias=\"") << data.aliasName
-				<< _T("\" key=\"") << data.keyName << _T("\"");
+			out << L"alias=\"" << data.aliasName
+				<< L"\" key=\"" << data.keyName << L"\"";
 			break;
 		}
 		case CmdId::DefSubstitute: {
 			auto data = reader.readDefSubstitute();
-			out << _T("lhs=[...] rhs=@") << data.rhsKeySeqIdx;
+			out << L"lhs=[...] rhs=@" << data.rhsKeySeqIdx;
 			break;
 		}
 		case CmdId::DefOption: {
 			auto data = reader.readDefOption();
-			out << _T("option=\"") << data.optionName << _T("\"");
+			out << L"option=\"" << data.optionName << L"\"";
 			if (!data.qualifier.empty())
-				out << _T(" qual=\"") << data.qualifier << _T("\"");
-			out << _T(" value=\"") << data.value << _T("\"");
+				out << L" qual=\"" << data.qualifier << L"\"";
+			out << L" value=\"" << data.value << L"\"";
 			break;
 		}
 		case CmdId::DefSymbol: {
 			auto data = reader.readDefSymbol();
-			out << _T("symbol=\"") << data.symbolName << _T("\"");
+			out << L"symbol=\"" << data.symbolName << L"\"";
 			break;
 		}
 		case CmdId::KeymapDef: {
 			auto data = reader.readKeymapDef();
-			out << _T("keyword=\"") << data.keyword
-				<< _T("\" name=\"") << data.name << _T("\"");
+			out << L"keyword=\"" << data.keyword
+				<< L"\" name=\"" << data.name << L"\"";
 			if (!data.windowClassName.empty())
-				out << _T(" class=/") << data.windowClassName << _T("/");
+				out << L" class=/" << data.windowClassName << L"/";
 			if (!data.windowOp.empty())
-				out << _T(" op=") << data.windowOp;
+				out << L" op=" << data.windowOp;
 			if (!data.windowTitleName.empty())
-				out << _T(" title=/") << data.windowTitleName << _T("/");
+				out << L" title=/" << data.windowTitleName << L"/";
 			if (!data.parentName.empty())
-				out << _T(" parent=\"") << data.parentName << _T("\"");
+				out << L" parent=\"" << data.parentName << L"\"";
 			if (data.defaultKeySeqIdx >= 0)
-				out << _T(" default=@") << data.defaultKeySeqIdx;
+				out << L" default=@" << data.defaultKeySeqIdx;
 			break;
 		}
 		case CmdId::KeyAssign: {
 			auto data = reader.readKeyAssign();
-			out << _T("lhs=[");
+			out << L"lhs=[";
 			for (size_t j = 0; j < data.lhsKeys.size(); ++j) {
-				if (j > 0) out << _T(", ");
-				out << _T("\"") << data.lhsKeys[j].keyName << _T("\"");
+				if (j > 0) out << L", ";
+				out << L"\"" << data.lhsKeys[j].keyName << L"\"";
 			}
-			out << _T("] rhs=@") << data.rhsKeySeqIdx;
+			out << L"] rhs=@" << data.rhsKeySeqIdx;
 			break;
 		}
 		case CmdId::KeyDefaultMod: {
 			auto data = reader.readKeyDefaultMod();
-			out << _T("assign=... keyseq=...");
+			out << L"assign=... keyseq=...";
 			break;
 		}
 		case CmdId::EventAssign: {
 			auto data = reader.readEventAssign();
-			out << _T("event=\"") << data.eventName
-				<< _T("\" rhs=@") << data.rhsKeySeqIdx;
+			out << L"event=\"" << data.eventName
+				<< L"\" rhs=@" << data.rhsKeySeqIdx;
 			break;
 		}
 		case CmdId::ModAssign: {
 			auto data = reader.readModAssign();
-			out << _T("main=\"") << data.mainModifierName
-				<< _T("\" op=\"") << data.op << _T("\" keys=[");
+			out << L"main=\"" << data.mainModifierName
+				<< L"\" op=\"" << data.op << L"\" keys=[";
 			for (size_t j = 0; j < data.keys.size(); ++j) {
-				if (j > 0) out << _T(", ");
+				if (j > 0) out << L", ";
 				if (!data.keys[j].assignMode.empty())
 					out << data.keys[j].assignMode;
-				out << _T("\"") << data.keys[j].keyName << _T("\"");
+				out << L"\"" << data.keys[j].keyName << L"\"";
 			}
-			out << _T("]");
+			out << L"]";
 			break;
 		}
 		case CmdId::KeySeqDef: {
 			auto data = reader.readKeySeqDef();
-			out << _T("idx=") << data.keySeqIdx;
+			out << L"idx=" << data.keySeqIdx;
 			break;
 		}
 		case CmdId::Commit:

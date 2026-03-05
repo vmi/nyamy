@@ -21,18 +21,18 @@ class ConfigFiles;
 class MayuParser
 {
 public:
-	using Prefixes = std::vector<tstringi>;
+	using Prefixes = std::vector<wstringi>;
 
 private:
 	Lexer *m_lexer;				///< current lexer
 	Lexer::Tokens m_tokens;			///< tokens for current line
 	Lexer::Tokens::iterator m_ti;		///< current token iterator
 
-	tstringi m_filename;			///< current filename
+	wstringi m_filename;			///< current filename
 	size_t m_lineNumber;			///< current line number
 
 	bool m_hasErrors;			///< any errors occurred?
-	std::vector<tstring> m_messages;	///< error/warning messages
+	std::vector<std::wstring> m_messages;	///< error/warning messages
 
 	static std::shared_ptr<Prefixes> s_prefixes;	///< shared prefix table
 
@@ -47,19 +47,19 @@ private:
 	AstSourceLoc currentLoc() const;
 
 	// Error reporting
-	void error(const tstring &msg);
-	void warning(const tstring &msg);
+	void error(const std::wstring &msg);
+	void warning(const std::wstring &msg);
 
 	// Prefix initialization
 	static void initPrefixes();
 
 	// Modifier parsing helpers
 	bool isModifierToken(const Token *t) const;
-	bool isModifierTokenName(const tstringi &name) const;
+	bool isModifierTokenName(const wstringi &name) const;
 	bool isAssignModifierToken(const Token *t) const;
 	std::vector<AstModifierSpec> parseModifierSpecs();
 	std::vector<AstModifierSpec> tokensToModifierSpecs(
-		const std::vector<tstringi> &tokens) const;
+		const std::vector<wstringi> &tokens) const;
 
 	// Scan code parsing
 	std::vector<AstScanCode> parseScanCodes();
@@ -85,7 +85,7 @@ private:
 
 	// Keymap definition
 	std::unique_ptr<AstKeymapDef> parseKeymapDefinition(
-		const tstringi &keyword);
+		const wstringi &keyword);
 
 	// Key and event assignments
 	AstNodePtr parseKeyAssignOrDefaultModifier();
@@ -110,19 +110,19 @@ public:
 
 	/// Parse from a buffer
 	std::unique_ptr<AstFile> parseBuffer(
-		const _TCHAR *buffer, size_t length,
-		const tstringi &filename);
+		const wchar_t *buffer, size_t length,
+		const wstringi &filename);
 
 	/// Parse from a file (reads via ConfigFiles)
 	std::unique_ptr<AstFile> parseFile(
-		const tstringi &filename,
+		const wstringi &filename,
 		ConfigFiles &configFiles);
 
 	/// Check if there were any errors
 	bool hasErrors() const { return m_hasErrors; }
 
 	/// Get collected error/warning messages
-	const std::vector<tstring> &getMessages() const {
+	const std::vector<std::wstring> &getMessages() const {
 		return m_messages;
 	}
 };

@@ -13,41 +13,41 @@
 class Registry
 {
 	HKEY m_root;					/// registry root
-	tstring m_path;				/// path from registry root
+	std::wstring m_path;				/// path from registry root
 
 public:
-	using tstrings = std::list<tstring>;
+	using tstrings = std::list<std::wstring>;
 
 public:
 	///
 	Registry() : m_root(NULL) {
-		setRoot(NULL, _T(""));
+		setRoot(NULL, L"");
 	}
 	///
-	Registry(HKEY i_root, const tstring &i_path)
+	Registry(HKEY i_root, const std::wstring &i_path)
 			: m_root(i_root), m_path(i_path) {
 		setRoot(i_root, i_path);
 	}
 
 	/// set registry root and path
-	void setRoot(HKEY i_root, const tstring &i_path) {
+	void setRoot(HKEY i_root, const std::wstring &i_path) {
 		m_root = i_root;
 		if (m_root) {
 			m_path = i_path;
 		} else {
-			_TCHAR exePath[GANA_MAX_PATH];
-			_TCHAR exeDrive[GANA_MAX_PATH];
-			_TCHAR exeDir[GANA_MAX_PATH];
+			wchar_t exePath[GANA_MAX_PATH];
+			wchar_t exeDrive[GANA_MAX_PATH];
+			wchar_t exeDir[GANA_MAX_PATH];
 			GetModuleFileName(NULL, exePath, GANA_MAX_PATH);
-			_tsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH, NULL, 0, NULL, 0);
+			_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH, NULL, 0, NULL, 0);
 			m_path = exeDrive;
 			m_path += exeDir;
-			m_path += _T("yamy.ini");
+			m_path += L"yamy.ini";
 		}
 	}
 
 	/// remvoe
-	bool remove(const tstring &i_name = _T("")) const {
+	bool remove(const std::wstring &i_name = L"") const {
 		return remove(m_root, m_path, i_name);
 	}
 
@@ -57,94 +57,94 @@ public:
 	}
 
 	/// read DWORD
-	bool read(const tstring &i_name, int *o_value, int i_defaultValue = 0)
+	bool read(const std::wstring &i_name, int *o_value, int i_defaultValue = 0)
 	const {
 		return read(m_root, m_path, i_name, o_value, i_defaultValue);
 	}
 	/// write DWORD
-	bool write(const tstring &i_name, int i_value) const {
+	bool write(const std::wstring &i_name, int i_value) const {
 		return write(m_root, m_path, i_name, i_value);
 	}
 
-	/// read tstring
-	bool read(const tstring &i_name, tstring *o_value,
-			  const tstring &i_defaultValue = _T("")) const {
+	/// read std::wstring
+	bool read(const std::wstring &i_name, std::wstring *o_value,
+			  const std::wstring &i_defaultValue = L"") const {
 		return read(m_root, m_path, i_name, o_value, i_defaultValue);
 	}
-	/// write tstring
-	bool write(const tstring &i_name, const tstring &i_value) const {
+	/// write std::wstring
+	bool write(const std::wstring &i_name, const std::wstring &i_value) const {
 		return write(m_root, m_path, i_name, i_value);
 	}
 
 #ifndef USE_INI
-	/// read list of tstring
-	bool read(const tstring &i_name, tstrings *o_value,
+	/// read list of std::wstring
+	bool read(const std::wstring &i_name, tstrings *o_value,
 			  const tstrings &i_defaultValue = tstrings()) const {
 		return read(m_root, m_path, i_name, o_value, i_defaultValue);
 	}
-	/// write list of tstring
-	bool write(const tstring &i_name, const tstrings &i_value) const {
+	/// write list of std::wstring
+	bool write(const std::wstring &i_name, const tstrings &i_value) const {
 		return write(m_root, m_path, i_name, i_value);
 	}
 #endif //!USE_INI
 
 	/// read binary data
-	bool read(const tstring &i_name, BYTE *o_value, DWORD *i_valueSize,
+	bool read(const std::wstring &i_name, BYTE *o_value, DWORD *i_valueSize,
 			  const BYTE *i_defaultValue = NULL, DWORD i_defaultValueSize = 0)
 	const {
 		return read(m_root, m_path, i_name, o_value, i_valueSize, i_defaultValue,
 					i_defaultValueSize);
 	}
 	/// write binary data
-	bool write(const tstring &i_name, const BYTE *i_value,
+	bool write(const std::wstring &i_name, const BYTE *i_value,
 			   DWORD i_valueSize) const {
 		return write(m_root, m_path, i_name, i_value, i_valueSize);
 	}
 
 public:
 	/// remove
-	static bool remove(HKEY i_root, const tstring &i_path,
-					   const tstring &i_name = _T(""));
+	static bool remove(HKEY i_root, const std::wstring &i_path,
+					   const std::wstring &i_name = L"");
 
 	/// does exist the key ?
-	static bool doesExist(HKEY i_root, const tstring &i_path);
+	static bool doesExist(HKEY i_root, const std::wstring &i_path);
 
 	/// read DWORD
-	static bool read(HKEY i_root, const tstring &i_path, const tstring &i_name,
+	static bool read(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
 					 int *o_value, int i_defaultValue = 0);
 	/// write DWORD
-	static bool write(HKEY i_root, const tstring &i_path, const tstring &i_name,
+	static bool write(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
 					  int i_value);
 
-	/// read tstring
-	static bool read(HKEY i_root, const tstring &i_path, const tstring &i_name,
-					 tstring *o_value, const tstring &i_defaultValue = _T(""));
-	/// write tstring
-	static bool write(HKEY i_root, const tstring &i_path, const tstring &i_name,
-					  const tstring &i_value);
+	/// read std::wstring
+	static bool read(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
+					 std::wstring *o_value, const std::wstring &i_defaultValue = L"");
+	/// write std::wstring
+	static bool write(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
+					  const std::wstring &i_value);
 
 #ifndef USE_INI
-	/// read list of tstring
-	static bool read(HKEY i_root, const tstring &i_path, const tstring &i_name,
+	/// read list of std::wstring
+	static bool read(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
 					 tstrings *o_value, const tstrings &i_defaultValue = tstrings());
-	/// write list of tstring
-	static bool write(HKEY i_root, const tstring &i_path, const tstring &i_name,
+	/// write list of std::wstring
+	static bool write(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
 					  const tstrings &i_value);
 #endif //!USE_INI
 
 	/// read binary data
-	static bool read(HKEY i_root, const tstring &i_path, const tstring &i_name,
+	static bool read(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
 					 BYTE *o_value, DWORD *i_valueSize,
 					 const BYTE *i_defaultValue = NULL,
 					 DWORD i_defaultValueSize = 0);
 	/// write binary data
-	static bool write(HKEY i_root, const tstring &i_path, const tstring &i_name,
+	static bool write(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
 					  const BYTE *i_value, DWORD i_valueSize);
 	/// read LOGFONT
-	static bool read(HKEY i_root, const tstring &i_path, const tstring &i_name,
-					 LOGFONT *o_value, const tstring &i_defaultStringValue);
+	static bool read(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
+					 LOGFONT *o_value, const std::wstring &i_defaultStringValue);
 	/// write LOGFONT
-	static bool write(HKEY i_root, const tstring &i_path, const tstring &i_name,
+	static bool write(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
 					  const LOGFONT &i_value);
 };
 

@@ -39,7 +39,7 @@ bool MayuParser::isEOL() const
 Token *MayuParser::getToken()
 {
 	if (isEOL())
-		throw ErrorMessage() << _T("too few words.");
+		throw ErrorMessage() << L"too few words.";
 	return &*(m_ti++);
 }
 
@@ -47,7 +47,7 @@ Token *MayuParser::getToken()
 Token *MayuParser::lookToken()
 {
 	if (isEOL())
-		throw ErrorMessage() << _T("too few words.");
+		throw ErrorMessage() << L"too few words.";
 	return &*m_ti;
 }
 
@@ -62,21 +62,21 @@ AstSourceLoc MayuParser::currentLoc() const
 }
 
 
-void MayuParser::error(const tstring &msg)
+void MayuParser::error(const std::wstring &msg)
 {
 	m_hasErrors = true;
-	tstringstream ss;
-	ss << m_filename << _T("(") << m_lineNumber
-	   << _T(") : error: ") << msg;
+	std::wstringstream ss;
+	ss << m_filename << L"(" << m_lineNumber
+	   << L") : error: " << msg;
 	m_messages.push_back(ss.str());
 }
 
 
-void MayuParser::warning(const tstring &msg)
+void MayuParser::warning(const std::wstring &msg)
 {
-	tstringstream ss;
-	ss << m_filename << _T("(") << m_lineNumber
-	   << _T(") : warning: ") << msg;
+	std::wstringstream ss;
+	ss << m_filename << L"(" << m_lineNumber
+	   << L") : warning: " << msg;
 	m_messages.push_back(ss.str());
 }
 
@@ -85,7 +85,7 @@ void MayuParser::warning(const tstring &msg)
 // Prefix initialization
 //=============================================================================
 
-static bool prefixSortPred(const tstringi &a, const tstringi &b)
+static bool prefixSortPred(const wstringi &a, const wstringi &b)
 {
 	return b.size() < a.size();
 }
@@ -96,21 +96,21 @@ void MayuParser::initPrefixes()
 	if (s_prefixes)
 		return;
 
-	static const _TCHAR *prefixes[] = {
-		_T("="), _T("=>"), _T("&&"), _T("||"), _T(":"), _T("$"), _T("&"),
-		_T("-="), _T("+="), _T("!!!"), _T("!!"), _T("!"),
-		_T("E0-"), _T("E1-"),
-		_T("S-"), _T("A-"), _T("M-"), _T("C-"),
-		_T("W-"), _T("*"), _T("~"),
-		_T("U-"), _T("D-"),
-		_T("R-"), _T("IL-"), _T("IC-"), _T("I-"),
-		_T("NL-"), _T("CL-"), _T("SL-"), _T("KL-"),
-		_T("MAX-"), _T("MIN-"), _T("MMAX-"), _T("MMIN-"),
-		_T("T-"), _T("TS-"),
-		_T("M0-"), _T("M1-"), _T("M2-"), _T("M3-"), _T("M4-"),
-		_T("M5-"), _T("M6-"), _T("M7-"), _T("M8-"), _T("M9-"),
-		_T("L0-"), _T("L1-"), _T("L2-"), _T("L3-"), _T("L4-"),
-		_T("L5-"), _T("L6-"), _T("L7-"), _T("L8-"), _T("L9-"),
+	static const wchar_t *prefixes[] = {
+		L"=", L"=>", L"&&", L"||", L":", L"$", L"&",
+		L"-=", L"+=", L"!!!", L"!!", L"!",
+		L"E0-", L"E1-",
+		L"S-", L"A-", L"M-", L"C-",
+		L"W-", L"*", L"~",
+		L"U-", L"D-",
+		L"R-", L"IL-", L"IC-", L"I-",
+		L"NL-", L"CL-", L"SL-", L"KL-",
+		L"MAX-", L"MIN-", L"MMAX-", L"MMIN-",
+		L"T-", L"TS-",
+		L"M0-", L"M1-", L"M2-", L"M3-", L"M4-",
+		L"M5-", L"M6-", L"M7-", L"M8-", L"M9-",
+		L"L0-", L"L1-", L"L2-", L"L3-", L"L4-",
+		L"L5-", L"L6-", L"L7-", L"L8-", L"L9-",
 	};
 	s_prefixes = std::make_shared<Prefixes>();
 	for (size_t i = 0; i < NUMBER_OF(prefixes); ++i)
@@ -131,20 +131,20 @@ bool MayuParser::isModifierToken(const Token *t) const
 }
 
 
-bool MayuParser::isModifierTokenName(const tstringi &name) const
+bool MayuParser::isModifierTokenName(const wstringi &name) const
 {
-	static const _TCHAR *modifiers[] = {
-		_T("S-"), _T("A-"), _T("M-"), _T("C-"), _T("W-"),
-		_T("U-"), _T("D-"),
-		_T("R-"), _T("IL-"), _T("IC-"), _T("I-"),
-		_T("NL-"), _T("CL-"), _T("SL-"), _T("KL-"),
-		_T("MAX-"), _T("MIN-"), _T("MMAX-"), _T("MMIN-"),
-		_T("T-"), _T("TS-"),
-		_T("M0-"), _T("M1-"), _T("M2-"), _T("M3-"), _T("M4-"),
-		_T("M5-"), _T("M6-"), _T("M7-"), _T("M8-"), _T("M9-"),
-		_T("L0-"), _T("L1-"), _T("L2-"), _T("L3-"), _T("L4-"),
-		_T("L5-"), _T("L6-"), _T("L7-"), _T("L8-"), _T("L9-"),
-		_T("*"), _T("~"),
+	static const wchar_t *modifiers[] = {
+		L"S-", L"A-", L"M-", L"C-", L"W-",
+		L"U-", L"D-",
+		L"R-", L"IL-", L"IC-", L"I-",
+		L"NL-", L"CL-", L"SL-", L"KL-",
+		L"MAX-", L"MIN-", L"MMAX-", L"MMIN-",
+		L"T-", L"TS-",
+		L"M0-", L"M1-", L"M2-", L"M3-", L"M4-",
+		L"M5-", L"M6-", L"M7-", L"M8-", L"M9-",
+		L"L0-", L"L1-", L"L2-", L"L3-", L"L4-",
+		L"L5-", L"L6-", L"L7-", L"L8-", L"L9-",
+		L"*", L"~",
 	};
 	for (size_t i = 0; i < NUMBER_OF(modifiers); ++i)
 		if (name == modifiers[i])
@@ -154,17 +154,17 @@ bool MayuParser::isModifierTokenName(const tstringi &name) const
 
 
 std::vector<AstModifierSpec> MayuParser::tokensToModifierSpecs(
-	const std::vector<tstringi> &tokens) const
+	const std::vector<wstringi> &tokens) const
 {
 	std::vector<AstModifierSpec> specs;
 	AstModifierSpec::Flag flag = AstModifierSpec::Press;
 
 	for (const auto &tok : tokens) {
-		if (tok == _T("*")) {
+		if (tok == L"*") {
 			flag = AstModifierSpec::Dontcare;
 			continue;
 		}
-		if (tok == _T("~")) {
+		if (tok == L"~") {
 			flag = AstModifierSpec::Release;
 			continue;
 		}
@@ -177,7 +177,7 @@ std::vector<AstModifierSpec> MayuParser::tokensToModifierSpecs(
 	// Handle trailing bare * or ~
 	if (flag != AstModifierSpec::Press) {
 		AstModifierSpec wildcard;
-		wildcard.name = (flag == AstModifierSpec::Dontcare) ? _T("*") : _T("~");
+		wildcard.name = (flag == AstModifierSpec::Dontcare) ? L"*" : L"~";
 		wildcard.flag = flag;
 		specs.push_back(wildcard);
 	}
@@ -201,12 +201,12 @@ std::vector<AstModifierSpec> MayuParser::parseModifierSpecs()
 		if (!t->isString())
 			break;
 
-		if (*t == _T("*")) {
+		if (*t == L"*") {
 			getToken();
 			flag = AstModifierSpec::Dontcare;
 			continue;
 		}
-		if (*t == _T("~")) {
+		if (*t == L"~") {
 			getToken();
 			flag = AstModifierSpec::Release;
 			continue;
@@ -228,7 +228,7 @@ std::vector<AstModifierSpec> MayuParser::parseModifierSpecs()
 	// modifiers.  This replicates the old pipeline's "trailing flag" behavior.
 	if (flag != AstModifierSpec::Press) {
 		AstModifierSpec wildcard;
-		wildcard.name = (flag == AstModifierSpec::Dontcare) ? _T("*") : _T("~");
+		wildcard.name = (flag == AstModifierSpec::Dontcare) ? L"*" : L"~";
 		wildcard.flag = flag;
 		specs.push_back(wildcard);
 	}
@@ -252,11 +252,11 @@ std::vector<AstScanCode> MayuParser::parseScanCodes()
 				scanCodes.push_back(sc);
 				break;
 			}
-			if (*t == _T("E0-") || *t == _T("E1-"))
+			if (*t == L"E0-" || *t == L"E1-")
 				sc.extensions.push_back(t->getString());
 			else
-				throw ErrorMessage() << _T("`") << *t
-					<< _T("': invalid modifier.");
+				throw ErrorMessage() << L"`" << *t
+					<< L"': invalid modifier.";
 		}
 	}
 	return scanCodes;
@@ -280,8 +280,8 @@ MayuParser::MayuParser()
 //=============================================================================
 
 std::unique_ptr<AstFile> MayuParser::parseBuffer(
-	const _TCHAR *buffer, size_t length,
-	const tstringi &filename)
+	const wchar_t *buffer, size_t length,
+	const wstringi &filename)
 {
 	initPrefixes();
 
@@ -303,7 +303,7 @@ std::unique_ptr<AstFile> MayuParser::parseBuffer(
 			if (node)
 				file->statements.push_back(std::move(node));
 		} catch (ErrorMessage &e) {
-			tstringstream ss;
+			std::wstringstream ss;
 			ss << e;
 			error(ss.str());
 		}
@@ -315,14 +315,14 @@ std::unique_ptr<AstFile> MayuParser::parseBuffer(
 
 
 std::unique_ptr<AstFile> MayuParser::parseFile(
-	const tstringi &filename,
+	const wstringi &filename,
 	ConfigFiles &configFiles)
 {
-	tstring data;
+	std::wstring data;
 	if (!configFiles.readFile(&data, filename)) {
 		m_hasErrors = true;
-		tstringstream ss;
-		ss << filename << _T(" : error: file not found");
+		std::wstringstream ss;
+		ss << filename << L" : error: file not found";
 		m_messages.push_back(ss.str());
 		return std::make_unique<AstFile>();
 	}
@@ -342,42 +342,42 @@ AstNodePtr MayuParser::parseLine()
 	Token *t = getToken();
 
 	// Conditional symbols
-	if (*t == _T("if") || *t == _T("and"))
-		return parseConditional(*t == _T("and"));
+	if (*t == L"if" || *t == L"and")
+		return parseConditional(*t == L"and");
 
-	if (*t == _T("else") || *t == _T("elseif") ||
-		*t == _T("elsif") || *t == _T("elif") ||
-		*t == _T("or") || *t == _T("endif")) {
+	if (*t == L"else" || *t == L"elseif" ||
+		*t == L"elsif" || *t == L"elif" ||
+		*t == L"or" || *t == L"endif") {
 		// These are handled by parseConditional's multi-line loop.
 		// If we see them at top-level, it's an unbalanced error.
-		throw ErrorMessage() << _T("unbalanced `") << *t << _T("'.");
+		throw ErrorMessage() << L"unbalanced `" << *t << L"'.";
 	}
 
-	if (*t == _T("define"))
+	if (*t == L"define")
 		return parseDefine();
 
-	if (*t == _T("include"))
+	if (*t == L"include")
 		return parseInclude();
 
-	if (*t == _T("def"))
+	if (*t == L"def")
 		return parseKeyboardDefinition();
 
-	if (*t == _T("keymap") || *t == _T("keymap2") || *t == _T("window"))
+	if (*t == L"keymap" || *t == L"keymap2" || *t == L"window")
 		return parseKeymapDefinition(t->getString());
 
-	if (*t == _T("key"))
+	if (*t == L"key")
 		return parseKeyAssignOrDefaultModifier();
 
-	if (*t == _T("event"))
+	if (*t == L"event")
 		return parseEventAssign();
 
-	if (*t == _T("mod"))
+	if (*t == L"mod")
 		return parseModifierAssign();
 
-	if (*t == _T("keyseq"))
+	if (*t == L"keyseq")
 		return parseKeySeqDefinition();
 
-	throw ErrorMessage() << _T("syntax error `") << *t << _T("'.");
+	throw ErrorMessage() << L"syntax error `" << *t << L"'.";
 }
 
 
@@ -393,15 +393,15 @@ std::unique_ptr<AstConditional> MayuParser::parseConditional(bool /*isAnd*/)
 	// Parse first "if" branch's condition: ( !? SYMBOL )
 	auto parseCond = [this](AstCondBranch &branch) {
 		if (!getToken()->isOpenParen())
-			throw ErrorMessage() << _T("there must be `(' after `if'.");
+			throw ErrorMessage() << L"there must be `(' after `if'.";
 		Token *t = getToken();
-		if (*t == _T("!")) {
+		if (*t == L"!") {
 			branch.isNegated = true;
 			t = getToken();
 		}
 		branch.symbol = t->getString();
 		if (!getToken()->isCloseParen())
-			throw ErrorMessage() << _T("there must be `)'.");
+			throw ErrorMessage() << L"there must be `)'.";
 	};
 
 	// Parse inline statement on same line (if any)
@@ -412,7 +412,7 @@ std::unique_ptr<AstConditional> MayuParser::parseConditional(bool /*isAnd*/)
 				if (stmt)
 					branch.body.push_back(std::move(stmt));
 			} catch (ErrorMessage &e) {
-				tstringstream ss;
+				std::wstringstream ss;
 				ss << e;
 				error(ss.str());
 			}
@@ -421,19 +421,19 @@ std::unique_ptr<AstConditional> MayuParser::parseConditional(bool /*isAnd*/)
 
 	// Consume inline AND conditions: "and ( !? SYMBOL )" on the same line
 	auto parseAndConditions = [this](AstCondBranch &branch) {
-		while (!isEOL() && *lookToken() == _T("and")) {
+		while (!isEOL() && *lookToken() == L"and") {
 			getToken(); // consume "and"
 			if (!getToken()->isOpenParen())
-				throw ErrorMessage() << _T("there must be `(' after `and'.");
+				throw ErrorMessage() << L"there must be `(' after `and'.";
 			Token *t = getToken();
 			AstCondBranch::AndCond ac;
-			if (*t == _T("!")) {
+			if (*t == L"!") {
 				ac.isNegated = true;
 				t = getToken();
 			}
 			ac.symbol = t->getString();
 			if (!getToken()->isCloseParen())
-				throw ErrorMessage() << _T("there must be `)' after `and' condition.");
+				throw ErrorMessage() << L"there must be `)' after `and' condition.";
 			branch.andConditions.push_back(std::move(ac));
 		}
 	};
@@ -457,13 +457,13 @@ std::unique_ptr<AstConditional> MayuParser::parseConditional(bool /*isAnd*/)
 
 		Token *t = lookToken();
 
-		if (*t == _T("endif")) {
+		if (*t == L"endif") {
 			getToken();
 			return node;
 		}
 
-		if (*t == _T("elseif") || *t == _T("elsif") ||
-			*t == _T("elif") || *t == _T("or")) {
+		if (*t == L"elseif" || *t == L"elsif" ||
+			*t == L"elif" || *t == L"or") {
 			getToken();
 			AstCondBranch branch;
 			parseCond(branch);
@@ -473,7 +473,7 @@ std::unique_ptr<AstConditional> MayuParser::parseConditional(bool /*isAnd*/)
 			continue;
 		}
 
-		if (*t == _T("else")) {
+		if (*t == L"else") {
 			getToken();
 			AstCondBranch branch;
 			// else branch has no condition (empty symbol)
@@ -488,14 +488,14 @@ std::unique_ptr<AstConditional> MayuParser::parseConditional(bool /*isAnd*/)
 			if (stmt && !node->branches.empty())
 				node->branches.back().body.push_back(std::move(stmt));
 		} catch (ErrorMessage &e) {
-			tstringstream ss;
+			std::wstringstream ss;
 			ss << e;
 			error(ss.str());
 		}
 	}
 
 	// Reached EOF without endif
-	error(_T("unbalanced `if'. you forget `endif', didn't you?"));
+	error(L"unbalanced `if'. you forget `endif', didn't you?");
 	return node;
 }
 
@@ -530,14 +530,14 @@ AstNodePtr MayuParser::parseKeyboardDefinition()
 {
 	Token *t = getToken();
 
-	if (*t == _T("key")) return parseDefKey();
-	if (*t == _T("mod")) return parseDefModifier();
-	if (*t == _T("sync")) return parseDefSync();
-	if (*t == _T("alias")) return parseDefAlias();
-	if (*t == _T("subst")) return parseDefSubstitute();
-	if (*t == _T("option")) return parseDefOption();
+	if (*t == L"key") return parseDefKey();
+	if (*t == L"mod") return parseDefModifier();
+	if (*t == L"sync") return parseDefSync();
+	if (*t == L"alias") return parseDefAlias();
+	if (*t == L"subst") return parseDefSubstitute();
+	if (*t == L"option") return parseDefOption();
 
-	throw ErrorMessage() << _T("syntax error `") << *t << _T("'.");
+	throw ErrorMessage() << L"syntax error `" << *t << L"'.";
 }
 
 
@@ -548,17 +548,17 @@ std::unique_ptr<AstDefKey> MayuParser::parseDefKey()
 
 	Token *t = getToken();
 
-	if (*t == _T('(')) {
+	if (*t == L'(') {
 		node->isParenthesized = true;
 		node->names.push_back(getToken()->getString());
-		while (t = getToken(), *t != _T(')'))
+		while (t = getToken(), *t != L')')
 			node->names.push_back(t->getString());
-		if (*getToken() != _T("="))
+		if (*getToken() != L"=")
 			throw ErrorMessage()
-				<< _T("there must be `=' after `)'.");
+				<< L"there must be `=' after `)'.";
 	} else {
 		node->names.push_back(t->getString());
-		while (t = getToken(), *t != _T("="))
+		while (t = getToken(), *t != L"=")
 			node->names.push_back(t->getString());
 	}
 
@@ -573,9 +573,9 @@ std::unique_ptr<AstDefModifier> MayuParser::parseDefModifier()
 	node->m_loc = currentLoc();
 	node->modifierName = getToken()->getString();
 
-	if (*getToken() != _T("="))
+	if (*getToken() != L"=")
 		throw ErrorMessage()
-			<< _T("there must be `=' after modifier name.");
+			<< L"there must be `=' after modifier name.";
 
 	while (!isEOL())
 		node->keyNames.push_back(getToken()->getString());
@@ -589,9 +589,9 @@ std::unique_ptr<AstDefSync> MayuParser::parseDefSync()
 	auto node = std::make_unique<AstDefSync>();
 	node->m_loc = currentLoc();
 
-	if (*getToken() != _T("="))
+	if (*getToken() != L"=")
 		throw ErrorMessage()
-			<< _T("there must be `=' after `sync'.");
+			<< L"there must be `=' after `sync'.";
 
 	node->scanCodes = parseScanCodes();
 	return node;
@@ -604,9 +604,9 @@ std::unique_ptr<AstDefAlias> MayuParser::parseDefAlias()
 	node->m_loc = currentLoc();
 	node->aliasName = getToken()->getString();
 
-	if (*getToken() != _T("="))
+	if (*getToken() != L"=")
 		throw ErrorMessage()
-			<< _T("there must be `=' after alias name.");
+			<< L"there must be `=' after alias name.";
 
 	node->keyName = getToken()->getString();
 	return node;
@@ -625,7 +625,7 @@ std::unique_ptr<AstDefSubstitute> MayuParser::parseDefSubstitute()
 		mkey.keyName = getToken()->getString();
 		node->lhsKeys.push_back(std::move(mkey));
 	} while (!isEOL() &&
-			 !(*lookToken() == _T("=>") || *lookToken() == _T("=")));
+			 !(*lookToken() == L"=>" || *lookToken() == L"="));
 
 	getToken(); // consume "=" or "=>"
 
@@ -642,16 +642,16 @@ std::unique_ptr<AstDefOption> MayuParser::parseDefOption()
 	Token *t = getToken();
 	node->optionName = t->getString();
 
-	if (*t == _T("delay-of")) {
-		if (*getToken() != _T("!!!"))
+	if (*t == L"delay-of") {
+		if (*getToken() != L"!!!")
 			throw ErrorMessage()
-				<< _T("there must be `!!!' after `def option delay-of'.");
-		node->qualifier = _T("!!!");
+				<< L"there must be `!!!' after `def option delay-of'.";
+		node->qualifier = L"!!!";
 	}
 
-	if (*getToken() != _T("="))
+	if (*getToken() != L"=")
 		throw ErrorMessage()
-			<< _T("there must be `=' in def option.");
+			<< L"there must be `=' in def option.";
 
 	node->value = getToken()->getString();
 	return node;
@@ -663,7 +663,7 @@ std::unique_ptr<AstDefOption> MayuParser::parseDefOption()
 //=============================================================================
 
 std::unique_ptr<AstKeymapDef> MayuParser::parseKeymapDefinition(
-	const tstringi &keyword)
+	const wstringi &keyword)
 {
 	auto node = std::make_unique<AstKeymapDef>();
 	node->m_loc = currentLoc();
@@ -673,36 +673,36 @@ std::unique_ptr<AstKeymapDef> MayuParser::parseKeymapDefinition(
 	if (!isEOL()) {
 		Token *t = lookToken();
 
-		if (keyword == _T("window")) {
+		if (keyword == L"window") {
 			if (t->isOpenParen()) {
 				getToken();
 				auto ws = std::make_unique<AstWindowSpec>();
 				ws->className = getToken()->getRegexp();
 				t = getToken();
-				if (*t == _T("&&"))
-					ws->op = _T("&&");
-				else if (*t == _T("||"))
-					ws->op = _T("||");
+				if (*t == L"&&")
+					ws->op = L"&&";
+				else if (*t == L"||")
+					ws->op = L"||";
 				else
-					throw ErrorMessage() << _T("`") << *t
-						<< _T("': unknown operator.");
+					throw ErrorMessage() << L"`" << *t
+						<< L"': unknown operator.";
 				ws->titleName = getToken()->getRegexp();
 				if (!getToken()->isCloseParen())
 					throw ErrorMessage()
-						<< _T("there must be `)'.");
+						<< L"there must be `)'.";
 				node->window = std::move(ws);
 			} else if (t->isRegexp()) {
 				getToken();
 				auto ws = std::make_unique<AstWindowSpec>();
 				ws->className = t->getRegexp();
-				ws->op = _T("&&");
+				ws->op = L"&&";
 				node->window = std::move(ws);
 			}
 		}
 
 		if (!isEOL()) {
 			t = lookToken();
-			if (*t == _T(":")) {
+			if (*t == L":") {
 				getToken();
 				node->parentName = getToken()->getString();
 			}
@@ -710,9 +710,9 @@ std::unique_ptr<AstKeymapDef> MayuParser::parseKeymapDefinition(
 
 		if (!isEOL()) {
 			Token *t2 = getToken();
-			if (!(*t2 == _T("=>") || *t2 == _T("=")))
-				throw ErrorMessage() << _T("`") << *t2
-					<< _T("': syntax error.");
+			if (!(*t2 == L"=>" || *t2 == L"="))
+				throw ErrorMessage() << L"`" << *t2
+					<< L"': syntax error.";
 			node->defaultKeySeq = parseKeySequence();
 		}
 	}
@@ -733,7 +733,7 @@ AstNodePtr MayuParser::parseKeyAssignOrDefaultModifier()
 	std::vector<AstModifierSpec> mods = parseModifierSpecs();
 
 	// Check if this is a default modifier change: key MOD = MOD
-	if (!isEOL() && *lookToken() == _T("=")) {
+	if (!isEOL() && *lookToken() == L"=") {
 		// Could be default modifier change OR key assignment.
 		// Default modifier change: no key name before "="
 		// We need to look ahead: if the current token is "=",
@@ -765,7 +765,7 @@ AstNodePtr MayuParser::parseKeyAssignOrDefaultModifier()
 
 	// Additional modified keys until "=" or "=>"
 	while (!isEOL() &&
-		   !(*lookToken() == _T("=>") || *lookToken() == _T("="))) {
+		   !(*lookToken() == L"=>" || *lookToken() == L"=")) {
 		AstModifiedKey mkey;
 		mkey.modifiers = parseModifierSpecs();
 		mkey.keyName = getToken()->getString();
@@ -790,8 +790,8 @@ std::unique_ptr<AstEventAssign> MayuParser::parseEventAssign()
 	node->eventName = getToken()->getString();
 
 	Token *t = getToken();
-	if (!(*t == _T("=>") || *t == _T("=")))
-		throw ErrorMessage() << _T("`=' is expected.");
+	if (!(*t == L"=>" || *t == L"="))
+		throw ErrorMessage() << L"`=' is expected.";
 
 	node->keySeq = parseKeySequence();
 	return node;
@@ -812,22 +812,22 @@ std::unique_ptr<AstModifierAssign> MayuParser::parseModifierAssign()
 	// Parse prefix modifiers (assign_mode + modifier_name pairs)
 	// and the main modifier name
 	while (true) {
-		tstringi assignMode;
-		if (*t == _T("!"))
-			assignMode = _T("!"), t = getToken();
-		else if (*t == _T("!!"))
-			assignMode = _T("!!"), t = getToken();
-		else if (*t == _T("!!!"))
-			assignMode = _T("!!!"), t = getToken();
+		wstringi assignMode;
+		if (*t == L"!")
+			assignMode = L"!", t = getToken();
+		else if (*t == L"!!")
+			assignMode = L"!!", t = getToken();
+		else if (*t == L"!!!")
+			assignMode = L"!!!", t = getToken();
 
-		tstringi modName = t->getString();
+		wstringi modName = t->getString();
 
 		// Look ahead to see if this is the main modifier
 		// (followed by "=", "+=", "-=") or a prefix
 		if (assignMode.empty() && !isEOL()) {
 			Token *next = lookToken();
-			if (*next == _T("=") || *next == _T("+=") ||
-				*next == _T("-=")) {
+			if (*next == L"=" || *next == L"+=" ||
+				*next == L"-=") {
 				node->mainModifierName = modName;
 				break;
 			}
@@ -852,26 +852,26 @@ std::unique_ptr<AstModifierAssign> MayuParser::parseModifierAssign()
 
 	// Operator
 	t = getToken();
-	if (*t == _T("="))
-		node->op = _T("=");
-	else if (*t == _T("+="))
-		node->op = _T("+=");
-	else if (*t == _T("-="))
-		node->op = _T("-=");
+	if (*t == L"=")
+		node->op = L"=";
+	else if (*t == L"+=")
+		node->op = L"+=";
+	else if (*t == L"-=")
+		node->op = L"-=";
 	else
-		throw ErrorMessage() << _T("`") << *t
-			<< _T("': is unknown operator.");
+		throw ErrorMessage() << L"`" << *t
+			<< L"': is unknown operator.";
 
 	// RHS: (ASSIGN_MODE? KEY_NAME)+
 	while (!isEOL()) {
 		t = getToken();
 		AstModAssignKey key;
-		if (*t == _T("!"))
-			key.assignMode = _T("!"), t = getToken();
-		else if (*t == _T("!!"))
-			key.assignMode = _T("!!"), t = getToken();
-		else if (*t == _T("!!!"))
-			key.assignMode = _T("!!!"), t = getToken();
+		if (*t == L"!")
+			key.assignMode = L"!", t = getToken();
+		else if (*t == L"!!")
+			key.assignMode = L"!!", t = getToken();
+		else if (*t == L"!!!")
+			key.assignMode = L"!!!", t = getToken();
 		key.keyName = t->getString();
 		node->keys.push_back(key);
 	}
@@ -889,15 +889,15 @@ std::unique_ptr<AstKeySeqDef> MayuParser::parseKeySeqDefinition()
 	auto node = std::make_unique<AstKeySeqDef>();
 	node->m_loc = currentLoc();
 
-	if (*getToken() != _T("$"))
+	if (*getToken() != L"$")
 		throw ErrorMessage()
-			<< _T("there must be `$' after `keyseq'.");
+			<< L"there must be `$' after `keyseq'.";
 
 	node->name = getToken()->getString();
 
-	if (*getToken() != _T("="))
+	if (*getToken() != L"=")
 		throw ErrorMessage()
-			<< _T("there must be `=' after keyseq name.");
+			<< L"there must be `=' after keyseq name.";
 
 	node->keySeq = parseKeySequence(false);
 	return node;
@@ -928,13 +928,13 @@ std::unique_ptr<AstKeySequence> MayuParser::parseKeySequence(bool inParen)
 			action->sequence = parseKeySequence(true);
 			getToken(); // consume ')'
 			seq->actions.push_back(std::move(action));
-		} else if (*t == _T("$")) {
+		} else if (*t == L"$") {
 			getToken(); // consume '$'
 			auto action = std::make_unique<AstActionKeySeqRef>();
 			action->modifiers = std::move(mods);
 			action->name = getToken()->getString();
 			seq->actions.push_back(std::move(action));
-		} else if (*t == _T("&")) {
+		} else if (*t == L"&") {
 			getToken(); // consume '&'
 			auto action = std::make_unique<AstActionFuncCall>();
 			action->modifiers = std::move(mods);
@@ -964,7 +964,7 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 	Token *t = lookToken();
 
 	// $NAME -> Kind_KeySeqRef
-	if (*t == _T("$")) {
+	if (*t == L"$") {
 		getToken();
 		arg->kind = AstArgument::Kind_KeySeqRef;
 		arg->stringValue = getToken()->getString();
@@ -998,14 +998,14 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 
 	// General case: greedily collect all tokens until ',' / ')' / EOL.
 	// Each comma-separated element is one argument regardless of token count.
-	std::vector<tstringi> rawTokens;
+	std::vector<wstringi> rawTokens;
 	while (!isEOL() && !lookToken()->isComma() && !lookToken()->isCloseParen()) {
 		rawTokens.push_back(getToken()->getString());
 	}
 
 	bool allModifiers = !rawTokens.empty() &&
 		std::all_of(rawTokens.begin(), rawTokens.end(),
-			[this](const tstringi &s) { return isModifierTokenName(s); });
+			[this](const wstringi &s) { return isModifierTokenName(s); });
 
 	if (rawTokens.size() == 1 && !isModifierTokenName(rawTokens[0])) {
 		// Single non-modifier token -> Kind_String (backward compatible)
@@ -1048,7 +1048,7 @@ std::vector<std::unique_ptr<AstArgument>> MayuParser::parseArguments()
 	if (!isEOL() && lookToken()->isCloseParen())
 		getToken(); // consume ')'
 	else
-		throw ErrorMessage() << _T("`)' expected in function arguments.");
+		throw ErrorMessage() << L"`)' expected in function arguments.";
 
 	return args;
 }

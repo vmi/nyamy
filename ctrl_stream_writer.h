@@ -31,7 +31,7 @@ private:
 	// Primitive writers (little-endian, same convention as CmdStreamWriter)
 	void writeU8(uint8_t v);
 	void writeU16(uint16_t v);
-	void writeString(const tstringi &s);
+	void writeString(const wstringi &s);
 };
 
 

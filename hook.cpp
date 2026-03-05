@@ -16,11 +16,11 @@
 
 
 ///
-#define HOOK_DATA_NAME _T("{08D6E55C-5103-4e00-8209-A1C4AB13BBEF}") _T(VERSION)
+#define HOOK_DATA_NAME L"{08D6E55C-5103-4e00-8209-A1C4AB13BBEF}" WIDEN(VERSION)
 #ifdef _WIN64
-#define HOOK_DATA_NAME_ARCH _T("{290C0D51-8AEE-403d-9172-E43D46270996}") _T(VERSION)
+#define HOOK_DATA_NAME_ARCH L"{290C0D51-8AEE-403d-9172-E43D46270996}" WIDEN(VERSION)
 #else // !_WIN64
-#define HOOK_DATA_NAME_ARCH _T("{716A5DEB-CB02-4438-ABC8-D00E48673E45}") _T(VERSION)
+#define HOOK_DATA_NAME_ARCH L"{716A5DEB-CB02-4438-ABC8-D00E48673E45}" WIDEN(VERSION)
 #endif // !_WIN64
 
 // Some applications use different values for below messages
@@ -84,7 +84,7 @@ struct Globals {
 #endif // HOOK_LOG_TO_FILE
 #ifndef NDEBUG
 	bool m_isLogging;
-	_TCHAR m_moduleName[GANA_MAX_PATH];
+	wchar_t m_moduleName[GANA_MAX_PATH];
 #endif // !NDEBUG
 };
 
@@ -97,7 +97,7 @@ static Globals g;
 
 static void notifyThreadDetach();
 static void notifyShow(NotifyShow::Show i_show, bool i_isMDI);
-static void notifyLog(_TCHAR *i_msg);
+static void notifyLog(wchar_t *i_msg);
 static bool mapHookData(bool i_isYamy);
 static void unmapHookData();
 static bool initialize(bool i_isYamy);
@@ -128,18 +128,18 @@ static void WriteToLog(const char *data)
 bool initialize(bool i_isYamy)
 {
 #ifndef NDEBUG
-	_TCHAR path[GANA_MAX_PATH];
+	wchar_t path[GANA_MAX_PATH];
 	GetModuleFileName(NULL, path, GANA_MAX_PATH);
-	_tsplitpath_s(path, NULL, 0, NULL, 0, g.m_moduleName, GANA_MAX_PATH, NULL, 0);
-	if (_tcsnicmp(g.m_moduleName, _T("Dbgview"), sizeof(_T("Dbgview"))/sizeof(_TCHAR)) != 0 &&
-			_tcsnicmp(g.m_moduleName, _T("windbg"), sizeof(_T("windbg"))/sizeof(_TCHAR)) != 0) {
+	_wsplitpath_s(path, NULL, 0, NULL, 0, g.m_moduleName, GANA_MAX_PATH, NULL, 0);
+	if (_wcsnicmp(g.m_moduleName, L"Dbgview", sizeof(L"Dbgview")/sizeof(wchar_t)) != 0 &&
+			_wcsnicmp(g.m_moduleName, L"windbg", sizeof(L"windbg")/sizeof(wchar_t)) != 0) {
 		g.m_isLogging = true;
 	}
 #endif // !NDEBUG
 #ifdef HOOK_LOG_TO_FILE
-	_TCHAR logFileName[GANA_MAX_PATH];
-	GetEnvironmentVariable(_T("USERPROFILE"), logFileName, NUMBER_OF(logFileName));
-	_tcsncat(logFileName, _T("\\AppData\\LocalLow\\yamydll.txt"), _tcslen(_T("\\AppData\\LocalLow\\yamydll.log")));
+	wchar_t logFileName[GANA_MAX_PATH];
+	GetEnvironmentVariable(L"USERPROFILE", logFileName, NUMBER_OF(logFileName));
+	wcsncat(logFileName, L"\\AppData\\LocalLow\\yamydll.txt", wcslen(L"\\AppData\\LocalLow\\yamydll.log"));
 	g.m_logFile = CreateFile(logFileName, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
 		OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 #endif // HOOK_LOG_TO_FILE
@@ -158,7 +158,7 @@ bool initialize(bool i_isYamy)
 	}
 	if (!mapHookData(i_isYamy))
 		return false;
-	_tsetlocale(LC_ALL, _T(""));
+	_wsetlocale(LC_ALL, L"");
 	g.m_WM_MAYU_MESSAGE =
 		RegisterWindowMessage(addSessionId(WM_MAYU_MESSAGE_NAME).c_str());
 	g.m_hwndTaskTray = g_hookData->getHwndTaskTray();
@@ -299,47 +299,45 @@ bool notify(void *i_data, size_t i_dataSize)
 
 /// get class name and title name
 static void getClassNameTitleName(HWND i_hwnd, bool i_isInMenu,
-								  tstringi *o_className,
-								  tstring *o_titleName)
+								  wstringi *o_className,
+								  std::wstring *o_titleName)
 {
-	tstringi &className = *o_className;
-	tstring &titleName = *o_titleName;
+	wstringi &className = *o_className;
+	std::wstring &titleName = *o_titleName;
 
 	bool isTheFirstTime = true;
 
 	if (i_isInMenu) {
-		className = titleName = _T("MENU");
+		className = titleName = L"MENU";
 		isTheFirstTime = false;
 	}
 
 	while (true) {
-		_TCHAR buf[MAX(GANA_MAX_PATH, GANA_MAX_ATOM_LENGTH)];
+		wchar_t buf[MAX(GANA_MAX_PATH, GANA_MAX_ATOM_LENGTH)];
 
 		// get class name
 		if (i_hwnd)
 			GetClassName(i_hwnd, buf, NUMBER_OF(buf));
 		else
 			GetModuleFileName(GetModuleHandle(NULL), buf, NUMBER_OF(buf));
-		buf[NUMBER_OF(buf) - 1] = _T('\0');
+		buf[NUMBER_OF(buf) - 1] = L'\0';
 		if (isTheFirstTime)
 			className = buf;
 		else
-			className = tstringi(buf) + _T(":") + className;
+			className = wstringi(buf) + L":" + className;
 
 		// get title name
 		if (i_hwnd) {
 			GetWindowText(i_hwnd, buf, NUMBER_OF(buf));
-			buf[NUMBER_OF(buf) - 1] = _T('\0');
-			for (_TCHAR *b = buf; *b; ++ b)
-				if (_istlead(*b) && b[1])
-					b ++;
-				else if (_istcntrl(*b))
-					*b = _T('?');
+			buf[NUMBER_OF(buf) - 1] = L'\0';
+			for (wchar_t *b = buf; *b; ++ b)
+				if (iswcntrl(*b))
+					*b = L'?';
 		}
 		if (isTheFirstTime)
 			titleName = buf;
 		else
-			titleName = tstring(buf) + _T(":") + titleName;
+			titleName = std::wstring(buf) + L":" + titleName;
 
 		// next loop or exit
 		if (!i_hwnd)
@@ -385,8 +383,8 @@ static void updateShow(HWND i_hwnd, NotifyShow::Show i_show)
 /// notify WM_Targetted
 static void notifyName(HWND i_hwnd, Notify::Type i_type = Notify::Type_name)
 {
-	tstringi className;
-	tstring titleName;
+	wstringi className;
+	std::wstring titleName;
 	getClassNameTitleName(i_hwnd, g.m_isInMenu, &className, &titleName);
 
 	NotifySetFocus nfc;
@@ -463,7 +461,7 @@ static void notifyShow(NotifyShow::Show i_show, bool i_isMDI)
 
 
 /// notify log
-static void notifyLog(_TCHAR *i_msg)
+static void notifyLog(wchar_t *i_msg)
 {
 	NotifyLog nl;
 	nl.m_type = Notify::Type_log;
@@ -475,12 +473,12 @@ static void notifyLog(_TCHAR *i_msg)
 /// &Recenter
 static void funcRecenter(HWND i_hwnd)
 {
-	_TCHAR buf[MAX(GANA_MAX_PATH, GANA_MAX_ATOM_LENGTH)];
+	wchar_t buf[MAX(GANA_MAX_PATH, GANA_MAX_ATOM_LENGTH)];
 	GetClassName(i_hwnd, buf, NUMBER_OF(buf));
 	bool isEdit;
-	if (_tcsicmp(buf, _T("Edit")) == 0)
+	if (_wcsicmp(buf, L"Edit") == 0)
 		isEdit = true;
-	else if (_tcsnicmp(buf, _T("RichEdit"), 8) == 0)
+	else if (_wcsnicmp(buf, L"RichEdit", 8) == 0)
 		isEdit = false;
 	else
 		return;	// this function only works for Edit control
@@ -529,9 +527,9 @@ static void funcSetImeStatus(HWND i_hwnd, int i_status)
 // &SetImeString
 static void funcSetImeString(HWND i_hwnd, int i_size)
 {
-	std::vector<_TCHAR> buf(i_size);
+	std::vector<wchar_t> buf(i_size);
 	DWORD len = 0;
-	_TCHAR ImeDesc[GANA_MAX_ATOM_LENGTH];
+	wchar_t ImeDesc[GANA_MAX_ATOM_LENGTH];
 	UINT ImeDescLen;
 	DWORD error;
 	DWORD denom = 1;
@@ -544,8 +542,8 @@ static void funcSetImeString(HWND i_hwnd, int i_size)
 
 	ImeDescLen = ImmGetDescription(GetKeyboardLayout(0),
 								   ImeDesc, NUMBER_OF(ImeDesc));
-	if (_tcsncmp(ImeDesc, _T("SKKIME"), ImeDescLen) > 0)
-		denom = sizeof(_TCHAR);
+	if (wcsncmp(ImeDesc, L"SKKIME", ImeDescLen) > 0)
+		denom = sizeof(wchar_t);
 
 	HIMC hIMC = ImmGetContext(i_hwnd);
 	if (hIMC == INVALID_HANDLE_VALUE)

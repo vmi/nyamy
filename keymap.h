@@ -34,11 +34,11 @@ public:
 	/// create clone
 	virtual Action *clone() const = 0;
 	/// stream output
-	virtual tostream &output(tostream &i_ost) const = 0;
+	virtual std::wostream &output(std::wostream &i_ost) const = 0;
 };
 
 ///
-tostream &operator<<(tostream &i_ost, const Action &i_action);
+std::wostream &operator<<(std::wostream &i_ost, const Action &i_action);
 
 ///
 class ActionKey : public Action
@@ -58,7 +58,7 @@ public:
 	/// create clone
 	virtual Action *clone() const;
 	/// stream output
-	virtual tostream &output(tostream &i_ost) const;
+	virtual std::wostream &output(std::wostream &i_ost) const;
 };
 
 
@@ -80,7 +80,7 @@ public:
 	/// create clone
 	virtual Action *clone() const;
 	/// stream output
-	virtual tostream &output(tostream &i_ost) const;
+	virtual std::wostream &output(std::wostream &i_ost) const;
 };
 
 
@@ -105,7 +105,7 @@ public:
 	/// create clone
 	virtual Action *clone() const;
 	/// stream output
-	virtual tostream &output(tostream &i_ost) const;
+	virtual std::wostream &output(std::wostream &i_ost) const;
 };
 
 
@@ -117,7 +117,7 @@ public:
 
 private:
 	Actions m_actions;				///
-	tstringi m_name;				///
+	wstringi m_name;				///
 	Modifier::Type m_mode;			/** Either Modifier::Type_KEYSEQ
                                                     or Modifier::Type_ASSIGN */
 
@@ -129,7 +129,7 @@ private:
 
 public:
 	///
-	KeySeq(const tstringi &i_name);
+	KeySeq(const wstringi &i_name);
 	///
 	KeySeq(const KeySeq &i_ks);
 	///
@@ -150,13 +150,13 @@ public:
 	ModifiedKey getFirstModifiedKey() const;
 
 	///
-	const tstringi &getName() const {
+	const wstringi &getName() const {
 		return m_name;
 	}
 
 	/// stream output
-	friend tostream &operator<<(tostream &i_ost, const KeySeq &i_ks);
-	friend tostream &operator<<(tostream& i_ost, const KeySeq* i_ks);
+	friend std::wostream &operator<<(std::wostream &i_ost, const KeySeq &i_ks);
+	friend std::wostream &operator<<(std::wostream& i_ost, const KeySeq* i_ks);
 
 	///
 	bool isCorrectMode(Modifier::Type i_mode) {
@@ -266,9 +266,9 @@ private:
 	ModAssignments m_modAssignments[Modifier::Type_ASSIGN];
 
 	Type m_type;					/// type
-	tstringi m_name;				/// keymap name
-	tregex m_windowClass;				/// window class name regexp
-	tregex m_windowTitle;				/// window title name regexp
+	wstringi m_name;				/// keymap name
+	wregex_stored m_windowClass;				/// window class name regexp
+	wregex_stored m_windowTitle;				/// window title name regexp
 
 	KeySeq *m_defaultKeySeq;			/// default keySeq
 	Keymap *m_parentKeymap;			/// parent keymap
@@ -282,9 +282,9 @@ private:
 public:
 	///
 	Keymap(Type i_type,
-		   const tstringi &i_name,
-		   const tstringi &i_windowClass,
-		   const tstringi &i_windowTitle,
+		   const wstringi &i_name,
+		   const wstringi &i_windowClass,
+		   const wstringi &i_windowTitle,
 		   KeySeq *i_defaultKeySeq,
 		   Keymap *i_parentKeymap);
 
@@ -307,13 +307,13 @@ public:
 		return m_parentKeymap;
 	}
 	///
-	const tstringi &getName() const {
+	const wstringi &getName() const {
 		return m_name;
 	}
 
 	/// does same window
-	bool doesSameWindow(const tstringi i_className,
-						const tstringi &i_titleName);
+	bool doesSameWindow(const wstringi i_className,
+						const wstringi &i_titleName);
 
 	/// adjust modifier
 	void adjustModifier(Keyboard &i_keyboard);
@@ -324,7 +324,7 @@ public:
 	}
 
 	/// describe
-	void describe(tostream &i_ost, DescribeParam *i_dp) const;
+	void describe(std::wostream &i_ost, DescribeParam *i_dp) const;
 
 	/// set default keySeq and parent keymap if default keySeq has not been set
 	bool setIfNotYet(KeySeq *i_keySeq, Keymap *i_parentKeymap);
@@ -332,7 +332,7 @@ public:
 
 
 /// stream output
-extern tostream &operator<<(tostream &i_ost, const Keymap *i_keymap);
+extern std::wostream &operator<<(std::wostream &i_ost, const Keymap *i_keymap);
 
 
 ///
@@ -353,12 +353,12 @@ public:
 	Keymaps();
 
 	/// search by name
-	Keymap *searchByName(const tstringi &i_name);
+	Keymap *searchByName(const wstringi &i_name);
 
 	/// search window
 	void searchWindow(KeymapPtrList *o_keymapPtrList,
-					  const tstringi &i_className,
-					  const tstringi &i_titleName);
+					  const wstringi &i_className,
+					  const wstringi &i_titleName);
 
 	/// add keymap
 	Keymap *add(const Keymap &i_keymap);
@@ -388,7 +388,7 @@ public:
 	KeySeq *add(const KeySeq &i_keySeq);
 
 	/// search by name
-	KeySeq *searchByName(const tstringi &i_name);
+	KeySeq *searchByName(const wstringi &i_name);
 
 	/// iterators for enumeration
 	using iterator = KeySeqList::iterator;

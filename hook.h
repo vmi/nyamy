@@ -6,17 +6,16 @@
 #  define _HOOK_H
 
 #  include "misc.h"
-#  include <tchar.h>
 #  include <windef.h>
 
 ///
 #  define HOOK_PIPE_NAME \
- _T("\\\\.\\pipe\\GANAware\\mayu\\{4B22D464-7A4E-494b-982A-C2B2BBAAF9F3}") _T(VERSION)
+ L"\\\\.\\pipe\\GANAware\\mayu\\{4B22D464-7A4E-494b-982A-C2B2BBAAF9F3}" WIDEN(VERSION)
 ///
 #  define NOTIFY_MAILSLOT_NAME \
-_T("\\\\.\\mailslot\\GANAware\\mayu\\{330F7914-EB5B-49be-ACCE-D2B8DF585B32}") _T(VERSION)
+L"\\\\.\\mailslot\\GANAware\\mayu\\{330F7914-EB5B-49be-ACCE-D2B8DF585B32}" WIDEN(VERSION)
 ///
-#  define WM_MAYU_MESSAGE_NAME _T("GANAware\\mayu\\WM_MAYU_MESSAGE")
+#  define WM_MAYU_MESSAGE_NAME L"GANAware\\mayu\\WM_MAYU_MESSAGE"
 
 ///
 enum MayuMessage {
@@ -51,8 +50,8 @@ struct Notify {
 struct NotifySetFocus : public Notify {
 	DWORD m_threadId;				///
 	DWORD _m_hwnd;				///
-	_TCHAR m_className[GANA_MAX_PATH];		///
-	_TCHAR m_titleName[GANA_MAX_PATH];		///
+	wchar_t m_className[GANA_MAX_PATH];		///
+	wchar_t m_titleName[GANA_MAX_PATH];		///
 
 	inline HWND getHwnd() const {
 		return reinterpret_cast<HWND>(static_cast<uintptr_t>(_m_hwnd));
@@ -125,7 +124,7 @@ struct NotifyShow : public Notify {
 
 ///
 struct NotifyLog : public Notify {
-	_TCHAR m_msg[GANA_MAX_PATH];			///
+	wchar_t m_msg[GANA_MAX_PATH];			///
 };
 
 

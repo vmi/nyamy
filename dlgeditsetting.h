@@ -19,9 +19,9 @@ BOOL CALLBACK dlgEditSetting_dlgProc(
 /// parameters for "Edit Setting" dialog box
 class DlgEditSettingData {
 public:
-	tstringi m_name;				/// setting name
-	tstringi m_filename;				/// filename of setting
-	tstringi m_symbols;		/// symbol list (-Dsymbol1;-Dsymbol2;-D...)
+	wstringi m_name;				/// setting name
+	wstringi m_filename;				/// filename of setting
+	wstringi m_symbols;		/// symbol list (-Dsymbol1;-Dsymbol2;-D...)
 };
 
 

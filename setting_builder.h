@@ -38,32 +38,32 @@ class SettingBuilder : public CmdLoadContext
 {
 public:
 	///
-	using Symbols = std::set<tstringi>;
+	using Symbols = std::set<wstringi>;
 
 public:
 	SettingBuilder() : m_setting(std::make_unique<Setting>()), m_currentKeymap(nullptr) { }
 
 	// Keyboard
 	void addKey(Key key) { m_setting->m_keyboard.addKey(key); }
-	Key *searchKey(const tstringi &name) { return m_setting->m_keyboard.searchKey(name); }
-	Key *searchKeyByNonAliasName(const tstringi &name) { return m_setting->m_keyboard.searchKeyByNonAliasName(name); }
+	Key *searchKey(const wstringi &name) { return m_setting->m_keyboard.searchKey(name); }
+	Key *searchKeyByNonAliasName(const wstringi &name) { return m_setting->m_keyboard.searchKeyByNonAliasName(name); }
 	void addModifier(Modifier::Type mt, Key *key) { m_setting->m_keyboard.addModifier(mt, key); }
 	Key *getSyncKey() { return m_setting->m_keyboard.getSyncKey(); }
-	void addAlias(const tstringi &name, Key *key) { m_setting->m_keyboard.addAlias(name, key); }
+	void addAlias(const wstringi &name, Key *key) { m_setting->m_keyboard.addAlias(name, key); }
 	void addSubstitute(const ModifiedKey &src, const ModifiedKey &dst) { m_setting->m_keyboard.addSubstitute(src, dst); }
 
 	// Keymaps
 	Keymap *addKeymap(const Keymap &km) { return m_setting->m_keymaps.add(km); }
-	Keymap *searchKeymapByName(const tstringi &name) { return m_setting->m_keymaps.searchByName(name); }
+	Keymap *searchKeymapByName(const wstringi &name) { return m_setting->m_keymaps.searchByName(name); }
 	void adjustModifiers() { m_setting->m_keymaps.adjustModifier(m_setting->m_keyboard); }
 
 	// KeySeqs
 	KeySeq *addKeySeq(const KeySeq &ks) { return m_setting->m_keySeqs.add(ks); }
-	KeySeq *searchKeySeqByName(const tstringi &name) { return m_setting->m_keySeqs.searchByName(name); }
+	KeySeq *searchKeySeqByName(const wstringi &name) { return m_setting->m_keySeqs.searchByName(name); }
 
 	// Symbols
-	void addSymbol(const tstringi &symbol) { m_setting->m_symbols.insert(symbol); }
-	bool hasSymbol(const tstringi &symbol) const { return m_setting->m_symbols.find(symbol) != m_setting->m_symbols.end(); }
+	void addSymbol(const wstringi &symbol) { m_setting->m_symbols.insert(symbol); }
+	bool hasSymbol(const wstringi &symbol) const { return m_setting->m_symbols.find(symbol) != m_setting->m_symbols.end(); }
 
 	// Options (return pointers for load_ARGUMENT compatibility)
 	bool *correctKanaLockHandling() { return &m_setting->m_correctKanaLockHandling; }
@@ -74,7 +74,7 @@ public:
 	LONG *dragThreshold() { return &m_setting->m_dragThreshold; }
 
 	// CmdLoadContext interface (used during command-stream interpretation)
-	const Keymap *resolveKeymap(const tstringi &name) override {
+	const Keymap *resolveKeymap(const wstringi &name) override {
 		return searchKeymapByName(name);
 	}
 	const KeySeq *resolveKeySeq(uint32_t index) override {

@@ -11,14 +11,14 @@
 #if defined(_MSC_VER)
 
 // get compiler version string
-tstring getCompilerVersionString()
+std::wstring getCompilerVersionString()
 {
 	TCHAR buf[200];
-	_sntprintf(buf, NUMBER_OF(buf),
-			   _T("Microsoft (R) 32-bit C/C++ Optimizing Compiler Version %d.%02d"),
+	_snwprintf(buf, NUMBER_OF(buf),
+			   L"Microsoft (R) 32-bit C/C++ Optimizing Compiler Version %d.%02d",
 			   _MSC_VER / 100,
 			   _MSC_VER % 100);
-	return tstring(buf);
+	return std::wstring(buf);
 }
 
 

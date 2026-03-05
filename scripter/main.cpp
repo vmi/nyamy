@@ -20,10 +20,10 @@
 
 
 //-----------------------------------------------------------------------------
-// StderrLog - thin SyncObject + tostream adaptor that writes to std::wcerr
+// StderrLog - thin SyncObject + std::wostream adaptor that writes to std::wcerr
 //-----------------------------------------------------------------------------
 
-// ConfigFiles/MayuCompiler accept (SyncObject*, tostream*) = (nullptr, nullptr)
+// ConfigFiles/MayuCompiler accept (SyncObject*, std::wostream*) = (nullptr, nullptr)
 // which silently discards log output.  We use nullptr here and collect
 // structured error info via hasErrors() / getMessages() instead.
 // Stderr output is done directly in doReload() below.
@@ -37,16 +37,16 @@ static void doReload(const Symbols &syms, CmdStreamWriter &writer)
 {
 	ConfigFiles cf;  // no log: errors surface through getMessages() / hasErrors()
 
-	tstringi path;
+	wstringi path;
 	Symbols regSymbols;
 	Symbols symbols = syms;
 
-	if (!cf.getFilename(_T(""), &path, &regSymbols)) {
+	if (!cf.getFilename(L"", &path, &regSymbols)) {
 		std::wcerr << L"error: could not find config file." << std::endl;
 		return;
 	}
 	for (const auto &s : regSymbols) symbols.insert(s);
-	std::wcerr << _T("  loading: ") << path << std::endl;
+	std::wcerr << L"  loading: " << path << std::endl;
 
 	MayuParser parser;
 	auto ast = parser.parseFile(path, cf);
@@ -68,15 +68,16 @@ static void doReload(const Symbols &syms, CmdStreamWriter &writer)
 
 
 //-----------------------------------------------------------------------------
-// _tmain
+// wmain
 //-----------------------------------------------------------------------------
 
-int _tmain(int /*argc*/, _TCHAR * /*argv*/[])
+int wmain(int /*argc*/, wchar_t * /*argv*/[])
 {
 	// Set stdin/stdout to binary mode (CmdStream is binary)
 	_setmode(_fileno(stdin),  _O_BINARY);
 	_setmode(_fileno(stdout), _O_BINARY);
-	// stderr remains in text mode (the yamy stderr thread reads it line by line)
+	// Set stderr to UTF-16 so that wcerr output is read as wide chars by the engine
+	_setmode(_fileno(stderr), _O_U16TEXT);
 
 	CtrlStreamReader ctrlReader(std::cin);
 	CmdStreamWriter  dataWriter(std::cout);

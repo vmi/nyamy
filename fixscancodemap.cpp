@@ -1,7 +1,6 @@
 #include "fixscancodemap.h"
 #include "misc.h"
 #include "windowstool.h"
-#include <tchar.h>
 #include <tlhelp32.h>
 #include <process.h>
 
@@ -135,7 +134,7 @@ DWORD FixScancodeMap::getWinLogonPid()
 
     BOOL bResult = Process32First(hSnap, &pe);
 	while (bResult){
-		if (!_tcsicmp(pe.szExeFile, _T("winlogon.exe"))) {
+		if (!_wcsicmp(pe.szExeFile, L"winlogon.exe")) {
 			DWORD sessionId;
 
 			if (ProcessIdToSessionId(pe.th32ProcessID, &sessionId) != FALSE) {
@@ -309,7 +308,7 @@ int FixScancodeMap::fix()
 	int result = 0;
 
 	// save original Scancode Map
-	ret = m_pReg->read(_T("Scancode Map"), NULL, &origSize, NULL, 0);
+	ret = m_pReg->read(L"Scancode Map", NULL, &origSize, NULL, 0);
 	if (ret) {
 		origMap = reinterpret_cast<ScancodeMap*>(malloc(origSize));
 		if (origMap == NULL) {
@@ -317,7 +316,7 @@ int FixScancodeMap::fix()
 			goto exit;
 		}
 
-		ret = m_pReg->read(_T("Scancode Map"), reinterpret_cast<BYTE*>(origMap), &origSize, NULL, 0);
+		ret = m_pReg->read(L"Scancode Map", reinterpret_cast<BYTE*>(origMap), &origSize, NULL, 0);
 		if (ret == false) {
 			result = YAMY_ERROR_ON_READ_SCANCODE_MAP;
 			goto exit;
@@ -371,7 +370,7 @@ int FixScancodeMap::fix()
 		fixSize += 4;
 	}
 
-	ret = m_pReg->write(_T("Scancode Map"), reinterpret_cast<BYTE*>(fixMap), fixSize);
+	ret = m_pReg->write(L"Scancode Map", reinterpret_cast<BYTE*>(fixMap), fixSize);
 	if (ret == false) {
 		result = YAMY_ERROR_ON_WRITE_SCANCODE_MAP;
 		goto exit;
@@ -380,9 +379,9 @@ int FixScancodeMap::fix()
 	result = update();
 
 	if (origMap) {
-		ret = m_pReg->write(_T("Scancode Map"), reinterpret_cast<BYTE*>(origMap), origSize);
+		ret = m_pReg->write(L"Scancode Map", reinterpret_cast<BYTE*>(origMap), origSize);
 	} else {
-		ret = m_pReg->remove(_T("Scancode Map"));
+		ret = m_pReg->remove(L"Scancode Map");
 	}
 	if (ret == false) {
 		result = YAMY_ERROR_ON_WRITE_SCANCODE_MAP;
@@ -456,15 +455,15 @@ FixScancodeMap::FixScancodeMap() :
 	m_messageOnFail(WM_NULL),
 	m_errorOnConstruct(0),
 	m_winlogonPid(0),
-	m_regHKCU(HKEY_CURRENT_USER, _T("Keyboard Layout")),
-	m_regHKLM(HKEY_LOCAL_MACHINE, _T("SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout")),
+	m_regHKCU(HKEY_CURRENT_USER, L"Keyboard Layout"),
+	m_regHKLM(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout"),
 	m_pReg(NULL)
 {
 	HMODULE hMod;
 
 	m_info.pid_ = GetCurrentProcessId();
 
-	memcpy(&m_info.advapi32_, _T("advapi32.dll"), sizeof(m_info.advapi32_));
+	memcpy(&m_info.advapi32_, L"advapi32.dll", sizeof(m_info.advapi32_));
 	memcpy(&m_info.impersonateLoggedOnUser_, "ImpersonateLoggedOnUser", sizeof(m_info.impersonateLoggedOnUser_));
 	memcpy(&m_info.revertToSelf_, "RevertToSelf", sizeof(m_info.revertToSelf_));
 	memcpy(&m_info.openProcessToken_, "OpenProcessToken", sizeof(m_info.openProcessToken_));
@@ -478,7 +477,7 @@ FixScancodeMap::FixScancodeMap() :
 
 	m_hThread = (HANDLE)_beginthreadex(NULL, 0, threadLoop, this, 0, &m_threadId);
 
-	hMod = GetModuleHandle(_T("user32.dll"));
+	hMod = GetModuleHandle(L"user32.dll");
 	if (hMod != NULL) {
 		m_info.pUpdate4 = (FpUpdatePerUserSystemParameters4)GetProcAddress(hMod, "UpdatePerUserSystemParameters");
 		m_info.pUpdate8 = (FpUpdatePerUserSystemParameters8)m_info.pUpdate4;
@@ -487,7 +486,7 @@ FixScancodeMap::FixScancodeMap() :
 		}
 	}
 
-	hMod = GetModuleHandle(_T("kernel32.dll"));
+	hMod = GetModuleHandle(L"kernel32.dll");
 	if (hMod != NULL) {
 		m_info.pGetModuleHandle = (FpGetModuleHandleW)GetProcAddress(hMod, "GetModuleHandleW");
 		if (m_info.pGetModuleHandle == NULL) {

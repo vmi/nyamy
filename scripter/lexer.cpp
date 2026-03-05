@@ -22,7 +22,7 @@ Token::Token(const Token &i_token)
 {
 }
 
-Token::Token(int i_value, const tstringi &i_display)
+Token::Token(int i_value, const wstringi &i_display)
 		: m_type(Type_number),
 		m_isValueQuoted(false),
 		m_numericValue(i_value),
@@ -31,7 +31,7 @@ Token::Token(int i_value, const tstringi &i_display)
 {
 }
 
-Token::Token(const tstringi &i_value, bool i_isValueQuoted, bool i_isRegexp)
+Token::Token(const wstringi &i_value, bool i_isValueQuoted, bool i_isRegexp)
 		: m_type(i_isRegexp ? Type_regexp : Type_string),
 		m_isValueQuoted(i_isValueQuoted),
 		m_numericValue(0),
@@ -44,7 +44,7 @@ Token::Token(Type i_m_type)
 		: m_type(i_m_type),
 		m_isValueQuoted(false),
 		m_numericValue(0),
-		m_stringValue(_T("")),
+		m_stringValue(L""),
 		m_data(NULL)
 {
 	ASSERT(m_type == Type_openParen || m_type == Type_closeParen ||
@@ -59,27 +59,27 @@ int Token::getNumber() const
 	if (m_stringValue.empty())
 		return 0;
 	else
-		throw ErrorMessage() << _T("`") << *this << _T("' is not a Type_number.");
+		throw ErrorMessage() << L"`" << *this << L"' is not a Type_number.";
 }
 
 // get string value
-tstringi Token::getString() const
+wstringi Token::getString() const
 {
 	if (m_type == Type_string)
 		return m_stringValue;
-	throw ErrorMessage() << _T("`") << *this << _T("' is not a string.");
+	throw ErrorMessage() << L"`" << *this << L"' is not a string.";
 }
 
 // get regexp value
-tstringi Token::getRegexp() const
+wstringi Token::getRegexp() const
 {
 	if (m_type == Type_regexp)
 		return m_stringValue;
-	throw ErrorMessage() << _T("`") << *this << _T("' is not a regexp.");
+	throw ErrorMessage() << L"`" << *this << L"' is not a regexp.";
 }
 
 // case insensitive equal
-bool Token::operator==(const _TCHAR *i_str) const
+bool Token::operator==(const wchar_t *i_str) const
 {
 	if (m_type == Type_string)
 		return m_stringValue == i_str;
@@ -87,21 +87,21 @@ bool Token::operator==(const _TCHAR *i_str) const
 }
 
 // paren equal
-bool Token::operator==(const _TCHAR i_c) const
+bool Token::operator==(const wchar_t i_c) const
 {
-	if (i_c == _T('(')) return m_type == Type_openParen;
-	if (i_c == _T(')')) return m_type == Type_openParen;
+	if (i_c == L'(') return m_type == Type_openParen;
+	if (i_c == L')') return m_type == Type_openParen;
 	return false;
 }
 
 // add string
-void Token::add(const tstringi &i_str)
+void Token::add(const wstringi &i_str)
 {
 	m_stringValue += i_str;
 }
 
 // stream output
-tostream &operator<<(tostream &i_ost, const Token &i_token)
+std::wostream &operator<<(std::wostream &i_ost, const Token &i_token)
 {
 	switch (i_token.m_type) {
 	case Token::Type_string:
@@ -114,13 +114,13 @@ tostream &operator<<(tostream &i_ost, const Token &i_token)
 		i_ost << i_token.m_stringValue;
 		break;
 	case Token::Type_openParen:
-		i_ost << _T("(");
+		i_ost << L"(";
 		break;
 	case Token::Type_closeParen:
-		i_ost << _T(")");
+		i_ost << L")";
 		break;
 	case Token::Type_comma:
-		i_ost << _T(", ");
+		i_ost << L", ";
 		break;
 	}
 	return i_ost;
@@ -131,7 +131,7 @@ tostream &operator<<(tostream &i_ost, const Token &i_token)
 // Lexer
 
 
-Lexer::Lexer(const _TCHAR *i_str, size_t i_length)
+Lexer::Lexer(const wchar_t *i_str, size_t i_length)
 		: m_lineNumber(1),
 		m_prefixes(NULL),
 		m_internalLineNumber(1),
@@ -148,29 +148,27 @@ void Lexer::setPrefixes(const Prefixes *i_prefixes)
 }
 
 // get a line
-bool Lexer::getLine(tstringi *o_line)
+bool Lexer::getLine(wstringi *o_line)
 {
 	o_line->resize(0);
 
 	if (m_ptr == m_end)
 		return false;
 
-	const _TCHAR *begin = m_ptr;
-	const _TCHAR *end = m_end;
+	const wchar_t *begin = m_ptr;
+	const wchar_t *end = m_end;
 
 	// lines are separated by: "\r\n", "\n", "\x2028" (Unicode Line Separator)
 	while (m_ptr != m_end)
 		switch (*m_ptr) {
-		case _T('\n'):
-#ifdef UNICODE
+		case L'\n':
 		case 0x2028:
-			//case _T('\x2028'):	//  (U+2028)
-#endif
+			//case L'\x2028':	//  (U+2028)
 			end = m_ptr;
 			++ m_ptr;
 			goto got_line_end;
-		case _T('\r'):
-			if (m_ptr + 1 != m_end && m_ptr[1] == _T('\n')) {
+		case L'\r':
+			if (m_ptr + 1 != m_end && m_ptr[1] == L'\n') {
 				end = m_ptr;
 				m_ptr += 2;
 				goto got_line_end;
@@ -188,31 +186,24 @@ got_line_end:
 }
 
 // symbol test
-static bool isSymbolChar(_TCHAR i_c)
+static bool isSymbolChar(wchar_t i_c)
 {
-	if (i_c == _T('\0'))
+	if (i_c == L'\0')
 		return false;
-	if (_istlead(i_c) ||
-			_istalpha(i_c) ||
-			_istdigit(i_c) ||
-			_istlead(i_c))
+	if (iswalpha(i_c) || iswdigit(i_c))
 		return true;
 
-#ifdef UNICODE
-	if (0x80 <= i_c && _istgraph(i_c))
+	if (0x80 <= i_c && iswgraph(i_c))
 		return true;
-#endif // UNICODE
 
-	if (_istpunct(i_c))
-		return !!_tcschr(_T("-+/?_\\"), i_c);
+	if (iswpunct(i_c))
+		return !!wcschr(L"-+/?_\\", i_c);
 
-#ifdef UNICODE
 	// check arrows
-	if (_tcschr(_T("\u2190\u2191\u2192\u2193"), i_c)) {
+	if (wcschr(L"\u2190\u2191\u2192\u2193", i_c)) {
 		return true;
 	}
-#endif // UNICODE
-	return _istgraph(i_c);
+	return iswgraph(i_c);
 }
 
 
@@ -223,28 +214,28 @@ bool Lexer::getLine(std::vector<Token> *o_tokens)
 	o_tokens->clear();
 	m_lineNumber = m_internalLineNumber;
 
-	tstringi line;
+	wstringi line;
 	bool isTokenExist = false;
 continue_getLineLoop:
 	while (getLine(&line)) {
-		const _TCHAR *t = line.c_str();
+		const wchar_t *t = line.c_str();
 
 continue_getTokenLoop:
 		while (true) {
 			// skip white space
-			while (*t != _T('\0') && _istspace(*t))
+			while (*t != L'\0' && iswspace(*t))
 				t ++;
-			if (*t == _T('\0') || *t == _T('#'))
+			if (*t == L'\0' || *t == L'#')
 				goto break_getTokenLoop; // no more tokens exist
-			if (*t == _T('\\') && *(t + 1) == _T('\0'))
+			if (*t == L'\\' && *(t + 1) == L'\0')
 				goto continue_getLineLoop; // continue to next line
 
-			const _TCHAR *tokenStart = t;
+			const wchar_t *tokenStart = t;
 
 			// comma or empty token
-			if (*t == _T(',')) {
+			if (*t == L',') {
 				if (!isTokenExist)
-					o_tokens->push_back(Token(_T(""), false));
+					o_tokens->push_back(Token(L"", false));
 				isTokenExist = false;
 				o_tokens->push_back(Token(Token::Type_comma));
 				t ++;
@@ -252,15 +243,15 @@ continue_getTokenLoop:
 			}
 
 			// paren
-			if (*t == _T('(')) {
+			if (*t == L'(') {
 				o_tokens->push_back(Token(Token::Type_openParen));
 				isTokenExist = false;
 				t ++;
 				goto continue_getTokenLoop;
 			}
-			if (*t == _T(')')) {
+			if (*t == L')') {
 				if (!isTokenExist)
-					o_tokens->push_back(Token(_T(""), false));
+					o_tokens->push_back(Token(L"", false));
 				isTokenExist = true;
 				o_tokens->push_back(Token(Token::Type_closeParen));
 				t ++;
@@ -272,7 +263,7 @@ continue_getTokenLoop:
 			// prefix
 			if (m_prefixes)
 				for (size_t i = 0; i < m_prefixes->size(); i ++)
-					if (_tcsnicmp(tokenStart, m_prefixes->at(i).c_str(),
+					if (_wcsnicmp(tokenStart, m_prefixes->at(i).c_str(),
 								  m_prefixes->at(i).size()) == 0) {
 						o_tokens->push_back(Token(m_prefixes->at(i), false));
 						t += m_prefixes->at(i).size();
@@ -280,31 +271,25 @@ continue_getTokenLoop:
 					}
 
 			// quoted or regexp
-			if (*t == _T('"') || *t == _T('\'') ||
-					*t == _T('/') || (*t == _T('\\') && *(t + 1) == _T('m') &&
-									  *(t + 2) != _T('\0'))) {
-				bool isRegexp = !(*t == _T('"') || *t == _T('\''));
-				_TCHAR q[2] = { *t++, _T('\0') }; // quote character
-				if (q[0] == _T('\\')) {
+			if (*t == L'"' || *t == L'\'' ||
+					*t == L'/' || (*t == L'\\' && *(t + 1) == L'm' &&
+									  *(t + 2) != L'\0')) {
+				bool isRegexp = !(*t == L'"' || *t == L'\'');
+				wchar_t q[2] = { *t++, L'\0' }; // quote character
+				if (q[0] == L'\\') {
 					t++;
 					q[0] = *t++;
 				}
 				tokenStart = t;
 
-				while (*t != _T('\0') && *t != q[0]) {
-					if (*t == _T('\\') && *(t + 1))
-						t ++;
-					if (_istlead(*t) && *(t + 1))
+				while (*t != L'\0' && *t != q[0]) {
+					if (*t == L'\\' && *(t + 1))
 						t ++;
 					t ++;
 				}
 
-				tstring str =
+				std::wstring str =
 					interpretMetaCharacters(tokenStart, t - tokenStart, q, isRegexp);
-#ifdef _MBCS
-				if (isRegexp)
-					str = guardRegexpFromMbcs(str.c_str());
-#endif
 				// concatinate continuous string
 				if (!isRegexp &&
 						0 < o_tokens->size() && o_tokens->back().isString() &&
@@ -312,7 +297,7 @@ continue_getTokenLoop:
 					o_tokens->back().add(str);
 				else
 					o_tokens->push_back(Token(str, true, isRegexp));
-				if (*t != _T('\0'))
+				if (*t != L'\0')
 					t ++;
 				goto continue_getTokenLoop;
 			}
@@ -320,41 +305,33 @@ continue_getTokenLoop:
 			// not quoted
 			{
 				while (isSymbolChar(*t)) {
-					if (*t == _T('\\'))
+					if (*t == L'\\')
 						if (*(t + 1))
 							t ++;
 						else
 							break;
-					if (_istlead(*t) && *(t + 1))
-						t ++;
 					t ++;
 				}
 				if (t == tokenStart) {
 					ErrorMessage e;
-					e << _T("invalid character ");
-#ifdef UNICODE
-					e << _T("U+");
-					e << std::hex; // << std::setw(4) << std::setfill(_T('0'));
+					e << L"invalid character ";
+					e << L"U+";
+					e << std::hex; // << std::setw(4) << std::setfill(L'0');
 					e << (int)(wchar_t)*t;
-#else
-					e << _T("\\x");
-					e << std::hex; // << std::setw(2) << std::setfill(_T('0'));
-					e << (int)(u_char)*t;
-#endif
 					e << std::dec;
-					if (_istprint(*t))
-						e << _T("(") << *t << _T(")");
+					if (iswprint(*t))
+						e << L"(" << *t << L")";
 					throw e;
 				}
 
-				_TCHAR *numEnd = NULL;
-				long value = _tcstol(tokenStart, &numEnd, 0);
+				wchar_t *numEnd = NULL;
+				long value = wcstol(tokenStart, &numEnd, 0);
 				if (tokenStart == numEnd) {
-					tstring str = interpretMetaCharacters(tokenStart, t - tokenStart);
+					std::wstring str = interpretMetaCharacters(tokenStart, t - tokenStart);
 					o_tokens->push_back(Token(str, false));
 				} else {
 					o_tokens->push_back(
-						Token(value, tstringi(tokenStart, numEnd - tokenStart)));
+						Token(value, wstringi(tokenStart, numEnd - tokenStart)));
 					t = numEnd;
 				}
 				goto continue_getTokenLoop;

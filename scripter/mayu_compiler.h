@@ -20,7 +20,7 @@
 class ConfigFiles;
 class MayuParser;
 
-using Symbols = std::set<tstringi>;
+using Symbols = std::set<wstringi>;
 
 
 ///
@@ -30,7 +30,7 @@ private:
 	Symbols m_symbols;			///< defined symbols
 	ConfigFiles &m_configFiles;		///< for include resolution
 	SyncObject *m_soLog;
-	tostream *m_log;
+	std::wostream *m_log;
 	CmdStreamWriter &m_writer;
 	bool m_hasErrors;
 	uint32_t m_nextKeySeqIdx;		///< auto-incrementing keySeq index
@@ -48,7 +48,7 @@ private:
 	CmdArgument compileArgument(const AstArgument &arg);
 	CmdScanCode compileScanCode(const AstScanCode &sc);
 
-	void error(const AstSourceLoc &loc, const tstring &msg);
+	void error(const AstSourceLoc &loc, const std::wstring &msg);
 
 	// AstVisitor implementation
 	void visit(const AstFile &node) override;
@@ -81,7 +81,7 @@ public:
 				 const Symbols &initialSymbols,
 				 ConfigFiles &configFiles,
 				 SyncObject *soLog = NULL,
-				 tostream *log = NULL);
+				 std::wostream *log = NULL);
 
 	/// Compile an AST file, writing commands to the stream
 	void compile(const AstFile &file);

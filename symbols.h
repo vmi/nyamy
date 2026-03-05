@@ -11,7 +11,7 @@
 
 
 /// symbols set
-using Symbols = std::set<tstringi>;
+using Symbols = std::set<wstringi>;
 
 
 #endif // !_SYMBOLS_H
