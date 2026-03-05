@@ -21,7 +21,6 @@
 #	* the default of <...MODIFIED_KEY_NAME>'s modifier-settings is:
 #		1. "IL-", "NL-", "CL-", "SL-", "KL-",
 #		   "MAX-", "MIN-", "MMAX-", "MMIN-",
-#		   "T-", "TS-",
 #		   /L[0-9]/, "U-" and "D-"
 #		   are specified with "*"
 #		2. all other modifiers are specified with "~"
@@ -208,8 +207,6 @@
 		| "MIN-"	# if Window minimized
 		| "MMAX-"	# if MDI child Window maximized
 		| "MMIN-"	# if MDI child Window minimized
-		| "T-"		# if finger on touchpad
-		| "TS-"	# same as "T-" except for sticky up to release all keys
 		| /M[0-9]/	# user defined modifier
 		| /L[0-9]/	# user defined lock
 

@@ -24,8 +24,6 @@ public:
 	KeySeqs m_keySeqs;				///
 	Symbols m_symbols;				///
 	bool m_correctKanaLockHandling;		///
-	bool m_sts4mayu;				///
-	bool m_cts4mayu;				///
 	bool m_mouseEvent;				///
 	LONG m_dragThreshold;			///
 	unsigned int m_oneShotRepeatableDelay;	///
@@ -33,8 +31,6 @@ public:
 public:
 	Setting()
 			: m_correctKanaLockHandling(false),
-			m_sts4mayu(false),
-			m_cts4mayu(false),
 			m_mouseEvent(false),
 			m_dragThreshold(0),
 			m_oneShotRepeatableDelay(0) { }

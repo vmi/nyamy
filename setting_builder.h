@@ -68,8 +68,6 @@ public:
 	// Options (return pointers for load_ARGUMENT compatibility)
 	bool *correctKanaLockHandling() { return &m_setting->m_correctKanaLockHandling; }
 	unsigned int *oneShotRepeatableDelay() { return &m_setting->m_oneShotRepeatableDelay; }
-	bool *sts4mayu() { return &m_setting->m_sts4mayu; }
-	bool *cts4mayu() { return &m_setting->m_cts4mayu; }
 	bool *mouseEvent() { return &m_setting->m_mouseEvent; }
 	LONG *dragThreshold() { return &m_setting->m_dragThreshold; }
 

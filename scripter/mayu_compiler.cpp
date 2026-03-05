@@ -39,8 +39,6 @@ static const struct {
 	{ L"MIN-", Modifier::Type_Minimized },
 	{ L"MMAX-", Modifier::Type_MdiMaximized },
 	{ L"MMIN-", Modifier::Type_MdiMinimized },
-	{ L"T-",   Modifier::Type_Touchpad },
-	{ L"TS-",  Modifier::Type_TouchpadSticky },
 	{ L"M0-",  Modifier::Type_Mod0 },
 	{ L"M1-",  Modifier::Type_Mod1 },
 	{ L"M2-",  Modifier::Type_Mod2 },

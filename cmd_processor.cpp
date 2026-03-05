@@ -172,8 +172,6 @@ void CmdProcessor::operator()(CmdDefOptionData &data)
 	const wstringi &value = data.value;
 	if (name == L"KL-") *m_builder->correctKanaLockHandling() = !(value == L"false");
 	else if (name == L"delay-of") *m_builder->oneShotRepeatableDelay() = static_cast<unsigned int>(_wtoi(value.c_str()));
-	else if (name == L"sts4mayu") *m_builder->sts4mayu() = !(value == L"false");
-	else if (name == L"cts4mayu") *m_builder->cts4mayu() = !(value == L"false");
 	else if (name == L"mouse-event") *m_builder->mouseEvent() = !(value == L"false");
 	else if (name == L"drag-threshold") *m_builder->dragThreshold() = static_cast<LONG>(_wtoi(value.c_str()));
 }

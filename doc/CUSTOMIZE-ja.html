@@ -62,8 +62,6 @@
 			    <li><code>MIN-</code> は、ウィンドウが最小化されていることを表します。
 			    <li><code>MMAX-</code> は、MDI 子ウィンドウが最大化されていることを表します。
 			    <li><code>MMIN-</code> は、MDI 子ウィンドウが最小化されていることを表します。
-			    <li><code>T-</code> は、タッチパッドに指が触れていることを表します。有効にするためには<a href="#def_option_ts4mayu" target="MANUAL">オプション</a>を設定する必要があります。
-			    <li><code>TS-</code> は、全てのキーが離されるまでオフにならないことを除けば <code>T-</code> と同じです。
 			  </ul>
 			  
 			  <p>以下のように記述すると、<kbd>Control</kbd> + <kbd>A</kbd> を押した時に、Windows へは <kbd>HOME</kbd> キーが入力されます。</p>
@@ -744,23 +742,6 @@
 			</div>
 		    </dd>
 
-		    <dt class="h3"><a name="def_option_ts4mayu">オプション (<code>sts4mayu, cts4mayu</code>)</a>
-			
-		    <dd class="d3">
-			<div>
-			  <p>モディファイヤ <code>T-, TS-</code> のサポートを有効にします。別途 DLL(<code>sts4mayu.dll</code> または <code>cts4mayu.dll</code>)が必要です。インストールパッケージには同梱しておりませんので、<a href="http://mayu.sourceforge.net/test/ts4mayu/">ここ</a>から取得し、<code>mayu.exe</code> と同じディレクトリに置いて下さい。</p>
-			  
-			  <p>Synaptics のタッチパッドを使用する。 <code>sts4mayu.dll</code> が必要です。</p>
-			  <p class="sample">
-			  def option sts4mayu = enable
-			  </p>
-			  
-			  <p>Cirque GlidePoint のタッチパッドを使用する。 <code>cts4mayu.dll </code>が必要です。</p>
-			  <p class="sample">
-			  def option cts4mayu = enable
-			  </p>
-			</div>
-		    </dd>
 		  </dl>
 		</div>
 		

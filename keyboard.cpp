@@ -85,7 +85,6 @@ Modifier::Modifier()
 		Type_ImeLock, Type_ImeComp, Type_NumLock, Type_CapsLock, Type_ScrollLock,
 		Type_KanaLock,
 		Type_Maximized, Type_Minimized, Type_MdiMaximized, Type_MdiMinimized,
-		Type_Touchpad, Type_TouchpadSticky,
 		Type_Lock0, Type_Lock1, Type_Lock2, Type_Lock3, Type_Lock4,
 		Type_Lock5, Type_Lock6, Type_Lock7, Type_Lock8, Type_Lock9,
 	};
@@ -131,8 +130,6 @@ std::wostream &operator<<(std::wostream &i_ost, const Modifier &i_m)
 		{ Modifier::Type_Minimized, L"MIN-" },
 		{ Modifier::Type_MdiMaximized, L"MMAX-" },
 		{ Modifier::Type_MdiMinimized, L"MMIN-" },
-		{ Modifier::Type_Touchpad, L"T-" },
-		{ Modifier::Type_TouchpadSticky, L"TS-" },
 		{ Modifier::Type_Mod0, L"M0-" }, { Modifier::Type_Mod1, L"M1-" },
 		{ Modifier::Type_Mod2, L"M2-" }, { Modifier::Type_Mod3, L"M3-" },
 		{ Modifier::Type_Mod4, L"M4-" }, { Modifier::Type_Mod5, L"M5-" },

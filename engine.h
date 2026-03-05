@@ -203,8 +203,6 @@ private:
 	OVERLAPPED m_ol;				/** for async read/write of
 						    mayu device */
 	HANDLE m_hookPipe;				/// named pipe for &SetImeString
-	HMODULE m_sts4mayu;				/// DLL module for ThumbSense
-	HMODULE m_cts4mayu;				/// DLL module for ThumbSense
 	bool volatile m_isLogMode;			/// is logging mode ?
 	bool volatile m_isEnabled;			/// is enabled  ?
 	bool volatile m_isSynchronizing;		/// is synchronizing ?
@@ -329,10 +327,6 @@ private:
 	/// set current keymap
 	void setCurrentKeymap(const Keymap *i_keymap,
 						  bool i_doesAddToHistory = false);
-	/// load/unload [sc]ts4mayu.dll
-	void manageTs4mayu(TCHAR *i_ts4mayuDllName, TCHAR *i_dependDllName,
-					   bool i_load, HMODULE *i_pTs4mayu);
-
 private:
 	// BEGINING OF FUNCTION DEFINITION
 	/// send a default key to Windows
