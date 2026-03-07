@@ -143,6 +143,7 @@
     <ClInclude Include="..\mayuipc.h" />
     <ClInclude Include="..\mayurc.h" />
     <ClInclude Include="..\misc.h" />
+    <ClInclude Include="..\pipe_streambuf.h" />
     <ClInclude Include="..\msgstream.h" />
     <ClInclude Include="..\multithread.h" />
     <ClInclude Include="..\registry.h" />

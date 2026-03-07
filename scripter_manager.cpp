@@ -7,90 +7,14 @@
 #include "scripter_manager.h"
 #include "cmd_processor.h"
 #include "cmd_stream_reader.h"
+#include "pipe_streambuf.h"
 #include "stringtool.h"
 
 #include <process.h>
+#include <vector>
 
 
 const UINT ScripterManager::WM_ScripterSettingReady = WM_APP + 120;
-
-
-//=============================================================================
-// PipeWriteStreambuf - wraps a Win32 write pipe HANDLE as a std::streambuf
-//=============================================================================
-
-class PipeWriteStreambuf : public std::streambuf
-{
-public:
-	explicit PipeWriteStreambuf(HANDLE h) : m_h(h) {}
-
-protected:
-	int_type overflow(int_type c) override {
-		if (c == EOF) return EOF;
-		char ch = static_cast<char>(c);
-		DWORD written;
-		return WriteFile(m_h, &ch, 1, &written, NULL) ? c : EOF;
-	}
-
-	std::streamsize xsputn(const char *s, std::streamsize n) override {
-		DWORD written;
-		if (!WriteFile(m_h, s, static_cast<DWORD>(n), &written, NULL))
-			return 0;
-		return static_cast<std::streamsize>(written);
-	}
-
-private:
-	HANDLE m_h;
-};
-
-
-//=============================================================================
-// PipeReadStreambuf - wraps a Win32 read pipe HANDLE as a std::streambuf
-//=============================================================================
-
-class PipeReadStreambuf : public std::streambuf
-{
-public:
-	explicit PipeReadStreambuf(HANDLE h) : m_h(h) {}
-
-protected:
-	int_type underflow() override {
-		DWORD got = 0;
-		if (!ReadFile(m_h, &m_ch, 1, &got, NULL) || got == 0)
-			return traits_type::eof();
-		setg(&m_ch, &m_ch, &m_ch + 1);
-		return traits_type::to_int_type(m_ch);
-	}
-
-private:
-	HANDLE m_h;
-	char m_ch = 0;
-};
-
-
-//=============================================================================
-// PipeReadWStreambuf - wraps a Win32 read pipe HANDLE as a std::wstreambuf
-// Reads UTF-16 wchar_t units from a pipe whose write end uses _O_U16TEXT mode
-//=============================================================================
-
-class PipeReadWStreambuf : public std::wstreambuf
-{
-public:
-	explicit PipeReadWStreambuf(HANDLE h) : m_h(h) {}
-
-protected:
-	int_type underflow() override {
-		DWORD got = 0;
-		if (!ReadFile(m_h, &m_ch, sizeof(wchar_t), &got, NULL) || got < sizeof(wchar_t))
-			return traits_type::eof();
-		setg(&m_ch, &m_ch, &m_ch + 1);
-		return traits_type::to_int_type(m_ch);
-	}
-
-private:
-	HANDLE m_h;
-	wchar_t m_ch = 0;
-};
 
 
 //=============================================================================
@@ -104,10 +28,10 @@ ScripterManager::ScripterManager(SyncObject *i_soLog, std::wostream *i_log,
 	, m_hwndNotify(i_hwndNotify)
 	, m_hCtrlWrite(INVALID_HANDLE_VALUE)
 	, m_hDataRead(INVALID_HANDLE_VALUE)
-	, m_hStderrRead(INVALID_HANDLE_VALUE)
+	, m_hMsgRead(INVALID_HANDLE_VALUE)
 	, m_hScripterProcess(NULL)
 	, m_hDataThread(NULL)
-	, m_hStderrThread(NULL)
+	, m_hMsgThread(NULL)
 	, m_quitSent(false)
 {
 }
@@ -150,7 +74,7 @@ DWORD ScripterManager::collectHandles(HANDLE *buf, DWORD maxCount)
 	DWORD n = 0;
 	if (m_hScripterProcess && n < maxCount) buf[n++] = m_hScripterProcess;
 	if (m_hDataThread      && n < maxCount) buf[n++] = m_hDataThread;
-	if (m_hStderrThread    && n < maxCount) buf[n++] = m_hStderrThread;
+	if (m_hMsgThread       && n < maxCount) buf[n++] = m_hMsgThread;
 	return n;
 }
 
@@ -158,39 +82,52 @@ void ScripterManager::closeHandles()
 {
 	if (m_hScripterProcess) { CloseHandle(m_hScripterProcess); m_hScripterProcess = NULL; }
 	if (m_hDataThread)      { CloseHandle(m_hDataThread);      m_hDataThread      = NULL; }
-	if (m_hStderrThread)    { CloseHandle(m_hStderrThread);    m_hStderrThread    = NULL; }
-	if (m_hDataRead   != INVALID_HANDLE_VALUE) { CloseHandle(m_hDataRead);   m_hDataRead   = INVALID_HANDLE_VALUE; }
-	if (m_hStderrRead != INVALID_HANDLE_VALUE) { CloseHandle(m_hStderrRead); m_hStderrRead = INVALID_HANDLE_VALUE; }
+	if (m_hMsgThread)       { CloseHandle(m_hMsgThread);       m_hMsgThread       = NULL; }
+	if (m_hDataRead != INVALID_HANDLE_VALUE) { CloseHandle(m_hDataRead); m_hDataRead = INVALID_HANDLE_VALUE; }
+	if (m_hMsgRead  != INVALID_HANDLE_VALUE) { CloseHandle(m_hMsgRead);  m_hMsgRead  = INVALID_HANDLE_VALUE; }
 }
 
 
 bool ScripterManager::start()
 {
-	// ctrl pipe:   yamy (write) -> scripter stdin (read)
-	HANDLE hCtrlRead    = INVALID_HANDLE_VALUE;
-	// data pipe:   scripter stdout (write) -> yamy (read)
-	HANDLE hDataWrite   = INVALID_HANDLE_VALUE;
-	// stderr pipe: scripter stderr (write) -> yamy (read)
-	HANDLE hStderrWrite = INVALID_HANDLE_VALUE;
+	// ctrl pipe:  yamy (write) -> scripter (read) via inherited handle in YSCR_CTRL env var
+	HANDLE hCtrlRead  = INVALID_HANDLE_VALUE;
+	// data pipe:  scripter (write) -> yamy (read) via inherited handle in YSCR_CMD env var
+	HANDLE hDataWrite = INVALID_HANDLE_VALUE;
+	// msg pipe:   scripter stdout+stderr (write) -> yamy (read), merged
+	HANDLE hMsgWrite  = INVALID_HANDLE_VALUE;
+	// NUL device: used as scripter's stdin (reads return EOF immediately)
+	HANDLE hNul       = INVALID_HANDLE_VALUE;
 
 	SECURITY_ATTRIBUTES sa = {};
 	sa.nLength        = sizeof(sa);
 	sa.bInheritHandle = TRUE;
 
-	if (!CreatePipe(&hCtrlRead,      &m_hCtrlWrite, &sa, 0) ||
-	    !CreatePipe(&m_hDataRead,    &hDataWrite,   &sa, 0) ||
-	    !CreatePipe(&m_hStderrRead,  &hStderrWrite, &sa, 0)) {
+	hNul = CreateFile(L"NUL", GENERIC_READ,
+	                  FILE_SHARE_READ | FILE_SHARE_WRITE,
+	                  &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (hNul == INVALID_HANDLE_VALUE ||
+	    !CreatePipe(&hCtrlRead,   &m_hCtrlWrite, &sa, 0) ||
+	    !CreatePipe(&m_hDataRead, &hDataWrite,   &sa, 0) ||
+	    !CreatePipe(&m_hMsgRead,  &hMsgWrite,    &sa, 0)) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
 			*m_log << L"ScripterManager: CreatePipe failed" << std::endl;
 		}
+		if (hNul      != INVALID_HANDLE_VALUE) CloseHandle(hNul);
+		if (hCtrlRead != INVALID_HANDLE_VALUE) CloseHandle(hCtrlRead);
+		if (hDataWrite!= INVALID_HANDLE_VALUE) CloseHandle(hDataWrite);
+		if (hMsgWrite != INVALID_HANDLE_VALUE) CloseHandle(hMsgWrite);
 		return false;
 	}
 
-	// do not inherit yamy-side handles to child process
-	SetHandleInformation(m_hCtrlWrite,  HANDLE_FLAG_INHERIT, 0);
-	SetHandleInformation(m_hDataRead,   HANDLE_FLAG_INHERIT, 0);
-	SetHandleInformation(m_hStderrRead, HANDLE_FLAG_INHERIT, 0);
+	// yamy-side handles must not be inherited by the child
+	SetHandleInformation(m_hCtrlWrite, HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(m_hDataRead,  HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(m_hMsgRead,   HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
+	// hCtrlRead, hDataWrite, hMsgWrite are inherited (sa.bInheritHandle=TRUE)
 
 	// determine scripter's executable path
 	wchar_t exePath[GANA_MAX_PATH];
@@ -203,22 +140,66 @@ bool ScripterManager::start()
 	scripterPath += exeDir;
 	scripterPath += L"yamy-scripter.exe";
 
+	// build command line
+	wchar_t cmdLine[1024];
+	swprintf_s(cmdLine, L"\"%s\"", scripterPath.c_str());
+
+	// build an environment block that includes YSCR_CTRL and YSCR_CMD
+	// so the child receives pipe handle values without polluting the parent environment
+	wchar_t ctrlVal[32], cmdVal[32];
+	swprintf_s(ctrlVal, L"%llu",
+	           static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(hCtrlRead)));
+	swprintf_s(cmdVal, L"%llu",
+	           static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(hDataWrite)));
+
+	std::vector<wchar_t> envBlock;
+	{
+		auto addVar = [&](const wchar_t *name, const wchar_t *value) {
+			for (const wchar_t *p = name;  *p; ++p) envBlock.push_back(*p);
+			envBlock.push_back(L'=');
+			for (const wchar_t *p = value; *p; ++p) envBlock.push_back(*p);
+			envBlock.push_back(L'\0');
+		};
+		addVar(L"YSCR_CTRL", ctrlVal);
+		addVar(L"YSCR_CMD",  cmdVal);
+
+		// append current process environment
+		wchar_t *cur = GetEnvironmentStringsW();
+		if (cur) {
+			for (const wchar_t *p = cur; *p; ) {
+				const wchar_t *entry = p;
+				while (*p) ++p;
+				++p;  // skip NUL
+				// skip any existing YSCR_CTRL/YSCR_CMD entries
+				bool skip = (wcsncmp(entry, L"YSCR_CTRL=", 10) == 0 ||
+				             wcsncmp(entry, L"YSCR_CMD=",   9) == 0);
+				if (!skip) {
+					for (const wchar_t *q = entry; q < p; ++q) envBlock.push_back(*q);
+				}
+			}
+			FreeEnvironmentStringsW(cur);
+		}
+		envBlock.push_back(L'\0');  // final double-NUL terminator
+	}
+
 	STARTUPINFO si = {};
 	si.cb         = sizeof(si);
 	si.dwFlags    = STARTF_USESTDHANDLES;
-	si.hStdInput  = hCtrlRead;
-	si.hStdOutput = hDataWrite;
-	si.hStdError  = hStderrWrite;
+	si.hStdInput  = hNul;       // stdin = NUL (EOF on read)
+	si.hStdOutput = hMsgWrite;  // stdout = message log
+	si.hStdError  = hMsgWrite;  // stderr = same pipe (merged)
 
 	PROCESS_INFORMATION pi = {};
-	BOOL result = CreateProcess(scripterPath.c_str(), NULL, NULL, NULL, TRUE,
-	                            CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+	BOOL result = CreateProcess(NULL, cmdLine, NULL, NULL, TRUE,
+	                            CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+	                            envBlock.data(), NULL, &si, &pi);
 	DWORD lastErr = GetLastError();
 
-	// handles passed to child process are no longer needed on parent side
+	// close handles that were passed to / used by the child
 	CloseHandle(hCtrlRead);
 	CloseHandle(hDataWrite);
-	CloseHandle(hStderrWrite);
+	CloseHandle(hMsgWrite);
+	CloseHandle(hNul);
 
 	if (!result) {
 		if (m_log) {
@@ -239,8 +220,8 @@ bool ScripterManager::start()
 
 	// start background threads
 	unsigned tid;
-	m_hDataThread   = (HANDLE)_beginthreadex(NULL, 0, dataThread,   this, 0, &tid);
-	m_hStderrThread = (HANDLE)_beginthreadex(NULL, 0, stderrThread, this, 0, &tid);
+	m_hDataThread = (HANDLE)_beginthreadex(NULL, 0, dataThread, this, 0, &tid);
+	m_hMsgThread  = (HANDLE)_beginthreadex(NULL, 0, msgThread,  this, 0, &tid);
 
 	if (m_log) {
 		Acquire a(m_soLog, 0);
@@ -302,19 +283,19 @@ void ScripterManager::runReader()
 
 
 //-----------------------------------------------------------------------------
-// Background thread: stderr (log text from scripter)
+// Background thread: msg (log text from scripter stdout+stderr, merged)
 //-----------------------------------------------------------------------------
 
-unsigned __stdcall ScripterManager::stderrThread(void *param)
+unsigned __stdcall ScripterManager::msgThread(void *param)
 {
-	static_cast<ScripterManager *>(param)->runStderrReader();
+	static_cast<ScripterManager *>(param)->runMsgReader();
 	return 0;
 }
 
 
-void ScripterManager::runStderrReader()
+void ScripterManager::runMsgReader()
 {
-	PipeReadWStreambuf wsb(m_hStderrRead);
+	PipeReadWStreambuf wsb(m_hMsgRead);
 	std::wistream ws(&wsb);
 	std::wstring line;
 

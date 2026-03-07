@@ -49,14 +49,14 @@ public:
 
 private:
 	// pipe handles
-	HANDLE m_hCtrlWrite;        ///< yamy -> scripter stdin (CtrlStream)
-	HANDLE m_hDataRead;         ///< scripter stdout -> yamy (CmdStream)
-	HANDLE m_hStderrRead;       ///< scripter stderr -> yamy (log text)
+	HANDLE m_hCtrlWrite;        ///< yamy -> scripter (CtrlStream, non-stdio)
+	HANDLE m_hDataRead;         ///< scripter -> yamy (CmdStream, non-stdio)
+	HANDLE m_hMsgRead;          ///< scripter stdout+stderr -> yamy (log text, merged)
 	HANDLE m_hScripterProcess;
 
-	// background threads (data + stderr)
+	// background threads (data + msg)
 	HANDLE m_hDataThread;
-	HANDLE m_hStderrThread;
+	HANDLE m_hMsgThread;
 
 	// ostream and its streambuf to write to ctrl pipe
 	std::unique_ptr<std::streambuf>  m_ctrlStreambuf;
@@ -75,9 +75,9 @@ private:
 
 	// background thread entry points
 	static unsigned __stdcall dataThread(void *param);
-	static unsigned __stdcall stderrThread(void *param);
+	static unsigned __stdcall msgThread(void *param);
 	void runReader();
-	void runStderrReader();
+	void runMsgReader();
 };
 
 

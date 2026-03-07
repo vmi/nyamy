@@ -103,6 +103,7 @@
   <ItemGroup>
     <ClInclude Include="..\errormessage.h" />
     <ClInclude Include="..\misc.h" />
+    <ClInclude Include="..\pipe_streambuf.h" />
     <ClInclude Include="..\scripter\ast.h" />
     <ClInclude Include="..\scripter\ast_visitor.h" />
     <ClInclude Include="..\scripter\cmd_stream_writer.h" />

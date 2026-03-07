@@ -12,7 +12,7 @@ extern "C"
 {
 #endif // __cplusplus
 
-extern SCRIPTER_API void scripter_engine(void);
+extern SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[]);
 
 #ifdef __cplusplus
 } // extern "C"

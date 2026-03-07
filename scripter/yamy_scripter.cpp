@@ -1,9 +1,9 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // scripter_engine.cpp - yamy-scripter entry point
 //
-// Reads CtrlStream commands from stdin (binary), compiles .mayu files,
-// and writes CmdStream to stdout (binary).
-// Errors and warnings are written to stderr (text, one message per line).
+// Reads CtrlStream commands from an inherited pipe handle passed via YSCR_CTRL env var.
+// Compiles .mayu files and writes CmdStream to an inherited pipe handle passed
+// via YSCR_CMD env var.  stdout and stderr are text log channels (UTF-16 on stderr).
 
 
 #include "misc.h"
@@ -17,16 +17,15 @@
 #define _YAMY_SCRIPTER_IMPL
 #include "yamy_scripter.h"
 
+#include "pipe_streambuf.h"
+
 #include <fcntl.h>
 #include <io.h>
 #include <iostream>
 
 
 //-----------------------------------------------------------------------------
-// StderrLog - thin SyncObject + std::wostream adaptor that writes to std::wcerr
-//-----------------------------------------------------------------------------
-
-// ConfigFiles/MayuCompiler accept (SyncObject*, std::wostream*) = (nullptr, nullptr)
+// Note: ConfigFiles/MayuCompiler accept (SyncObject*, std::wostream*) = (nullptr, nullptr)
 // which silently discards log output.  We use nullptr here and collect
 // structured error info via hasErrors() / getMessages() instead.
 // Stderr output is done directly in doReload() below.
@@ -70,28 +69,56 @@ static void doReload(const Symbols &syms, CmdStreamWriter &writer)
 }
 
 
-SCRIPTER_API void scripter_engine(void)
+SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[])
 {
-	// Set stdin/stdout to binary mode (CmdStream is binary)
-	_setmode(_fileno(stdin), _O_BINARY);
-	_setmode(_fileno(stdout), _O_BINARY);
-	// Set stderr to UTF-16 so that wcerr output is read as wide chars by the engine
+	// Read YSCR_CTRL (CtrlStream read handle) and YSCR_CMD (CmdStream write handle)
+	// from environment variables.  Both handles are inherited from the parent process.
+	HANDLE hCtrlRead  = INVALID_HANDLE_VALUE;
+	HANDLE hDataWrite = INVALID_HANDLE_VALUE;
+	{
+		wchar_t buf[32];
+		if (GetEnvironmentVariableW(L"YSCR_CTRL", buf, 32) > 0)
+			hCtrlRead  = reinterpret_cast<HANDLE>(
+			                 static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
+		if (GetEnvironmentVariableW(L"YSCR_CMD",  buf, 32) > 0)
+			hDataWrite = reinterpret_cast<HANDLE>(
+			                 static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
+	}
+
+	if (hCtrlRead == INVALID_HANDLE_VALUE || hDataWrite == INVALID_HANDLE_VALUE) {
+		// Set stderr to UTF-16 before writing the error message
+		_setmode(_fileno(stderr), _O_U16TEXT);
+		std::wcerr << L"error: YSCR_CTRL and YSCR_CMD environment variables are required" << std::endl;
+		return;
+	}
+
+	// stdout/stderr are now text log channels (not used for binary protocol).
+	// Set stderr to UTF-16 so the parent's PipeReadWStreambuf can read wide chars.
 	_setmode(_fileno(stderr), _O_U16TEXT);
 
-	CtrlStreamReader ctrlReader(std::cin);
-	CmdStreamWriter  dataWriter(std::cout);
+	// Wrap inherited pipe handles in streambufs
+	PipeReadStreambuf  ctrlBuf(hCtrlRead);
+	PipeWriteStreambuf dataBuf(hDataWrite);
+	std::istream ctrlStream(&ctrlBuf);
+	std::ostream dataStream(&dataBuf);
+
+	CtrlStreamReader ctrlReader(ctrlStream);
+	CmdStreamWriter  dataWriter(dataStream);
 
 	for (;;) {
 		CtrlId id;
 		if (!ctrlReader.readNext(id))
-			break;  // stdin closed -> exit
+			break;  // ctrl pipe closed -> exit
 
 		if (id == CtrlId::Quit) {
 			break;
 		} else if (id == CtrlId::Reload) {
 			Symbols syms = ctrlReader.readReload();
 			doReload(syms, dataWriter);
-			std::cout.flush();
+			dataStream.flush();
 		}
 	}
+
+	CloseHandle(hCtrlRead);
+	CloseHandle(hDataWrite);
 }

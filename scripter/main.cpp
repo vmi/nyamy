@@ -5,8 +5,8 @@
 // wmain
 //-----------------------------------------------------------------------------
 
-int wmain(int /*argc*/, wchar_t * /*argv*/[])
+int wmain(int argc, wchar_t *argv[])
 {
-	scripter_engine();
+	scripter_engine(argc, argv);
 	return 0;
 }
