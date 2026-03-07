@@ -263,11 +263,7 @@ static void unmapHookData()
 bool notify(void *i_data, size_t i_dataSize)
 {
 	COPYDATASTRUCT cd;
-#ifdef MAYU64
 	DWORD_PTR result;
-#else  // MAYU64
-	DWORD result;
-#endif // MAYU64
 
 	DWORD len;
 	if (g.m_hMailslot != INVALID_HANDLE_VALUE) {
@@ -356,20 +352,12 @@ static void updateShow(HWND i_hwnd, NotifyShow::Show i_show)
 	if (!i_hwnd)
 		return;
 
-#ifdef MAYU64
 	LONG_PTR style = GetWindowLongPtr(i_hwnd, GWL_STYLE);
-#else
-	LONG style = GetWindowLong(i_hwnd, GWL_STYLE);
-#endif
 	if ((style & (WS_MAXIMIZEBOX | WS_MINIMIZEBOX)) == 0)
 		return; // ignore window that has neither maximize or minimize button
 
 	if (style & WS_CHILD) {
-#ifdef MAYU64
 		LONG_PTR exStyle = GetWindowLongPtr(i_hwnd, GWL_EXSTYLE);
-#else
-		LONG exStyle = GetWindowLong(i_hwnd, GWL_EXSTYLE);
-#endif
 		if (exStyle & WS_EX_MDICHILD) {
 			isMDI = true;
 		} else
@@ -483,11 +471,7 @@ static void funcRecenter(HWND i_hwnd)
 	else
 		return;	// this function only works for Edit control
 
-#ifdef MAYU64
 	LONG_PTR style = GetWindowLongPtr(i_hwnd, GWL_STYLE);
-#else
-	LONG style = GetWindowLong(i_hwnd, GWL_STYLE);
-#endif
 	if (!(style & ES_MULTILINE))
 		return;	// this function only works for multi line Edit control
 

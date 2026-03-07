@@ -65,11 +65,9 @@ class Mayu
 #endif // LOG_TO_FILE
 
 	HMENU m_hMenuTaskTray;			/// tasktray menu
-#ifdef _WIN64
 	HANDLE m_hMutexYamyd;
 	STARTUPINFO m_si;
 	PROCESS_INFORMATION m_pi;
-#endif // _WIN64
 	HANDLE m_mutex;
 	HANDLE m_hNotifyMailslot;			/// mailslot to receive notify
 	HANDLE m_hNotifyEvent;			/// event on receive notify
@@ -283,11 +281,7 @@ private:
 	static LRESULT CALLBACK
 	tasktray_wndProc(HWND i_hwnd, UINT i_message,
 					 WPARAM i_wParam, LPARAM i_lParam) {
-#ifdef MAYU64
 		Mayu *This = reinterpret_cast<Mayu *>(GetWindowLongPtr(i_hwnd, 0));
-#else
-		Mayu *This = reinterpret_cast<Mayu *>(GetWindowLong(i_hwnd, 0));
-#endif
 
 		if (!This)
 			switch (i_message) {
@@ -298,11 +292,7 @@ private:
 					This->m_fixScancodeMap->init(i_hwnd, WM_APP_escapeNLSKeysFailed);
 					This->m_fixScancodeMap->escape(true);
 				}
-#ifdef MAYU64
 				SetWindowLongPtr(i_hwnd, 0, (LONG_PTR)This);
-#else
-				SetWindowLong(i_hwnd, 0, (long)This);
-#endif
 				return 0;
 			}
 		else
@@ -1144,7 +1134,6 @@ public:
 		// set initial lock state
 		notifyLockState();
 
-#ifdef _WIN64
 		ZeroMemory(&m_pi,sizeof(m_pi));
 		ZeroMemory(&m_si,sizeof(m_si));
 		m_si.cb=sizeof(m_si);
@@ -1181,7 +1170,6 @@ public:
 		} else {
 			CloseHandle(m_pi.hThread);
 		}
-#endif // _WIN64
 
 	}
 
@@ -1192,9 +1180,7 @@ public:
 		CHECK_FALSE( uninstallMessageHook() );
 
 		// --- Phase A: signal all shutdowns simultaneously ---
-#ifdef _WIN64
 		ReleaseMutex(m_hMutexYamyd);       // yamyd exits when it loses the mutex
-#endif // _WIN64
 		if (m_scripter)
 			m_scripter->sendQuit();            // scripter: send quit + close stdin pipe
 		if (m_fixScancodeMap) m_fixScancodeMap->signalQuit(); // FixScancodeMap thread: signal via event
@@ -1207,9 +1193,7 @@ public:
 		// --- Phase D: wait for all remaining threads/processes in parallel ---
 		HANDLE handles[6];
 		DWORD n = 0;
-#ifdef _WIN64
 		if (m_pi.hProcess) handles[n++] = m_pi.hProcess;
-#endif // _WIN64
 		if (m_scripter)
 			n += m_scripter->collectHandles(handles + n, 6 - n);
 		handles[n++] = hEngineThread;
@@ -1219,10 +1203,8 @@ public:
 			WaitForMultipleObjects(n, handles, TRUE, 5000);
 
 		// --- cleanup handles ---
-#ifdef _WIN64
 		if (m_pi.hProcess) { CloseHandle(m_pi.hProcess); m_pi.hProcess = NULL; }
 		CloseHandle(m_hMutexYamyd);
-#endif // _WIN64
 		if (m_scripter)
 			m_scripter->closeHandles();
 		m_engine.cleanupAfterStop(hEngineThread);
@@ -1387,14 +1369,10 @@ int WINAPI wWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
 	CHECK_TRUE( _wsetlocale(LC_ALL, L"") );
 
 	// common controls
-#if defined(_WIN95)
-	InitCommonControls();
-#else
 	INITCOMMONCONTROLSEX icc;
 	icc.dwSize = sizeof(icc);
 	icc.dwICC = ICC_LISTVIEW_CLASSES;
 	CHECK_TRUE( InitCommonControlsEx(&icc) );
-#endif
 
 	// convert old registry to new registry
 #ifndef USE_INI

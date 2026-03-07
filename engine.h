@@ -650,11 +650,7 @@ public:
 				// Function::toOverlappedWindow
 				HWND h = hf;
 				while (h) {
-#ifdef MAYU64
 					LONG_PTR style = GetWindowLongPtr(h, GWL_STYLE);
-#else
-					LONG style = GetWindowLong(h, GWL_STYLE);
-#endif
 					if ((style & WS_CHILD) == 0)
 						break;
 					h = GetParent(h);

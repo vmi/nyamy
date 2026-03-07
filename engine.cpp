@@ -1392,11 +1392,7 @@ void Engine::checkShow(HWND i_hwnd) {
 	bool isMDIMaximized = false;
 	bool isMDIMinimized = false;
 	while (i_hwnd) {
-#ifdef MAYU64
 		LONG_PTR exStyle = GetWindowLongPtr(i_hwnd, GWL_EXSTYLE);
-#else
-		LONG exStyle = GetWindowLong(i_hwnd, GWL_EXSTYLE);
-#endif
 		if (exStyle & WS_EX_MDICHILD) {
 			WINDOWPLACEMENT placement;
 			placement.length = sizeof(WINDOWPLACEMENT);
@@ -1415,11 +1411,7 @@ void Engine::checkShow(HWND i_hwnd) {
 			}
 		}
 
-#ifdef MAYU64
 		LONG_PTR style = GetWindowLongPtr(i_hwnd, GWL_STYLE);
-#else
-		LONG style = GetWindowLong(i_hwnd, GWL_STYLE);
-#endif
 		if ((style & WS_CHILD) == 0) {
 			WINDOWPLACEMENT placement;
 			placement.length = sizeof(WINDOWPLACEMENT);
