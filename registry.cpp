@@ -76,7 +76,7 @@ bool Registry::write(HKEY i_root, const std::wstring &i_path, const std::wstring
 		HKEY hkey;
 		DWORD disposition;
 		if (ERROR_SUCCESS !=
-			RegCreateKeyEx(i_root, i_path.c_str(), 0, L"",
+			RegCreateKeyEx(i_root, i_path.c_str(), 0, nullptr,
 						   REG_OPTION_NON_VOLATILE,
 						   KEY_ALL_ACCESS, NULL, &hkey, &disposition))
 			return false;
@@ -149,7 +149,7 @@ bool Registry::write(HKEY i_root, const std::wstring &i_path,
 		HKEY hkey;
 		DWORD disposition;
 		if (ERROR_SUCCESS !=
-				RegCreateKeyEx(i_root, i_path.c_str(), 0, L"",
+				RegCreateKeyEx(i_root, i_path.c_str(), 0, nullptr,
 							   REG_OPTION_NON_VOLATILE,
 							   KEY_ALL_ACCESS, NULL, &hkey, &disposition))
 			return false;
@@ -269,7 +269,7 @@ bool Registry::write(HKEY i_root, const std::wstring &i_path, const std::wstring
 		HKEY hkey;
 		DWORD disposition;
 		if (ERROR_SUCCESS !=
-				RegCreateKeyEx(i_root, i_path.c_str(), 0, L"",
+				RegCreateKeyEx(i_root, i_path.c_str(), 0, nullptr,
 							   REG_OPTION_NON_VOLATILE,
 							   KEY_ALL_ACCESS, NULL, &hkey, &disposition))
 			return false;

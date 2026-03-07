@@ -59,7 +59,10 @@ $files = @(
     "yamy32.dll",
     "yamyd32",
     "yamy64.dll",
-    "yamy-scripter.exe"
+    "yamy-scripter.exe",
+    "yamy-scripter.dll",
+    "yamy-scripter.lib",
+    "yamy_scripter.h"
 )
 
 $filesToArchive = @()
