@@ -15,7 +15,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>VERSION="$(VERSION)";LOGNAME="$(USERNAME)";COMPUTERNAME="$(COMPUTERNAME)";_CRT_SECURE_NO_WARNINGS;MAYU64;USE_INI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VERSION="$(VERSION)";LOGNAME="$(USERNAME)";COMPUTERNAME="$(COMPUTERNAME)";_CRT_SECURE_NO_WARNINGS;MAYU64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>ext_lib$(CPUBIT)\$(ConfigurationName)\lib</AdditionalLibraryDirectories>

@@ -364,7 +364,7 @@ AstNodePtr MayuParser::parseLine()
 		return parseKeymapDefinition(t->getString());
 
 	if (*t == L"key")
-		return parseKeyAssignOrDefaultModifier();
+		return parseKeyAssign();
 
 	if (*t == L"event")
 		return parseEventAssign();
@@ -720,34 +720,15 @@ std::unique_ptr<AstKeymapDef> MayuParser::parseKeymapDefinition(
 
 
 //=============================================================================
-// Key assignment / default modifier
+// Key assignment
 //=============================================================================
 
-AstNodePtr MayuParser::parseKeyAssignOrDefaultModifier()
+AstNodePtr MayuParser::parseKeyAssign()
 {
 	AstSourceLoc loc = currentLoc();
 
 	// Parse modifier sequence
 	std::vector<AstModifierSpec> mods = parseModifierSpecs();
-
-	// Check if this is a default modifier change: key MOD = MOD
-	if (!isEOL() && *lookToken() == L"=") {
-		// Could be default modifier change OR key assignment.
-		// Default modifier change: no key name before "="
-		// We need to look ahead: if the current token is "=",
-		// and we've only seen modifiers (no key names), it's default mod.
-		// But we need to distinguish from "key S-a = ..." which starts
-		// with modifier then key name then "=".
-		//
-		// In the original code, after parsing modifiers, if the next
-		// token is "=", it's a default modifier change.
-		getToken(); // consume "="
-		auto node = std::make_unique<AstKeyDefaultModifier>();
-		node->m_loc = loc;
-		node->assignModifier = std::move(mods);
-		node->keySeqModifier = parseModifierSpecs();
-		return node;
-	}
 
 	// Key assignment: key MODIFIER* KEY+ = KEY_SEQUENCE
 	auto node = std::make_unique<AstKeyAssign>();

@@ -340,17 +340,6 @@ public:
 };
 
 
-/// key MODIFIER = MODIFIER  (default modifier change)
-class AstKeyDefaultModifier : public AstNode
-{
-public:
-	std::vector<AstModifierSpec> assignModifier;
-	std::vector<AstModifierSpec> keySeqModifier;
-
-	void accept(AstVisitor &v) const override;
-};
-
-
 /// event EVENT_NAME = KEY_SEQUENCE
 class AstEventAssign : public AstNode
 {

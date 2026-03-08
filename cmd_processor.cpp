@@ -220,12 +220,6 @@ void CmdProcessor::operator()(CmdKeyAssignData &data)
 }
 
 
-void CmdProcessor::operator()(CmdKeyDefaultModData &)
-{
-	// no-op
-}
-
-
 void CmdProcessor::operator()(CmdEventAssignData &data)
 {
 	ModifiedKey mkey;
@@ -263,11 +257,6 @@ void CmdProcessor::operator()(CmdModAssignData &data)
 	}
 }
 
-
-void CmdProcessor::operator()(CmdKeySeqDefData &)
-{
-	// no-op
-}
 
 
 void CmdProcessor::operator()(CmdCommit)

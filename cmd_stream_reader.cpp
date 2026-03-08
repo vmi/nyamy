@@ -34,10 +34,8 @@ std::optional<AnyCmd> CmdStreamReader::readCmd()
 	case CmdId::DefSymbol:     return readDefSymbol();
 	case CmdId::KeymapDef:     return readKeymapDef();
 	case CmdId::KeyAssign:     return readKeyAssign();
-	case CmdId::KeyDefaultMod: return readKeyDefaultMod();
 	case CmdId::EventAssign:   return readEventAssign();
 	case CmdId::ModAssign:     return readModAssign();
-	case CmdId::KeySeqDef:     return readKeySeqDef();
 	case CmdId::Commit:        return CmdCommit{};
 	default:                   return std::nullopt;
 	}
@@ -314,14 +312,6 @@ CmdKeyAssignData CmdStreamReader::readKeyAssign()
 }
 
 
-CmdKeyDefaultModData CmdStreamReader::readKeyDefaultMod()
-{
-	CmdKeyDefaultModData data;
-	data.assignMod = readModifier();
-	data.keySeqMod = readModifier();
-	return data;
-}
-
 
 CmdEventAssignData CmdStreamReader::readEventAssign()
 {
@@ -351,14 +341,6 @@ CmdModAssignData CmdStreamReader::readModAssign()
 		ke.keyName = readString();
 		data.keys.push_back(ke);
 	}
-	return data;
-}
-
-
-CmdKeySeqDefData CmdStreamReader::readKeySeqDef()
-{
-	CmdKeySeqDefData data;
-	data.keySeqIdx = readU32();
 	return data;
 }
 
@@ -509,10 +491,8 @@ static const wchar_t *cmdIdToString(CmdId id)
 	case CmdId::DefSymbol:    return L"DefSymbol";
 	case CmdId::KeymapDef:    return L"KeymapDef";
 	case CmdId::KeyAssign:    return L"KeyAssign";
-	case CmdId::KeyDefaultMod:return L"KeyDefaultMod";
 	case CmdId::EventAssign:  return L"EventAssign";
 	case CmdId::ModAssign:    return L"ModAssign";
-	case CmdId::KeySeqDef:    return L"KeySeqDef";
 	case CmdId::Commit:       return L"Commit";
 	default:                  return L"???";
 	}
@@ -636,11 +616,6 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			out << L"] rhs=@" << data.rhsKeySeqIdx;
 			break;
 		}
-		case CmdId::KeyDefaultMod: {
-			auto data = reader.readKeyDefaultMod();
-			out << L"assign=... keyseq=...";
-			break;
-		}
 		case CmdId::EventAssign: {
 			auto data = reader.readEventAssign();
 			out << L"event=\"" << data.eventName
@@ -658,11 +633,6 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 				out << L"\"" << data.keys[j].keyName << L"\"";
 			}
 			out << L"]";
-			break;
-		}
-		case CmdId::KeySeqDef: {
-			auto data = reader.readKeySeqDef();
-			out << L"idx=" << data.keySeqIdx;
 			break;
 		}
 		case CmdId::Commit:

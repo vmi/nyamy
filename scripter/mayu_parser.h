@@ -88,7 +88,7 @@ private:
 		const wstringi &keyword);
 
 	// Key and event assignments
-	AstNodePtr parseKeyAssignOrDefaultModifier();
+	AstNodePtr parseKeyAssign();
 	std::unique_ptr<AstEventAssign> parseEventAssign();
 
 	// Modifier assignment

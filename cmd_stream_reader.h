@@ -31,10 +31,8 @@ public:
 	CmdDefSymbolData readDefSymbol();
 	CmdKeymapDefData readKeymapDef();
 	CmdKeyAssignData readKeyAssign();
-	CmdKeyDefaultModData readKeyDefaultMod();
 	CmdEventAssignData readEventAssign();
 	CmdModAssignData readModAssign();
-	CmdKeySeqDefData readKeySeqDef();
 
 	/// Read the next command as a fully-parsed value.
 	/// Returns std::nullopt on EOF or unknown CmdId.

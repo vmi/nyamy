@@ -33,7 +33,6 @@ public:
 	// Keymap and assignments
 	virtual void visit(const AstKeymapDef &node) = 0;
 	virtual void visit(const AstKeyAssign &node) = 0;
-	virtual void visit(const AstKeyDefaultModifier &node) = 0;
 	virtual void visit(const AstEventAssign &node) = 0;
 	virtual void visit(const AstModifierAssign &node) = 0;
 	virtual void visit(const AstKeySeqDef &node) = 0;
@@ -66,7 +65,6 @@ inline void AstDefSubstitute::accept(AstVisitor &v) const { v.visit(*this); }
 inline void AstDefOption::accept(AstVisitor &v) const { v.visit(*this); }
 inline void AstKeymapDef::accept(AstVisitor &v) const { v.visit(*this); }
 inline void AstKeyAssign::accept(AstVisitor &v) const { v.visit(*this); }
-inline void AstKeyDefaultModifier::accept(AstVisitor &v) const { v.visit(*this); }
 inline void AstEventAssign::accept(AstVisitor &v) const { v.visit(*this); }
 inline void AstModifierAssign::accept(AstVisitor &v) const { v.visit(*this); }
 inline void AstKeySeqDef::accept(AstVisitor &v) const { v.visit(*this); }

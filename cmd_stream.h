@@ -30,10 +30,8 @@ enum class CmdId : uint8_t {
 	DefSymbol      = 0x16,
 	KeymapDef      = 0x20,
 	KeyAssign      = 0x21,
-	KeyDefaultMod  = 0x22,
 	EventAssign    = 0x23,
 	ModAssign      = 0x24,
-	KeySeqDef      = 0x25,
 	Commit         = 0xFF,
 };
 
@@ -177,11 +175,6 @@ struct CmdKeyAssignData {
 	CmdKeyAssignData() : rhsKeySeqIdx(0) {}
 };
 
-struct CmdKeyDefaultModData {
-	CmdModifier assignMod;
-	CmdModifier keySeqMod;
-};
-
 struct CmdEventAssignData {
 	wstringi eventName;
 	uint32_t rhsKeySeqIdx;
@@ -205,13 +198,6 @@ struct CmdModAssignData {
 	std::vector<KeyEntry> keys;
 };
 
-struct CmdKeySeqDefData {
-	uint32_t keySeqIdx;
-
-	CmdKeySeqDefData() : keySeqIdx(0) {}
-};
-
-
 //=============================================================================
 // AnyCmd variant - a single fully-parsed command from a CmdStream
 //=============================================================================
@@ -231,10 +217,8 @@ using AnyCmd = std::variant<
 	CmdDefSymbolData,
 	CmdKeymapDefData,
 	CmdKeyAssignData,
-	CmdKeyDefaultModData,
 	CmdEventAssignData,
 	CmdModAssignData,
-	CmdKeySeqDefData,
 	CmdCommit
 >;
 

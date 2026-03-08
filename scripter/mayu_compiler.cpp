@@ -449,15 +449,6 @@ void MayuCompiler::visit(const AstKeyAssign &node)
 }
 
 
-void MayuCompiler::visit(const AstKeyDefaultModifier &node)
-{
-	CmdKeyDefaultModData data;
-	data.assignMod = compileModifierSpecs(node.assignModifier);
-	data.keySeqMod = compileModifierSpecs(node.keySeqModifier);
-	m_writer.writeKeyDefaultMod(data);
-}
-
-
 void MayuCompiler::visit(const AstEventAssign &node)
 {
 	CmdEventAssignData data;
@@ -491,17 +482,15 @@ void MayuCompiler::visit(const AstModifierAssign &node)
 
 void MayuCompiler::visit(const AstKeySeqDef &node)
 {
-	CmdKeySeqDefData data;
 	if (node.keySeq) {
 		CmdKeySequence bks;
 		bks.name = node.name;
 		for (const auto &action : node.keySeq->actions)
 			bks.actions.push_back(compileAction(*action));
 
-		data.keySeqIdx = m_nextKeySeqIdx++;
+		m_nextKeySeqIdx++;
 		m_writer.writeDefKeySeq(bks);
 	}
-	m_writer.writeKeySeqDef(data);
 }
 
 

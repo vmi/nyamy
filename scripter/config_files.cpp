@@ -60,36 +60,7 @@ bool ConfigFiles::getFilenameFromRegistry(
 // get home directory path
 void ConfigFiles::getHomeDirectories(HomeDirectories *o_pathes) const
 {
-	wstringi filename;
-#ifndef USE_INI
-	if (getFilenameFromRegistry(NULL, &filename, NULL) &&
-			!filename.empty()) {
-		wregex_stored getPath(L"^(.*[/\\\\])[^/\\\\]*$");
-		std::wsmatch getPathResult;
-		if (std::regex_match(filename, getPathResult, getPath))
-			o_pathes->push_back(getPathResult.str(1));
-	}
-
-	const wchar_t *home = _wgetenv(L"HOME");
-	if (home)
-		o_pathes->push_back(home);
-
-	const wchar_t *homedrive = _wgetenv(L"HOMEDRIVE");
-	const wchar_t *homepath = _wgetenv(L"HOMEPATH");
-	if (homedrive && homepath)
-		o_pathes->push_back(wstringi(homedrive) + homepath);
-
-	const wchar_t *userprofile = _wgetenv(L"USERPROFILE");
-	if (userprofile)
-		o_pathes->push_back(userprofile);
-
 	wchar_t buf[GANA_MAX_PATH];
-	DWORD len = GetCurrentDirectory(NUMBER_OF(buf), buf);
-	if (0 < len && len < NUMBER_OF(buf))
-		o_pathes->push_back(buf);
-#else //USE_INI
-	wchar_t buf[GANA_MAX_PATH];
-#endif //USE_INI
 
 	if (GetModuleFileName(GetModuleHandle(NULL), buf, NUMBER_OF(buf)))
 		o_pathes->push_back(pathRemoveFileSpec(buf));

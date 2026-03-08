@@ -1297,54 +1297,6 @@ public:
 // Functions
 
 
-/// convert registry
-void convertRegistry()
-{
-	Registry reg(MAYU_REGISTRY_ROOT);
-	wstringi dot_mayu;
-	bool doesAdd = false;
-	DWORD index;
-	if (reg.read(L".mayu", &dot_mayu)) {
-		reg.write(L".mayu0", L";" + dot_mayu + L";");
-		reg.remove(L".mayu");
-		doesAdd = true;
-		index = 0;
-	} else if (!reg.read(L".mayu0", &dot_mayu)) {
-		reg.write(L".mayu0", loadString(IDS_readFromHomeDirectory) + L";;");
-		doesAdd = true;
-		index = 1;
-	}
-	if (doesAdd) {
-		Registry commonreg(HKEY_LOCAL_MACHINE, L"Software\\GANAware\\mayu");
-		wstringi dir, layout;
-		if (commonreg.read(L"dir", &dir) &&
-				commonreg.read(L"layout", &layout)) {
-			wstringi tmp = L";" + dir + L"\\dot.mayu";
-			if (layout == L"109") {
-				reg.write(L".mayu1", loadString(IDS_109Emacs) + tmp
-						  + L";-DUSE109" L";-DUSEdefault");
-				reg.write(L".mayu2", loadString(IDS_104on109Emacs) + tmp
-						  + L";-DUSE109" L";-DUSEdefault" L";-DUSE104on109");
-				reg.write(L".mayu3", loadString(IDS_109) + tmp
-						  + L";-DUSE109");
-				reg.write(L".mayu4", loadString(IDS_104on109) + tmp
-						  + L";-DUSE109" L";-DUSE104on109");
-			} else {
-				reg.write(L".mayu1", loadString(IDS_104Emacs) + tmp
-						  + L";-DUSE104" L";-DUSEdefault");
-				reg.write(L".mayu2", loadString(IDS_109on104Emacs) + tmp
-						  + L";-DUSE104" L";-DUSEdefault" L";-DUSE109on104");
-				reg.write(L".mayu3", loadString(IDS_104) + tmp
-						  + L";-DUSE104");
-				reg.write(L".mayu4", loadString(IDS_109on104) + tmp
-						  + L";-DUSE104" L";-DUSE109on104");
-			}
-			reg.write(L".mayuIndex", index);
-		}
-	}
-}
-
-
 /// main
 static LPTOP_LEVEL_EXCEPTION_FILTER s_prevExceptionFilter = NULL;
 
@@ -1373,11 +1325,6 @@ int WINAPI wWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
 	icc.dwSize = sizeof(icc);
 	icc.dwICC = ICC_LISTVIEW_CLASSES;
 	CHECK_TRUE( InitCommonControlsEx(&icc) );
-
-	// convert old registry to new registry
-#ifndef USE_INI
-	convertRegistry();
-#endif // !USE_INI
 
 	// is another mayu running ?
 	HANDLE mutex = CreateMutex((SECURITY_ATTRIBUTES *)NULL, TRUE,

@@ -37,10 +37,8 @@ public:
 	void operator()(CmdDefSymbolData &);
 	void operator()(CmdKeymapDefData &);
 	void operator()(CmdKeyAssignData &);
-	void operator()(CmdKeyDefaultModData &);
 	void operator()(CmdEventAssignData &);
 	void operator()(CmdModAssignData &);
-	void operator()(CmdKeySeqDefData &);
 	void operator()(CmdCommit);
 
 private:

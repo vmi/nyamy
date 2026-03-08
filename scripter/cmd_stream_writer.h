@@ -26,10 +26,8 @@ public:
 	void writeDefSymbol(const CmdDefSymbolData &data);
 	void writeKeymapDef(const CmdKeymapDefData &data);
 	void writeKeyAssign(const CmdKeyAssignData &data);
-	void writeKeyDefaultMod(const CmdKeyDefaultModData &data);
 	void writeEventAssign(const CmdEventAssignData &data);
 	void writeModAssign(const CmdModAssignData &data);
-	void writeKeySeqDef(const CmdKeySeqDefData &data);
 	void writeCommit();
 
 private:

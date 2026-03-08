@@ -63,7 +63,6 @@ private:
 	void visit(const AstDefOption &node) override;
 	void visit(const AstKeymapDef &node) override;
 	void visit(const AstKeyAssign &node) override;
-	void visit(const AstKeyDefaultModifier &node) override;
 	void visit(const AstEventAssign &node) override;
 	void visit(const AstModifierAssign &node) override;
 	void visit(const AstKeySeqDef &node) override;

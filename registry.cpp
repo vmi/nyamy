@@ -168,69 +168,6 @@ bool Registry::write(HKEY i_root, const std::wstring &i_path,
 }
 
 
-#ifndef USE_INI
-// read list of string
-bool Registry::read(HKEY i_root, const std::wstring &i_path, const std::wstring &i_name,
-					tstrings *o_value, const tstrings &i_defaultValue)
-{
-	HKEY hkey;
-	if (ERROR_SUCCESS ==
-			RegOpenKeyEx(i_root, i_path.c_str(), 0, KEY_READ, &hkey)) {
-		DWORD type = REG_MULTI_SZ;
-		DWORD size = 0;
-		BYTE dummy;
-		if (ERROR_MORE_DATA ==
-				RegQueryValueEx(hkey, i_name.c_str(), NULL, &type, &dummy, &size)) {
-			if (0 < size) {
-				std::vector<BYTE> buf(size);
-				if (ERROR_SUCCESS == RegQueryValueEx(hkey, i_name.c_str(),
-													 NULL, &type, buf.data(), &size)) {
-					buf.back() = 0;
-					o_value->clear();
-					const wchar_t *p = reinterpret_cast<wchar_t *>(buf.data());
-					const wchar_t *end = reinterpret_cast<wchar_t *>(buf.data() + buf.size());
-					while (p < end && *p) {
-						o_value->push_back(p);
-						p += o_value->back().length() + 1;
-					}
-					RegCloseKey(hkey);
-					return true;
-				}
-			}
-		}
-		RegCloseKey(hkey);
-	}
-	if (!i_defaultValue.empty())
-		*o_value = i_defaultValue;
-	return false;
-}
-
-
-// write list of string
-bool Registry::write(HKEY i_root, const std::wstring &i_path,
-					 const std::wstring &i_name, const tstrings &i_value)
-{
-	HKEY hkey;
-	DWORD disposition;
-	if (ERROR_SUCCESS !=
-			RegCreateKeyEx(i_root, i_path.c_str(), 0, L"",
-						   REG_OPTION_NON_VOLATILE,
-						   KEY_ALL_ACCESS, NULL, &hkey, &disposition))
-		return false;
-	std::wstring value;
-	for (tstrings::const_iterator i = i_value.begin(); i != i_value.end(); ++ i) {
-		value += *i;
-		value += L'\0';
-	}
-	RegSetValueEx(hkey, i_name.c_str(), NULL, REG_MULTI_SZ,
-				  (BYTE *)value.c_str(),
-				  (value.size() + 1) * sizeof(std::wstring::value_type));
-	RegCloseKey(hkey);
-	return true;
-}
-#endif //!USE_INI
-
-
 // read binary
 bool Registry::read(HKEY i_root, const std::wstring &i_path,
 					const std::wstring &i_name, BYTE *o_value, DWORD *i_valueSize,

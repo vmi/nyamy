@@ -247,14 +247,6 @@ void CmdStreamWriter::writeKeyAssign(const CmdKeyAssignData &data)
 }
 
 
-void CmdStreamWriter::writeKeyDefaultMod(const CmdKeyDefaultModData &data)
-{
-	writeU8(static_cast<uint8_t>(CmdId::KeyDefaultMod));
-	writeModifier(data.assignMod);
-	writeModifier(data.keySeqMod);
-}
-
-
 void CmdStreamWriter::writeEventAssign(const CmdEventAssignData &data)
 {
 	writeU8(static_cast<uint8_t>(CmdId::EventAssign));
@@ -280,12 +272,6 @@ void CmdStreamWriter::writeModAssign(const CmdModAssignData &data)
 	}
 }
 
-
-void CmdStreamWriter::writeKeySeqDef(const CmdKeySeqDefData &data)
-{
-	writeU8(static_cast<uint8_t>(CmdId::KeySeqDef));
-	writeU32(data.keySeqIdx);
-}
 
 
 void CmdStreamWriter::writeCommit()
