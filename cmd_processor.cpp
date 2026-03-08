@@ -98,13 +98,13 @@ void CmdProcessor::process(CmdStreamReader &cr)
 }
 
 
-void CmdProcessor::operator()(CmdKeySequence &bks)
+void CmdProcessor::operator()(CmdArgsRegKeySeq &bks)
 {
 	m_builder->pushKeySeqRef(m_builder->materializeKeySeq(bks));
 }
 
 
-void CmdProcessor::operator()(CmdDefKeyData &data)
+void CmdProcessor::operator()(CmdArgsDefKey &data)
 {
 	Key key;
 	for (const auto &name : data.names) key.addName(name);
@@ -118,7 +118,7 @@ void CmdProcessor::operator()(CmdDefKeyData &data)
 }
 
 
-void CmdProcessor::operator()(CmdDefModifierData &data)
+void CmdProcessor::operator()(CmdArgsDefMod &data)
 {
 	Modifier::Type mt;
 	if (!lookupModifierType(data.modifierName, &mt))
@@ -131,7 +131,7 @@ void CmdProcessor::operator()(CmdDefModifierData &data)
 }
 
 
-void CmdProcessor::operator()(CmdDefSyncData &data)
+void CmdProcessor::operator()(CmdArgsDefSync &data)
 {
 	Key *key = m_builder->getSyncKey();
 	key->initialize();
@@ -145,7 +145,7 @@ void CmdProcessor::operator()(CmdDefSyncData &data)
 }
 
 
-void CmdProcessor::operator()(CmdDefAliasData &data)
+void CmdProcessor::operator()(CmdArgsDefAlias &data)
 {
 	Key *key = m_builder->searchKeyByNonAliasName(data.keyName);
 	if (!key) throw ErrorMessage() << L"invalid key: " << data.keyName;
@@ -153,7 +153,7 @@ void CmdProcessor::operator()(CmdDefAliasData &data)
 }
 
 
-void CmdProcessor::operator()(CmdDefSubstituteData &data)
+void CmdProcessor::operator()(CmdArgsDefSubst &data)
 {
 	KeySeq *keySeq = m_builder->getKeySeqRef(data.rhsKeySeqIdx);
 	ModifiedKey rhs = keySeq->getFirstModifiedKey();
@@ -166,24 +166,24 @@ void CmdProcessor::operator()(CmdDefSubstituteData &data)
 }
 
 
-void CmdProcessor::operator()(CmdDefOptionData &data)
+void CmdProcessor::operator()(CmdArgsDefOption &data)
 {
 	const wstringi &name = data.optionName;
 	const wstringi &value = data.value;
 	if (name == L"KL-") *m_builder->correctKanaLockHandling() = !(value == L"false");
-	else if (name == L"delay-of") *m_builder->oneShotRepeatableDelay() = static_cast<unsigned int>(_wtoi(value.c_str()));
+	else if (name == L"delay-of !!!") *m_builder->oneShotRepeatableDelay() = static_cast<unsigned int>(_wtoi(value.c_str()));
 	else if (name == L"mouse-event") *m_builder->mouseEvent() = !(value == L"false");
 	else if (name == L"drag-threshold") *m_builder->dragThreshold() = static_cast<LONG>(_wtoi(value.c_str()));
 }
 
 
-void CmdProcessor::operator()(CmdDefSymbolData &data)
+void CmdProcessor::operator()(CmdArgsDefSymbol &data)
 {
 	m_builder->addSymbol(data.symbolName);
 }
 
 
-void CmdProcessor::operator()(CmdKeymapDefData &data)
+void CmdProcessor::operator()(CmdArgsBeginKeymap &data)
 {
 	Keymap::Type type = Keymap::Type_keymap;
 	if (!data.windowOp.empty()) {
@@ -210,7 +210,7 @@ void CmdProcessor::operator()(CmdKeymapDefData &data)
 }
 
 
-void CmdProcessor::operator()(CmdKeyAssignData &data)
+void CmdProcessor::operator()(CmdArgsAssignKey &data)
 {
 	KeySeq *keySeq = m_builder->getKeySeqRef(data.rhsKeySeqIdx);
 	for (const auto &bmk : data.lhsKeys) {
@@ -220,7 +220,7 @@ void CmdProcessor::operator()(CmdKeyAssignData &data)
 }
 
 
-void CmdProcessor::operator()(CmdEventAssignData &data)
+void CmdProcessor::operator()(CmdArgsAssignEvent &data)
 {
 	ModifiedKey mkey;
 	mkey.m_modifier.dontcare();
@@ -236,7 +236,7 @@ void CmdProcessor::operator()(CmdEventAssignData &data)
 }
 
 
-void CmdProcessor::operator()(CmdModAssignData &data)
+void CmdProcessor::operator()(CmdArgsAssignMod &data)
 {
 	for (const auto &p : data.prefixes) {
 		Modifier::Type mt;
@@ -259,7 +259,7 @@ void CmdProcessor::operator()(CmdModAssignData &data)
 
 
 
-void CmdProcessor::operator()(CmdCommit)
+void CmdProcessor::operator()(CmdArgsCommit)
 {
 	if (m_commitCallback && m_builder)
 		m_commitCallback(m_builder->build());

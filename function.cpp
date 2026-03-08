@@ -14,15 +14,15 @@
 #include <algorithm>
 #include <process.h>
 
-VKey loadVKeyFromCmd(const CmdArgument &arg)
+VKey loadVKeyFromCmd(const CmdFuncArg &arg)
 {
 	// Mirrors the VKey encoding logic used in the scripter pipeline.
 	// Accepts Number (pre-encoded), String (bare key name), or
 	// TokenSeq (prefix tokens + key name, e.g. ["U-", "D-", "RButton"]).
 	std::vector<wstringi> toks;
-	if (arg.type == CmdArgument::TokenSeq)
+	if (arg.type == CmdFuncArg::TokenSeq)
 		toks = arg.tokens;
-	else if (arg.type == CmdArgument::String)
+	else if (arg.type == CmdFuncArg::String)
 		toks.push_back(arg.stringValue);
 	else
 		return static_cast<VKey>(arg.numberValue); // Number: already encoded

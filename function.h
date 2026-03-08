@@ -33,7 +33,7 @@ public:
 	/// virtual destructor
 	virtual ~FunctionData() = 0;
 	///
-	virtual void loadFromCmd(const std::vector<CmdArgument> &i_args,
+	virtual void loadFromCmd(const std::vector<CmdFuncArg> &i_args,
 								  CmdLoadContext *i_ctx) = 0;
 	///
 	virtual void exec(Engine *i_engine, FunctionParam *i_param) const = 0;
@@ -62,9 +62,9 @@ enum VKey {
 /// stream output
 extern std::wostream &operator<<(std::wostream &i_ost, VKey i_data);
 
-/// Resolve a CmdArgument (String, TokenSeq, or Number) to a VKey value.
+/// Resolve a CmdFuncArg (String, TokenSeq, or Number) to a VKey value.
 /// Handles prefix tokens E-, U-, D- followed by a key name or number.
-extern VKey loadVKeyFromCmd(const CmdArgument &arg);
+extern VKey loadVKeyFromCmd(const CmdFuncArg &arg);
 
 
 ///

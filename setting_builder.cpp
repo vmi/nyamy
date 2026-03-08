@@ -7,7 +7,7 @@
 #include "setting_builder.h"
 
 
-KeySeq *SettingBuilder::materializeKeySeq(const CmdKeySequence &cmdKs)
+KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs)
 {
 	KeySeq ks(cmdKs.name);
 	if (cmdKs.mode != 0)

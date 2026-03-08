@@ -20,18 +20,18 @@
 //=============================================================================
 
 enum class CmdId : uint8_t {
-	DefKeySeq      = 0x01,
+	RegKeySeq      = 0x01,
 	DefKey         = 0x10,
-	DefModifier    = 0x11,
+	DefMod         = 0x11,
 	DefSync        = 0x12,
 	DefAlias       = 0x13,
-	DefSubstitute  = 0x14,
+	DefSubst       = 0x14,
 	DefOption      = 0x15,
 	DefSymbol      = 0x16,
-	KeymapDef      = 0x20,
-	KeyAssign      = 0x21,
-	EventAssign    = 0x23,
-	ModAssign      = 0x24,
+	BeginKeymap    = 0x20,
+	AssignKey      = 0x21,
+	AssignEvent    = 0x23,
+	AssignMod      = 0x24,
 	Commit         = 0xFF,
 };
 
@@ -66,7 +66,7 @@ struct CmdModifiedKey {
 
 
 /// Function argument in bytecode
-struct CmdArgument {
+struct CmdFuncArg {
 	enum Type : uint8_t {
 		String,
 		Number,
@@ -83,7 +83,7 @@ struct CmdArgument {
 	CmdModifier modifierValue;
 	std::vector<wstringi> tokens;		///< for TokenSeq
 
-	CmdArgument() : type(String), numberValue(0), keySeqIndex(0) {}
+	CmdFuncArg() : type(String), numberValue(0), keySeqIndex(0) {}
 };
 
 
@@ -99,7 +99,7 @@ struct CmdAction {
 	Type type;
 	CmdModifier modifier;
 	wstringi name;				///< key name / keyseq name / func name
-	std::vector<CmdArgument> arguments;	///< for FuncCall only
+	std::vector<CmdFuncArg> arguments;	///< for FuncCall only
 	std::vector<CmdAction> subActions;	///< for SubSeq only
 
 	CmdAction() : type(Key) {}
@@ -107,12 +107,12 @@ struct CmdAction {
 
 
 /// Named key sequence (stored in the pool)
-struct CmdKeySequence {
+struct CmdArgsRegKeySeq {
 	wstringi name;
 	uint8_t mode;			///< Modifier::Type_KEYSEQ or Type_ASSIGN
 	std::vector<CmdAction> actions;
 
-	CmdKeySequence() : mode(0) {}
+	CmdArgsRegKeySeq() : mode(0) {}
 };
 
 
@@ -120,43 +120,42 @@ struct CmdKeySequence {
 // Command data structures (moved from bytecode.h)
 //=============================================================================
 
-struct CmdDefKeyData {
+struct CmdArgsDefKey {
 	std::vector<wstringi> names;
 	std::vector<CmdScanCode> scanCodes;
 };
 
-struct CmdDefModifierData {
+struct CmdArgsDefMod {
 	wstringi modifierName;
 	std::vector<wstringi> keyNames;
 };
 
-struct CmdDefSyncData {
+struct CmdArgsDefSync {
 	std::vector<CmdScanCode> scanCodes;
 };
 
-struct CmdDefAliasData {
+struct CmdArgsDefAlias {
 	wstringi aliasName;
 	wstringi keyName;
 };
 
-struct CmdDefSubstituteData {
+struct CmdArgsDefSubst {
 	std::vector<CmdModifiedKey> lhsKeys;
 	uint32_t rhsKeySeqIdx;
 
-	CmdDefSubstituteData() : rhsKeySeqIdx(0) {}
+	CmdArgsDefSubst() : rhsKeySeqIdx(0) {}
 };
 
-struct CmdDefOptionData {
-	wstringi optionName;
-	wstringi qualifier;
+struct CmdArgsDefOption {
+	wstringi optionName;	///< The qualifier has already been combined by the compiler (e.g., "delay-of !!!").
 	wstringi value;
 };
 
-struct CmdDefSymbolData {
+struct CmdArgsDefSymbol {
 	wstringi symbolName;
 };
 
-struct CmdKeymapDefData {
+struct CmdArgsBeginKeymap {
 	wstringi keyword;		///< "keymap", "keymap2", "window"
 	wstringi name;
 	wstringi windowClassName;
@@ -165,24 +164,24 @@ struct CmdKeymapDefData {
 	wstringi parentName;
 	int32_t defaultKeySeqIdx;	///< -1 if none
 
-	CmdKeymapDefData() : defaultKeySeqIdx(-1) {}
+	CmdArgsBeginKeymap() : defaultKeySeqIdx(-1) {}
 };
 
-struct CmdKeyAssignData {
+struct CmdArgsAssignKey {
 	std::vector<CmdModifiedKey> lhsKeys;
 	uint32_t rhsKeySeqIdx;
 
-	CmdKeyAssignData() : rhsKeySeqIdx(0) {}
+	CmdArgsAssignKey() : rhsKeySeqIdx(0) {}
 };
 
-struct CmdEventAssignData {
+struct CmdArgsAssignEvent {
 	wstringi eventName;
 	uint32_t rhsKeySeqIdx;
 
-	CmdEventAssignData() : rhsKeySeqIdx(0) {}
+	CmdArgsAssignEvent() : rhsKeySeqIdx(0) {}
 };
 
-struct CmdModAssignData {
+struct CmdArgsAssignMod {
 	struct PrefixMod {
 		wstringi assignMode;
 		wstringi modifierName;
@@ -199,27 +198,27 @@ struct CmdModAssignData {
 };
 
 //=============================================================================
-// AnyCmd variant - a single fully-parsed command from a CmdStream
+// CmdArgs variant - a single fully-parsed command from a CmdStream
 //=============================================================================
 
 /// Tag-only struct for the payload-free Commit command
-struct CmdCommit {};
+struct CmdArgsCommit {};
 
 /// A fully-parsed command, covering all CmdId values
-using AnyCmd = std::variant<
-	CmdKeySequence,
-	CmdDefKeyData,
-	CmdDefModifierData,
-	CmdDefSyncData,
-	CmdDefAliasData,
-	CmdDefSubstituteData,
-	CmdDefOptionData,
-	CmdDefSymbolData,
-	CmdKeymapDefData,
-	CmdKeyAssignData,
-	CmdEventAssignData,
-	CmdModAssignData,
-	CmdCommit
+using CmdArgs = std::variant<
+	CmdArgsRegKeySeq,
+	CmdArgsDefKey,
+	CmdArgsDefMod,
+	CmdArgsDefSync,
+	CmdArgsDefAlias,
+	CmdArgsDefSubst,
+	CmdArgsDefOption,
+	CmdArgsDefSymbol,
+	CmdArgsBeginKeymap,
+	CmdArgsAssignKey,
+	CmdArgsAssignEvent,
+	CmdArgsAssignMod,
+	CmdArgsCommit
 >;
 
 

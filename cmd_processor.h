@@ -19,27 +19,27 @@ public:
 
 	CmdProcessor(SyncObject *soLog, std::wostream *log);
 
-	/// Register a callback invoked each time CmdCommit is received.
+	/// Register a callback invoked each time CmdArgsCommit is received.
 	void onCommit(CommitCallback cb);
 
 	/// Read commands from cr in a loop until EOF.
-	/// Calls initBuilder() on construction and after each CmdCommit.
+	/// Calls initBuilder() on construction and after each CmdArgsCommit.
 	void process(CmdStreamReader &cr);
 
 	// Visitor operators (public: required by std::visit)
-	void operator()(CmdKeySequence &);
-	void operator()(CmdDefKeyData &);
-	void operator()(CmdDefModifierData &);
-	void operator()(CmdDefSyncData &);
-	void operator()(CmdDefAliasData &);
-	void operator()(CmdDefSubstituteData &);
-	void operator()(CmdDefOptionData &);
-	void operator()(CmdDefSymbolData &);
-	void operator()(CmdKeymapDefData &);
-	void operator()(CmdKeyAssignData &);
-	void operator()(CmdEventAssignData &);
-	void operator()(CmdModAssignData &);
-	void operator()(CmdCommit);
+	void operator()(CmdArgsRegKeySeq &);
+	void operator()(CmdArgsDefKey &);
+	void operator()(CmdArgsDefMod &);
+	void operator()(CmdArgsDefSync &);
+	void operator()(CmdArgsDefAlias &);
+	void operator()(CmdArgsDefSubst &);
+	void operator()(CmdArgsDefOption &);
+	void operator()(CmdArgsDefSymbol &);
+	void operator()(CmdArgsBeginKeymap &);
+	void operator()(CmdArgsAssignKey &);
+	void operator()(CmdArgsAssignEvent &);
+	void operator()(CmdArgsAssignMod &);
+	void operator()(CmdArgsCommit);
 
 private:
 	void initBuilder();

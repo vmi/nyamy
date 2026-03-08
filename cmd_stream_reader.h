@@ -21,22 +21,22 @@ public:
 	bool readNext(CmdId &cmdId);
 
 	// Data readers - call after readNext() returns the corresponding CmdId
-	CmdKeySequence readDefKeySeq();
-	CmdDefKeyData readDefKey();
-	CmdDefModifierData readDefModifier();
-	CmdDefSyncData readDefSync();
-	CmdDefAliasData readDefAlias();
-	CmdDefSubstituteData readDefSubstitute();
-	CmdDefOptionData readDefOption();
-	CmdDefSymbolData readDefSymbol();
-	CmdKeymapDefData readKeymapDef();
-	CmdKeyAssignData readKeyAssign();
-	CmdEventAssignData readEventAssign();
-	CmdModAssignData readModAssign();
+	CmdArgsRegKeySeq readRegKeySeq();
+	CmdArgsDefKey readDefKey();
+	CmdArgsDefMod readDefMod();
+	CmdArgsDefSync readDefSync();
+	CmdArgsDefAlias readDefAlias();
+	CmdArgsDefSubst readDefSubst();
+	CmdArgsDefOption readDefOption();
+	CmdArgsDefSymbol readDefSymbol();
+	CmdArgsBeginKeymap readBeginKeymap();
+	CmdArgsAssignKey readAssignKey();
+	CmdArgsAssignEvent readAssignEvent();
+	CmdArgsAssignMod readAssignMod();
 
 	/// Read the next command as a fully-parsed value.
 	/// Returns std::nullopt on EOF or unknown CmdId.
-	std::optional<AnyCmd> readCmd();
+	std::optional<CmdArgs> readCmd();
 
 	/// Dump the entire command stream to text (replaces BcDisassembler)
 	static void dump(std::istream &in, std::wostream &out);
@@ -54,14 +54,14 @@ private:
 	CmdModifier readModifier();
 	CmdScanCode readScanCode();
 	CmdModifiedKey readModifiedKey();
-	CmdArgument readArgument();
+	CmdFuncArg readArgument();
 	CmdAction readAction();
-	CmdKeySequence readKeySequence();
+	CmdArgsRegKeySeq readKeySequence();
 
 	// Dump helpers
 	static void dumpModifier(std::wostream &out, const CmdModifier &mod);
 	static void dumpAction(std::wostream &out, const CmdAction &action, int indent);
-	static void dumpArgument(std::wostream &out, const CmdArgument &arg);
+	static void dumpArgument(std::wostream &out, const CmdFuncArg &arg);
 };
 
 

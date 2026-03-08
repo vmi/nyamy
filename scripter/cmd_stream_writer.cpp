@@ -87,25 +87,25 @@ void CmdStreamWriter::writeModifiedKey(const CmdModifiedKey &mk)
 }
 
 
-void CmdStreamWriter::writeArgument(const CmdArgument &arg)
+void CmdStreamWriter::writeArgument(const CmdFuncArg &arg)
 {
 	writeU8(static_cast<uint8_t>(arg.type));
 	switch (arg.type) {
-	case CmdArgument::String:
-	case CmdArgument::Regexp:
+	case CmdFuncArg::String:
+	case CmdFuncArg::Regexp:
 		writeString(arg.stringValue);
 		break;
-	case CmdArgument::Number:
+	case CmdFuncArg::Number:
 		writeI32(arg.numberValue);
 		writeString(arg.stringValue);
 		break;
-	case CmdArgument::KeySeqIdx:
+	case CmdFuncArg::KeySeqIdx:
 		writeU32(arg.keySeqIndex);
 		break;
-	case CmdArgument::ModSeq:
+	case CmdFuncArg::ModSeq:
 		writeModifier(arg.modifierValue);
 		break;
-	case CmdArgument::TokenSeq:
+	case CmdFuncArg::TokenSeq:
 		writeU16(static_cast<uint16_t>(arg.tokens.size()));
 		for (const auto &tok : arg.tokens)
 			writeString(tok);
@@ -138,7 +138,7 @@ void CmdStreamWriter::writeAction(const CmdAction &action)
 }
 
 
-void CmdStreamWriter::writeKeySequence(const CmdKeySequence &ks)
+void CmdStreamWriter::writeKeySequence(const CmdArgsRegKeySeq &ks)
 {
 	writeString(ks.name);
 	writeU8(ks.mode);
@@ -152,14 +152,14 @@ void CmdStreamWriter::writeKeySequence(const CmdKeySequence &ks)
 // CmdStreamWriter - command writers
 //=============================================================================
 
-void CmdStreamWriter::writeDefKeySeq(const CmdKeySequence &ks)
+void CmdStreamWriter::writeRegKeySeq(const CmdArgsRegKeySeq &ks)
 {
-	writeU8(static_cast<uint8_t>(CmdId::DefKeySeq));
+	writeU8(static_cast<uint8_t>(CmdId::RegKeySeq));
 	writeKeySequence(ks);
 }
 
 
-void CmdStreamWriter::writeDefKey(const CmdDefKeyData &data)
+void CmdStreamWriter::writeDefKey(const CmdArgsDefKey &data)
 {
 	writeU8(static_cast<uint8_t>(CmdId::DefKey));
 	writeU32(static_cast<uint32_t>(data.names.size()));
@@ -171,9 +171,9 @@ void CmdStreamWriter::writeDefKey(const CmdDefKeyData &data)
 }
 
 
-void CmdStreamWriter::writeDefModifier(const CmdDefModifierData &data)
+void CmdStreamWriter::writeDefMod(const CmdArgsDefMod &data)
 {
-	writeU8(static_cast<uint8_t>(CmdId::DefModifier));
+	writeU8(static_cast<uint8_t>(CmdId::DefMod));
 	writeString(data.modifierName);
 	writeU32(static_cast<uint32_t>(data.keyNames.size()));
 	for (const auto &n : data.keyNames)
@@ -181,7 +181,7 @@ void CmdStreamWriter::writeDefModifier(const CmdDefModifierData &data)
 }
 
 
-void CmdStreamWriter::writeDefSync(const CmdDefSyncData &data)
+void CmdStreamWriter::writeDefSync(const CmdArgsDefSync &data)
 {
 	writeU8(static_cast<uint8_t>(CmdId::DefSync));
 	writeU32(static_cast<uint32_t>(data.scanCodes.size()));
@@ -190,7 +190,7 @@ void CmdStreamWriter::writeDefSync(const CmdDefSyncData &data)
 }
 
 
-void CmdStreamWriter::writeDefAlias(const CmdDefAliasData &data)
+void CmdStreamWriter::writeDefAlias(const CmdArgsDefAlias &data)
 {
 	writeU8(static_cast<uint8_t>(CmdId::DefAlias));
 	writeString(data.aliasName);
@@ -198,9 +198,9 @@ void CmdStreamWriter::writeDefAlias(const CmdDefAliasData &data)
 }
 
 
-void CmdStreamWriter::writeDefSubstitute(const CmdDefSubstituteData &data)
+void CmdStreamWriter::writeDefSubst(const CmdArgsDefSubst &data)
 {
-	writeU8(static_cast<uint8_t>(CmdId::DefSubstitute));
+	writeU8(static_cast<uint8_t>(CmdId::DefSubst));
 	writeU32(static_cast<uint32_t>(data.lhsKeys.size()));
 	for (const auto &mk : data.lhsKeys)
 		writeModifiedKey(mk);
@@ -208,25 +208,24 @@ void CmdStreamWriter::writeDefSubstitute(const CmdDefSubstituteData &data)
 }
 
 
-void CmdStreamWriter::writeDefOption(const CmdDefOptionData &data)
+void CmdStreamWriter::writeDefOption(const CmdArgsDefOption &data)
 {
 	writeU8(static_cast<uint8_t>(CmdId::DefOption));
 	writeString(data.optionName);
-	writeString(data.qualifier);
 	writeString(data.value);
 }
 
 
-void CmdStreamWriter::writeDefSymbol(const CmdDefSymbolData &data)
+void CmdStreamWriter::writeDefSymbol(const CmdArgsDefSymbol &data)
 {
 	writeU8(static_cast<uint8_t>(CmdId::DefSymbol));
 	writeString(data.symbolName);
 }
 
 
-void CmdStreamWriter::writeKeymapDef(const CmdKeymapDefData &data)
+void CmdStreamWriter::writeBeginKeymap(const CmdArgsBeginKeymap &data)
 {
-	writeU8(static_cast<uint8_t>(CmdId::KeymapDef));
+	writeU8(static_cast<uint8_t>(CmdId::BeginKeymap));
 	writeString(data.keyword);
 	writeString(data.name);
 	writeString(data.windowClassName);
@@ -237,9 +236,9 @@ void CmdStreamWriter::writeKeymapDef(const CmdKeymapDefData &data)
 }
 
 
-void CmdStreamWriter::writeKeyAssign(const CmdKeyAssignData &data)
+void CmdStreamWriter::writeAssignKey(const CmdArgsAssignKey &data)
 {
-	writeU8(static_cast<uint8_t>(CmdId::KeyAssign));
+	writeU8(static_cast<uint8_t>(CmdId::AssignKey));
 	writeU32(static_cast<uint32_t>(data.lhsKeys.size()));
 	for (const auto &mk : data.lhsKeys)
 		writeModifiedKey(mk);
@@ -247,17 +246,17 @@ void CmdStreamWriter::writeKeyAssign(const CmdKeyAssignData &data)
 }
 
 
-void CmdStreamWriter::writeEventAssign(const CmdEventAssignData &data)
+void CmdStreamWriter::writeAssignEvent(const CmdArgsAssignEvent &data)
 {
-	writeU8(static_cast<uint8_t>(CmdId::EventAssign));
+	writeU8(static_cast<uint8_t>(CmdId::AssignEvent));
 	writeString(data.eventName);
 	writeU32(data.rhsKeySeqIdx);
 }
 
 
-void CmdStreamWriter::writeModAssign(const CmdModAssignData &data)
+void CmdStreamWriter::writeAssignMod(const CmdArgsAssignMod &data)
 {
-	writeU8(static_cast<uint8_t>(CmdId::ModAssign));
+	writeU8(static_cast<uint8_t>(CmdId::AssignMod));
 	writeU32(static_cast<uint32_t>(data.prefixes.size()));
 	for (const auto &p : data.prefixes) {
 		writeString(p.assignMode);

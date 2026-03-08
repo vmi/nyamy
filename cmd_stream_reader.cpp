@@ -19,24 +19,24 @@
 CmdStreamReader::CmdStreamReader(std::istream &in) : m_in(in) {}
 
 
-std::optional<AnyCmd> CmdStreamReader::readCmd()
+std::optional<CmdArgs> CmdStreamReader::readCmd()
 {
 	CmdId cmdId;
 	if (!readNext(cmdId)) return std::nullopt;
 	switch (cmdId) {
-	case CmdId::DefKeySeq:     return readDefKeySeq();
+	case CmdId::RegKeySeq:     return readRegKeySeq();
 	case CmdId::DefKey:        return readDefKey();
-	case CmdId::DefModifier:   return readDefModifier();
+	case CmdId::DefMod:   return readDefMod();
 	case CmdId::DefSync:       return readDefSync();
 	case CmdId::DefAlias:      return readDefAlias();
-	case CmdId::DefSubstitute: return readDefSubstitute();
+	case CmdId::DefSubst: return readDefSubst();
 	case CmdId::DefOption:     return readDefOption();
 	case CmdId::DefSymbol:     return readDefSymbol();
-	case CmdId::KeymapDef:     return readKeymapDef();
-	case CmdId::KeyAssign:     return readKeyAssign();
-	case CmdId::EventAssign:   return readEventAssign();
-	case CmdId::ModAssign:     return readModAssign();
-	case CmdId::Commit:        return CmdCommit{};
+	case CmdId::BeginKeymap:     return readBeginKeymap();
+	case CmdId::AssignKey:     return readAssignKey();
+	case CmdId::AssignEvent:   return readAssignEvent();
+	case CmdId::AssignMod:     return readAssignMod();
+	case CmdId::Commit:        return CmdArgsCommit{};
 	default:                   return std::nullopt;
 	}
 }
@@ -134,26 +134,26 @@ CmdModifiedKey CmdStreamReader::readModifiedKey()
 }
 
 
-CmdArgument CmdStreamReader::readArgument()
+CmdFuncArg CmdStreamReader::readArgument()
 {
-	CmdArgument arg;
-	arg.type = static_cast<CmdArgument::Type>(readU8());
+	CmdFuncArg arg;
+	arg.type = static_cast<CmdFuncArg::Type>(readU8());
 	switch (arg.type) {
-	case CmdArgument::String:
-	case CmdArgument::Regexp:
+	case CmdFuncArg::String:
+	case CmdFuncArg::Regexp:
 		arg.stringValue = readString();
 		break;
-	case CmdArgument::Number:
+	case CmdFuncArg::Number:
 		arg.numberValue = readI32();
 		arg.stringValue = readString();
 		break;
-	case CmdArgument::KeySeqIdx:
+	case CmdFuncArg::KeySeqIdx:
 		arg.keySeqIndex = readU32();
 		break;
-	case CmdArgument::ModSeq:
+	case CmdFuncArg::ModSeq:
 		arg.modifierValue = readModifier();
 		break;
-	case CmdArgument::TokenSeq: {
+	case CmdFuncArg::TokenSeq: {
 		uint16_t count = readU16();
 		arg.tokens.resize(count);
 		for (uint16_t i = 0; i < count; ++i)
@@ -193,9 +193,9 @@ CmdAction CmdStreamReader::readAction()
 }
 
 
-CmdKeySequence CmdStreamReader::readKeySequence()
+CmdArgsRegKeySeq CmdStreamReader::readKeySequence()
 {
-	CmdKeySequence ks;
+	CmdArgsRegKeySeq ks;
 	ks.name = readString();
 	ks.mode = readU8();
 	uint32_t count = readU32();
@@ -209,15 +209,15 @@ CmdKeySequence CmdStreamReader::readKeySequence()
 // CmdStreamReader - command data readers
 //=============================================================================
 
-CmdKeySequence CmdStreamReader::readDefKeySeq()
+CmdArgsRegKeySeq CmdStreamReader::readRegKeySeq()
 {
 	return readKeySequence();
 }
 
 
-CmdDefKeyData CmdStreamReader::readDefKey()
+CmdArgsDefKey CmdStreamReader::readDefKey()
 {
-	CmdDefKeyData data;
+	CmdArgsDefKey data;
 	uint32_t nameCount = readU32();
 	for (uint32_t i = 0; i < nameCount; ++i)
 		data.names.push_back(readString());
@@ -228,9 +228,9 @@ CmdDefKeyData CmdStreamReader::readDefKey()
 }
 
 
-CmdDefModifierData CmdStreamReader::readDefModifier()
+CmdArgsDefMod CmdStreamReader::readDefMod()
 {
-	CmdDefModifierData data;
+	CmdArgsDefMod data;
 	data.modifierName = readString();
 	uint32_t count = readU32();
 	for (uint32_t i = 0; i < count; ++i)
@@ -239,9 +239,9 @@ CmdDefModifierData CmdStreamReader::readDefModifier()
 }
 
 
-CmdDefSyncData CmdStreamReader::readDefSync()
+CmdArgsDefSync CmdStreamReader::readDefSync()
 {
-	CmdDefSyncData data;
+	CmdArgsDefSync data;
 	uint32_t count = readU32();
 	for (uint32_t i = 0; i < count; ++i)
 		data.scanCodes.push_back(readScanCode());
@@ -249,18 +249,18 @@ CmdDefSyncData CmdStreamReader::readDefSync()
 }
 
 
-CmdDefAliasData CmdStreamReader::readDefAlias()
+CmdArgsDefAlias CmdStreamReader::readDefAlias()
 {
-	CmdDefAliasData data;
+	CmdArgsDefAlias data;
 	data.aliasName = readString();
 	data.keyName = readString();
 	return data;
 }
 
 
-CmdDefSubstituteData CmdStreamReader::readDefSubstitute()
+CmdArgsDefSubst CmdStreamReader::readDefSubst()
 {
-	CmdDefSubstituteData data;
+	CmdArgsDefSubst data;
 	uint32_t count = readU32();
 	for (uint32_t i = 0; i < count; ++i)
 		data.lhsKeys.push_back(readModifiedKey());
@@ -269,27 +269,26 @@ CmdDefSubstituteData CmdStreamReader::readDefSubstitute()
 }
 
 
-CmdDefOptionData CmdStreamReader::readDefOption()
+CmdArgsDefOption CmdStreamReader::readDefOption()
 {
-	CmdDefOptionData data;
+	CmdArgsDefOption data;
 	data.optionName = readString();
-	data.qualifier = readString();
 	data.value = readString();
 	return data;
 }
 
 
-CmdDefSymbolData CmdStreamReader::readDefSymbol()
+CmdArgsDefSymbol CmdStreamReader::readDefSymbol()
 {
-	CmdDefSymbolData data;
+	CmdArgsDefSymbol data;
 	data.symbolName = readString();
 	return data;
 }
 
 
-CmdKeymapDefData CmdStreamReader::readKeymapDef()
+CmdArgsBeginKeymap CmdStreamReader::readBeginKeymap()
 {
-	CmdKeymapDefData data;
+	CmdArgsBeginKeymap data;
 	data.keyword = readString();
 	data.name = readString();
 	data.windowClassName = readString();
@@ -301,9 +300,9 @@ CmdKeymapDefData CmdStreamReader::readKeymapDef()
 }
 
 
-CmdKeyAssignData CmdStreamReader::readKeyAssign()
+CmdArgsAssignKey CmdStreamReader::readAssignKey()
 {
-	CmdKeyAssignData data;
+	CmdArgsAssignKey data;
 	uint32_t count = readU32();
 	for (uint32_t i = 0; i < count; ++i)
 		data.lhsKeys.push_back(readModifiedKey());
@@ -313,21 +312,21 @@ CmdKeyAssignData CmdStreamReader::readKeyAssign()
 
 
 
-CmdEventAssignData CmdStreamReader::readEventAssign()
+CmdArgsAssignEvent CmdStreamReader::readAssignEvent()
 {
-	CmdEventAssignData data;
+	CmdArgsAssignEvent data;
 	data.eventName = readString();
 	data.rhsKeySeqIdx = readU32();
 	return data;
 }
 
 
-CmdModAssignData CmdStreamReader::readModAssign()
+CmdArgsAssignMod CmdStreamReader::readAssignMod()
 {
-	CmdModAssignData data;
+	CmdArgsAssignMod data;
 	uint32_t prefCount = readU32();
 	for (uint32_t i = 0; i < prefCount; ++i) {
-		CmdModAssignData::PrefixMod pm;
+		CmdArgsAssignMod::PrefixMod pm;
 		pm.assignMode = readString();
 		pm.modifierName = readString();
 		data.prefixes.push_back(pm);
@@ -336,7 +335,7 @@ CmdModAssignData CmdStreamReader::readModAssign()
 	data.op = readString();
 	uint32_t keyCount = readU32();
 	for (uint32_t i = 0; i < keyCount; ++i) {
-		CmdModAssignData::KeyEntry ke;
+		CmdArgsAssignMod::KeyEntry ke;
 		ke.assignMode = readString();
 		ke.keyName = readString();
 		data.keys.push_back(ke);
@@ -413,22 +412,22 @@ void CmdStreamReader::dumpModifier(std::wostream &out, const CmdModifier &mod)
 }
 
 
-void CmdStreamReader::dumpArgument(std::wostream &out, const CmdArgument &arg)
+void CmdStreamReader::dumpArgument(std::wostream &out, const CmdFuncArg &arg)
 {
 	switch (arg.type) {
-	case CmdArgument::String:
+	case CmdFuncArg::String:
 		out << L"\"" << arg.stringValue << L"\"";
 		break;
-	case CmdArgument::Number:
+	case CmdFuncArg::Number:
 		out << arg.numberValue;
 		break;
-	case CmdArgument::Regexp:
+	case CmdFuncArg::Regexp:
 		out << L"/" << arg.stringValue << L"/";
 		break;
-	case CmdArgument::KeySeqIdx:
+	case CmdFuncArg::KeySeqIdx:
 		out << L"@" << arg.keySeqIndex;
 		break;
-	case CmdArgument::ModSeq:
+	case CmdFuncArg::ModSeq:
 		out << L"mod";
 		dumpModifier(out, arg.modifierValue);
 		break;
@@ -481,18 +480,18 @@ void CmdStreamReader::dumpAction(std::wostream &out, const CmdAction &action,
 static const wchar_t *cmdIdToString(CmdId id)
 {
 	switch (id) {
-	case CmdId::DefKeySeq:    return L"DefKeySeq";
+	case CmdId::RegKeySeq:    return L"RegKeySeq";
 	case CmdId::DefKey:       return L"DefKey";
-	case CmdId::DefModifier:  return L"DefModifier";
+	case CmdId::DefMod:  return L"DefMod";
 	case CmdId::DefSync:      return L"DefSync";
 	case CmdId::DefAlias:     return L"DefAlias";
-	case CmdId::DefSubstitute:return L"DefSubstitute";
+	case CmdId::DefSubst:return L"DefSubst";
 	case CmdId::DefOption:    return L"DefOption";
 	case CmdId::DefSymbol:    return L"DefSymbol";
-	case CmdId::KeymapDef:    return L"KeymapDef";
-	case CmdId::KeyAssign:    return L"KeyAssign";
-	case CmdId::EventAssign:  return L"EventAssign";
-	case CmdId::ModAssign:    return L"ModAssign";
+	case CmdId::BeginKeymap:    return L"BeginKeymap";
+	case CmdId::AssignKey:    return L"AssignKey";
+	case CmdId::AssignEvent:  return L"AssignEvent";
+	case CmdId::AssignMod:    return L"AssignMod";
 	case CmdId::Commit:       return L"Commit";
 	default:                  return L"???";
 	}
@@ -516,8 +515,8 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			<< cmdIdToString(cmdId);
 
 		switch (cmdId) {
-		case CmdId::DefKeySeq: {
-			CmdKeySequence ks = reader.readKeySequence();
+		case CmdId::RegKeySeq: {
+			CmdArgsRegKeySeq ks = reader.readKeySequence();
 			out << L"[" << keySeqIndex << L"] name=\""
 				<< ks.name << L"\" mode=" << (int)ks.mode
 				<< std::endl;
@@ -545,8 +544,8 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			out << L"]";
 			break;
 		}
-		case CmdId::DefModifier: {
-			auto data = reader.readDefModifier();
+		case CmdId::DefMod: {
+			auto data = reader.readDefMod();
 			out << L"mod=\"" << data.modifierName << L"\" keys=[";
 			for (size_t j = 0; j < data.keyNames.size(); ++j) {
 				if (j > 0) out << L", ";
@@ -572,16 +571,14 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 				<< L"\" key=\"" << data.keyName << L"\"";
 			break;
 		}
-		case CmdId::DefSubstitute: {
-			auto data = reader.readDefSubstitute();
+		case CmdId::DefSubst: {
+			auto data = reader.readDefSubst();
 			out << L"lhs=[...] rhs=@" << data.rhsKeySeqIdx;
 			break;
 		}
 		case CmdId::DefOption: {
 			auto data = reader.readDefOption();
 			out << L"option=\"" << data.optionName << L"\"";
-			if (!data.qualifier.empty())
-				out << L" qual=\"" << data.qualifier << L"\"";
 			out << L" value=\"" << data.value << L"\"";
 			break;
 		}
@@ -590,8 +587,8 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			out << L"symbol=\"" << data.symbolName << L"\"";
 			break;
 		}
-		case CmdId::KeymapDef: {
-			auto data = reader.readKeymapDef();
+		case CmdId::BeginKeymap: {
+			auto data = reader.readBeginKeymap();
 			out << L"keyword=\"" << data.keyword
 				<< L"\" name=\"" << data.name << L"\"";
 			if (!data.windowClassName.empty())
@@ -606,8 +603,8 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 				out << L" default=@" << data.defaultKeySeqIdx;
 			break;
 		}
-		case CmdId::KeyAssign: {
-			auto data = reader.readKeyAssign();
+		case CmdId::AssignKey: {
+			auto data = reader.readAssignKey();
 			out << L"lhs=[";
 			for (size_t j = 0; j < data.lhsKeys.size(); ++j) {
 				if (j > 0) out << L", ";
@@ -616,14 +613,14 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			out << L"] rhs=@" << data.rhsKeySeqIdx;
 			break;
 		}
-		case CmdId::EventAssign: {
-			auto data = reader.readEventAssign();
+		case CmdId::AssignEvent: {
+			auto data = reader.readAssignEvent();
 			out << L"event=\"" << data.eventName
 				<< L"\" rhs=@" << data.rhsKeySeqIdx;
 			break;
 		}
-		case CmdId::ModAssign: {
-			auto data = reader.readModAssign();
+		case CmdId::AssignMod: {
+			auto data = reader.readAssignMod();
 			out << L"main=\"" << data.mainModifierName
 				<< L"\" op=\"" << data.op << L"\" keys=[";
 			for (size_t j = 0; j < data.keys.size(); ++j) {

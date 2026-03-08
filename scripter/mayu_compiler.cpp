@@ -93,7 +93,7 @@ void MayuCompiler::compile(const AstFile &file)
 	m_nextKeySeqIdx = 0;
 
 	for (const auto &sym : m_symbols) {
-		CmdDefSymbolData data;
+		CmdArgsDefSymbol data;
 		data.symbolName = sym;
 		m_writer.writeDefSymbol(data);
 	}
@@ -188,38 +188,38 @@ CmdScanCode MayuCompiler::compileScanCode(const AstScanCode &sc)
 }
 
 
-CmdArgument MayuCompiler::compileArgument(const AstArgument &arg)
+CmdFuncArg MayuCompiler::compileArgument(const AstArgument &arg)
 {
-	CmdArgument ba;
+	CmdFuncArg ba;
 	switch (arg.kind) {
 	case AstArgument::Kind_String:
-		ba.type = CmdArgument::String;
+		ba.type = CmdFuncArg::String;
 		ba.stringValue = arg.stringValue;
 		break;
 	case AstArgument::Kind_Number:
-		ba.type = CmdArgument::Number;
+		ba.type = CmdFuncArg::Number;
 		ba.numberValue = arg.numberValue;
 		break;
 	case AstArgument::Kind_Regexp:
-		ba.type = CmdArgument::Regexp;
+		ba.type = CmdFuncArg::Regexp;
 		ba.stringValue = arg.stringValue;
 		break;
 	case AstArgument::Kind_KeySeqRef:
-		ba.type = CmdArgument::String;
+		ba.type = CmdFuncArg::String;
 		ba.stringValue = arg.stringValue;
 		break;
 	case AstArgument::Kind_KeySeqLiteral:
 		if (arg.keySeq) {
-			ba.type = CmdArgument::KeySeqIdx;
+			ba.type = CmdFuncArg::KeySeqIdx;
 			ba.keySeqIndex = compileKeySequence(*arg.keySeq);
 		}
 		break;
 	case AstArgument::Kind_ModifierSeq:
-		ba.type = CmdArgument::ModSeq;
+		ba.type = CmdFuncArg::ModSeq;
 		ba.modifierValue = compileModifierSpecs(arg.modifierSeq);
 		break;
 	case AstArgument::Kind_TokenSeq:
-		ba.type = CmdArgument::TokenSeq;
+		ba.type = CmdFuncArg::TokenSeq;
 		ba.tokens = arg.tokens;
 		break;
 	}
@@ -256,12 +256,12 @@ CmdAction MayuCompiler::compileAction(const AstAction &action)
 
 uint32_t MayuCompiler::compileKeySequence(const AstKeySequence &seq)
 {
-	CmdKeySequence bks;
+	CmdArgsRegKeySeq bks;
 	for (const auto &action : seq.actions)
 		bks.actions.push_back(compileAction(*action));
 
 	uint32_t idx = m_nextKeySeqIdx++;
-	m_writer.writeDefKeySeq(bks);
+	m_writer.writeRegKeySeq(bks);
 	return idx;
 }
 
@@ -308,7 +308,7 @@ void MayuCompiler::visit(const AstConditional &node)
 void MayuCompiler::visit(const AstDefineSymbol &node)
 {
 	m_symbols.insert(node.symbol);
-	CmdDefSymbolData data;
+	CmdArgsDefSymbol data;
 	data.symbolName = node.symbol;
 	m_writer.writeDefSymbol(data);
 }
@@ -352,7 +352,7 @@ void MayuCompiler::visit(const AstInclude &node)
 
 void MayuCompiler::visit(const AstDefKey &node)
 {
-	CmdDefKeyData data;
+	CmdArgsDefKey data;
 	data.names = node.names;
 	for (const auto &sc : node.scanCodes)
 		data.scanCodes.push_back(compileScanCode(sc));
@@ -362,16 +362,16 @@ void MayuCompiler::visit(const AstDefKey &node)
 
 void MayuCompiler::visit(const AstDefModifier &node)
 {
-	CmdDefModifierData data;
+	CmdArgsDefMod data;
 	data.modifierName = node.modifierName;
 	data.keyNames = node.keyNames;
-	m_writer.writeDefModifier(data);
+	m_writer.writeDefMod(data);
 }
 
 
 void MayuCompiler::visit(const AstDefSync &node)
 {
-	CmdDefSyncData data;
+	CmdArgsDefSync data;
 	for (const auto &sc : node.scanCodes)
 		data.scanCodes.push_back(compileScanCode(sc));
 	m_writer.writeDefSync(data);
@@ -380,7 +380,7 @@ void MayuCompiler::visit(const AstDefSync &node)
 
 void MayuCompiler::visit(const AstDefAlias &node)
 {
-	CmdDefAliasData data;
+	CmdArgsDefAlias data;
 	data.aliasName = node.aliasName;
 	data.keyName = node.keyName;
 	m_writer.writeDefAlias(data);
@@ -389,7 +389,7 @@ void MayuCompiler::visit(const AstDefAlias &node)
 
 void MayuCompiler::visit(const AstDefSubstitute &node)
 {
-	CmdDefSubstituteData data;
+	CmdArgsDefSubst data;
 	for (const auto &mkey : node.lhsKeys) {
 		CmdModifiedKey bmk;
 		bmk.modifier = compileModifierSpecs(mkey.modifiers);
@@ -398,15 +398,16 @@ void MayuCompiler::visit(const AstDefSubstitute &node)
 	}
 	if (node.rhsKeySeq)
 		data.rhsKeySeqIdx = compileKeySequence(*node.rhsKeySeq);
-	m_writer.writeDefSubstitute(data);
+	m_writer.writeDefSubst(data);
 }
 
 
 void MayuCompiler::visit(const AstDefOption &node)
 {
-	CmdDefOptionData data;
-	data.optionName = node.optionName;
-	data.qualifier = node.qualifier;
+	CmdArgsDefOption data;
+	data.optionName = node.qualifier.empty()
+		? node.optionName
+		: wstringi(node.optionName + L" " + node.qualifier);
 	data.value = node.value;
 	m_writer.writeDefOption(data);
 }
@@ -418,7 +419,7 @@ void MayuCompiler::visit(const AstDefOption &node)
 
 void MayuCompiler::visit(const AstKeymapDef &node)
 {
-	CmdKeymapDefData data;
+	CmdArgsBeginKeymap data;
 	data.keyword = node.keyword;
 	data.name = node.name;
 	if (node.window) {
@@ -430,13 +431,13 @@ void MayuCompiler::visit(const AstKeymapDef &node)
 	if (node.defaultKeySeq)
 		data.defaultKeySeqIdx =
 			static_cast<int32_t>(compileKeySequence(*node.defaultKeySeq));
-	m_writer.writeKeymapDef(data);
+	m_writer.writeBeginKeymap(data);
 }
 
 
 void MayuCompiler::visit(const AstKeyAssign &node)
 {
-	CmdKeyAssignData data;
+	CmdArgsAssignKey data;
 	for (const auto &mkey : node.lhsKeys) {
 		CmdModifiedKey bmk;
 		bmk.modifier = compileModifierSpecs(mkey.modifiers);
@@ -445,25 +446,25 @@ void MayuCompiler::visit(const AstKeyAssign &node)
 	}
 	if (node.rhsKeySeq)
 		data.rhsKeySeqIdx = compileKeySequence(*node.rhsKeySeq);
-	m_writer.writeKeyAssign(data);
+	m_writer.writeAssignKey(data);
 }
 
 
 void MayuCompiler::visit(const AstEventAssign &node)
 {
-	CmdEventAssignData data;
+	CmdArgsAssignEvent data;
 	data.eventName = node.eventName;
 	if (node.keySeq)
 		data.rhsKeySeqIdx = compileKeySequence(*node.keySeq);
-	m_writer.writeEventAssign(data);
+	m_writer.writeAssignEvent(data);
 }
 
 
 void MayuCompiler::visit(const AstModifierAssign &node)
 {
-	CmdModAssignData data;
+	CmdArgsAssignMod data;
 	for (const auto &p : node.prefixes) {
-		CmdModAssignData::PrefixMod pm;
+		CmdArgsAssignMod::PrefixMod pm;
 		pm.assignMode = p.assignMode;
 		pm.modifierName = p.modifierName;
 		data.prefixes.push_back(pm);
@@ -471,25 +472,25 @@ void MayuCompiler::visit(const AstModifierAssign &node)
 	data.mainModifierName = node.mainModifierName;
 	data.op = node.op;
 	for (const auto &k : node.keys) {
-		CmdModAssignData::KeyEntry ke;
+		CmdArgsAssignMod::KeyEntry ke;
 		ke.assignMode = k.assignMode;
 		ke.keyName = k.keyName;
 		data.keys.push_back(ke);
 	}
-	m_writer.writeModAssign(data);
+	m_writer.writeAssignMod(data);
 }
 
 
 void MayuCompiler::visit(const AstKeySeqDef &node)
 {
 	if (node.keySeq) {
-		CmdKeySequence bks;
+		CmdArgsRegKeySeq bks;
 		bks.name = node.name;
 		for (const auto &action : node.keySeq->actions)
 			bks.actions.push_back(compileAction(*action));
 
 		m_nextKeySeqIdx++;
-		m_writer.writeDefKeySeq(bks);
+		m_writer.writeRegKeySeq(bks);
 	}
 }
 

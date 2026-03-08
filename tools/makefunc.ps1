@@ -190,7 +190,7 @@ foreach ($stmt in $statements) {
         $null = $sb.AppendLine("")
         
         # loadCmd
-        $null = $sb.AppendLine("  virtual void loadFromCmd(const std::vector<CmdArgument> &i_args,")
+        $null = $sb.AppendLine("  virtual void loadFromCmd(const std::vector<CmdFuncArg> &i_args,")
         $null = $sb.AppendLine("                                CmdLoadContext *i_ctx)")
         $null = $sb.AppendLine("  {")
 
@@ -201,7 +201,7 @@ foreach ($stmt in $statements) {
 
             $null = $sb.AppendLine("    if (i_args.size() <= $i) return;")
 
-            # Determine how to convert CmdArgument to the target type
+            # Determine how to convert CmdFuncArg to the target type
             switch -Regex ($type) {
                 "^bool\s*\*?$" {
                     $null = $sb.AppendLine("    $member = !(i_args[$i].stringValue == L`"false`");")

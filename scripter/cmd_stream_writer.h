@@ -16,18 +16,18 @@ class CmdStreamWriter
 public:
 	explicit CmdStreamWriter(std::ostream &out);
 
-	void writeDefKeySeq(const CmdKeySequence &ks);
-	void writeDefKey(const CmdDefKeyData &data);
-	void writeDefModifier(const CmdDefModifierData &data);
-	void writeDefSync(const CmdDefSyncData &data);
-	void writeDefAlias(const CmdDefAliasData &data);
-	void writeDefSubstitute(const CmdDefSubstituteData &data);
-	void writeDefOption(const CmdDefOptionData &data);
-	void writeDefSymbol(const CmdDefSymbolData &data);
-	void writeKeymapDef(const CmdKeymapDefData &data);
-	void writeKeyAssign(const CmdKeyAssignData &data);
-	void writeEventAssign(const CmdEventAssignData &data);
-	void writeModAssign(const CmdModAssignData &data);
+	void writeRegKeySeq(const CmdArgsRegKeySeq &ks);
+	void writeDefKey(const CmdArgsDefKey &data);
+	void writeDefMod(const CmdArgsDefMod &data);
+	void writeDefSync(const CmdArgsDefSync &data);
+	void writeDefAlias(const CmdArgsDefAlias &data);
+	void writeDefSubst(const CmdArgsDefSubst &data);
+	void writeDefOption(const CmdArgsDefOption &data);
+	void writeDefSymbol(const CmdArgsDefSymbol &data);
+	void writeBeginKeymap(const CmdArgsBeginKeymap &data);
+	void writeAssignKey(const CmdArgsAssignKey &data);
+	void writeAssignEvent(const CmdArgsAssignEvent &data);
+	void writeAssignMod(const CmdArgsAssignMod &data);
 	void writeCommit();
 
 private:
@@ -43,9 +43,9 @@ private:
 	void writeModifier(const CmdModifier &mod);
 	void writeScanCode(const CmdScanCode &sc);
 	void writeModifiedKey(const CmdModifiedKey &mk);
-	void writeArgument(const CmdArgument &arg);
+	void writeArgument(const CmdFuncArg &arg);
 	void writeAction(const CmdAction &action);
-	void writeKeySequence(const CmdKeySequence &ks);
+	void writeKeySequence(const CmdArgsRegKeySeq &ks);
 };
 
 

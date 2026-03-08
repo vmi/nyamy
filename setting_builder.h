@@ -83,7 +83,7 @@ public:
 		return modifierFromCmd(bm);
 	}
 
-	// KeySeq index registry (populated as DefKeySeq commands are processed)
+	// KeySeq index registry (populated as RegKeySeq commands are processed)
 	void pushKeySeqRef(KeySeq *ks) { m_keySeqs.push_back(ks); }
 	KeySeq *getKeySeqRef(uint32_t index) {
 		if (index < m_keySeqs.size()) return m_keySeqs[index];
@@ -102,8 +102,8 @@ public:
 		return mkey;
 	}
 
-	/// Materialize a CmdKeySequence into a KeySeq* owned by this builder
-	KeySeq *materializeKeySeq(const CmdKeySequence &cmdKs);
+	/// Materialize a CmdArgsRegKeySeq into a KeySeq* owned by this builder
+	KeySeq *materializeKeySeq(const CmdArgsRegKeySeq &cmdKs);
 
 	/// build the completed Setting
 	std::unique_ptr<Setting> build() { return std::move(m_setting); }

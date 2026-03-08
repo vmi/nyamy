@@ -45,7 +45,7 @@ private:
 	CmdAction compileAction(const AstAction &action);
 	CmdModifier compileModifierSpecs(
 		const std::vector<AstModifierSpec> &specs);
-	CmdArgument compileArgument(const AstArgument &arg);
+	CmdFuncArg compileArgument(const AstArgument &arg);
 	CmdScanCode compileScanCode(const AstScanCode &sc);
 
 	void error(const AstSourceLoc &loc, const std::wstring &msg);
