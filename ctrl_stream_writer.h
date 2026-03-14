@@ -19,8 +19,8 @@ class CtrlStreamWriter
 public:
 	explicit CtrlStreamWriter(std::ostream &out);
 
-	/// Send a reload request with the given symbol set
-	void writeReload(const Symbols &syms);
+	/// Send a start request with the given symbol set
+	void writeStart(const Symbols &syms);
 
 	/// Send a quit request
 	void writeQuit();

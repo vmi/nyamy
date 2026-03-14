@@ -35,7 +35,7 @@
 // doReload - compile .mayu files and write CmdStream to stdout
 //-----------------------------------------------------------------------------
 
-static void doReload(const Symbols &syms, CmdStreamWriter &writer)
+static void doCompile(const Symbols &syms, CmdStreamWriter &writer)
 {
 	ConfigFiles cf;  // no log: errors surface through getMessages() / hasErrors()
 
@@ -112,9 +112,9 @@ SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[])
 
 		if (id == CtrlId::Quit) {
 			break;
-		} else if (id == CtrlId::Reload) {
-			Symbols syms = ctrlReader.readReload();
-			doReload(syms, dataWriter);
+		} else if (id == CtrlId::Start) {
+			Symbols syms = ctrlReader.readStart();
+			doCompile(syms, dataWriter);
 			dataStream.flush();
 		}
 	}

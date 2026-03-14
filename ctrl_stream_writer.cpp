@@ -42,9 +42,9 @@ void CtrlStreamWriter::writeString(const wstringi &s)
 // CtrlStreamWriter - command writers
 //=============================================================================
 
-void CtrlStreamWriter::writeReload(const Symbols &syms)
+void CtrlStreamWriter::writeStart(const Symbols &syms)
 {
-	writeU8(static_cast<uint8_t>(CtrlId::Reload));
+	writeU8(static_cast<uint8_t>(CtrlId::Start));
 	writeU16(static_cast<uint16_t>(syms.size()));
 	for (const auto &sym : syms)
 		writeString(sym);

@@ -59,7 +59,7 @@ wstringi CtrlStreamReader::readString()
 // CtrlStreamReader - command readers
 //=============================================================================
 
-Symbols CtrlStreamReader::readReload()
+Symbols CtrlStreamReader::readStart()
 {
 	Symbols syms;
 	uint16_t count = readU16();

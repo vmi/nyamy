@@ -12,8 +12,8 @@
 
 /// Control command IDs (yamy -> scripter direction)
 enum class CtrlId : uint8_t {
-	Reload = 0x01,  ///< Recompile with the given symbols
-	Quit   = 0xFF,  ///< Terminate scripter
+	Start = 0x01,  ///< (Re)compile with the given symbols; sent on every scripter startup
+	Quit  = 0xFF,  ///< Terminate scripter
 };
 
 

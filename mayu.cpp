@@ -754,22 +754,11 @@ private:
 				initialSymbols.insert(__wargv[i] + 2);
 		}
 
-		// start scripter process on first call
-		if (!m_scripter) {
+		if (!m_scripter)
 			m_scripter = std::make_unique<ScripterManager>(&m_log, &m_log, m_hwndTaskTray);
-			if (!m_scripter->start()) {
-				Acquire a(&m_log, 0);
-				m_log << L"error: failed to start scripter process." << std::endl;
-				ShowWindow(m_hwndLog, SW_SHOW);
-				SetForegroundWindow(m_hwndLog);
-				m_scripter.reset();
-				return;
-			}
-		}
 
-		// Requests an asynchronous reload of the scripter process.
-		// The result is notified via WM_APP_scripterSettingReady.
-		m_scripter->reload(initialSymbols);
+		// Start (or restart) scripter asynchronously; result notified via WM_APP_scripterSettingReady.
+		m_scripter->start(initialSymbols);
 	}
 
 	// show message (a baloon from the task tray icon)

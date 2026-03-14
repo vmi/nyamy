@@ -14,6 +14,7 @@
 #  include "symbols.h"
 #  include "setting.h"
 #  include "multithread.h"
+#  include <future>
 #  include <memory>
 #  include <mutex>
 #  include <ostream>
@@ -28,8 +29,10 @@ public:
 	ScripterManager(SyncObject *i_soLog, std::wostream *i_log, HWND i_hwndNotify);
 	~ScripterManager();
 
-	/// start scripter process and establish pipes
-	bool start();
+	/// Start (or restart) the scripter process asynchronously.
+	/// Sends CtrlId::Start with syms after the process is ready.
+	/// If a previous start is still in progress, returns false and does nothing.
+	bool start(const Symbols &syms);
 
 	/// signal quit to scripter process (non-blocking; idempotent)
 	void sendQuit();
@@ -37,9 +40,6 @@ public:
 	DWORD collectHandles(HANDLE *buf, DWORD maxCount);
 	/// close and null out all process/thread/pipe handles (call after WaitForMultipleObjects)
 	void closeHandles();
-
-	/// send re-compile request to scripter (asynchronous; notifies WM_ScripterSettingReady on completion)
-	void reload(const Symbols &syms);
 
 	/// call from WM_ScripterSettingReady handler: take received Setting
 	std::unique_ptr<Setting> takeNewSetting();
@@ -72,6 +72,10 @@ private:
 	SyncObject *m_soLog;
 	std::wostream   *m_log;
 	HWND        m_hwndNotify;
+
+	// async start/restart
+	std::future<bool> m_startFuture;
+	bool launchScripter(const Symbols &syms);
 
 	// background thread entry points
 	static unsigned __stdcall dataThread(void *param);

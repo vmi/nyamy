@@ -22,8 +22,8 @@ public:
 	/// Read the next control command ID. Returns false on EOF.
 	bool readNext(CtrlId &ctrlId);
 
-	/// Read the payload of a Reload command (call after readNext returns Reload)
-	Symbols readReload();
+	/// Read the payload of a Start command (call after readNext returns Start)
+	Symbols readStart();
 
 private:
 	std::istream &m_in;

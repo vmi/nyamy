@@ -41,6 +41,10 @@ ScripterManager::~ScripterManager()
 {
 	sendQuit();
 
+	// wait for any async start/restart task to finish
+	if (m_startFuture.valid())
+		m_startFuture.wait();
+
 	// wait for any handles not yet closed by an external WaitForMultipleObjects
 	HANDLE handles[3];
 	DWORD n = collectHandles(handles, 3);
@@ -88,8 +92,31 @@ void ScripterManager::closeHandles()
 }
 
 
-bool ScripterManager::start()
+bool ScripterManager::start(const Symbols &syms)
 {
+	// If a previous async start is still running, skip
+	if (m_startFuture.valid() &&
+	    m_startFuture.wait_for(std::chrono::seconds(0)) == std::future_status::timeout)
+		return false;
+
+	m_startFuture = std::async(std::launch::async,
+	                           &ScripterManager::launchScripter, this, syms);
+	return true;
+}
+
+
+bool ScripterManager::launchScripter(const Symbols &syms)
+{
+	// Stop existing scripter if running
+	if (m_hScripterProcess != NULL) {
+		sendQuit();
+		HANDLE h[3];
+		DWORD n = collectHandles(h, 3);
+		if (n > 0) WaitForMultipleObjects(n, h, TRUE, INFINITE);
+		closeHandles();
+		m_quitSent = false;
+	}
+
 	// ctrl pipe:  yamy (write) -> scripter (read) via inherited handle in YSCR_CTRL env var
 	HANDLE hCtrlRead  = INVALID_HANDLE_VALUE;
 	// data pipe:  scripter (write) -> yamy (read) via inherited handle in YSCR_CMD env var
@@ -227,21 +254,12 @@ bool ScripterManager::start()
 		Acquire a(m_soLog, 0);
 		*m_log << L"ScripterManager: started " << scripterPath << std::endl;
 	}
-	return true;
-}
 
-
-void ScripterManager::reload(const Symbols &syms)
-{
-	if (!m_ctrlWriter) return;
-	try {
-		m_ctrlWriter->writeReload(syms);
-	} catch (...) {
-		if (m_log) {
-			Acquire a(m_soLog, 0);
-			*m_log << L"ScripterManager: writeReload failed" << std::endl;
-		}
+	// Send CtrlId::Start with the requested symbols
+	if (m_ctrlWriter) {
+		try { m_ctrlWriter->writeStart(syms); } catch (...) {}
 	}
+	return true;
 }
 
 

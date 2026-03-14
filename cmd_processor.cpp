@@ -47,16 +47,6 @@ CmdProcessor::CmdProcessor(SyncObject *soLog, std::wostream *log)
 void CmdProcessor::onCommit(CommitCallback cb) { m_commitCallback = std::move(cb); }
 
 
-void CmdProcessor::initBuilder()
-{
-	m_builder = std::make_unique<SettingBuilder>();
-	ActionFunction af(createFunctionData(L"OtherWindowClass"));
-	KeySeq *globalDefault = m_builder->addKeySeq(KeySeq(L"").add(af));
-	m_builder->setCurrentKeymap(m_builder->addKeymap(
-		Keymap(Keymap::Type_windowOr, L"Global", L"", L"",
-			   globalDefault, nullptr)));
-}
-
 
 void CmdProcessor::error(const std::wstring &msg)
 {
@@ -90,7 +80,13 @@ Keymap::AssignMode CmdProcessor::parseAssignMode(const wstringi &s)
 
 void CmdProcessor::process(CmdStreamReader &cr)
 {
-	initBuilder();
+	m_builder = std::make_unique<SettingBuilder>();
+	ActionFunction af(createFunctionData(L"OtherWindowClass"));
+	KeySeq *globalDefault = m_builder->addKeySeq(KeySeq(L"").add(af));
+	m_builder->setCurrentKeymap(m_builder->addKeymap(
+		Keymap(Keymap::Type_windowOr, L"Global", L"", L"",
+		       globalDefault, nullptr)));
+
 	while (auto cmd = cr.readCmd()) {
 		try { std::visit(*this, *cmd); }
 		catch (ErrorMessage &e) { error(e.getMessage()); }
@@ -263,5 +259,5 @@ void CmdProcessor::operator()(CmdArgsCommit)
 {
 	if (m_commitCallback && m_builder)
 		m_commitCallback(m_builder->build());
-	initBuilder();
+	m_builder.reset();
 }

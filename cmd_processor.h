@@ -23,7 +23,6 @@ public:
 	void onCommit(CommitCallback cb);
 
 	/// Read commands from cr in a loop until EOF.
-	/// Calls initBuilder() on construction and after each CmdArgsCommit.
 	void process(CmdStreamReader &cr);
 
 	// Visitor operators (public: required by std::visit)
@@ -42,7 +41,6 @@ public:
 	void operator()(CmdArgsCommit);
 
 private:
-	void initBuilder();
 	void error(const std::wstring &msg);
 	static bool lookupModifierType(const wstringi &name, Modifier::Type *o_mt);
 	static Keymap::AssignMode parseAssignMode(const wstringi &s);
