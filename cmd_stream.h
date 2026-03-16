@@ -10,6 +10,7 @@
 #  define _CMD_STREAM_H
 
 #  include "stringtool.h"
+#  include "ctrl_stream.h"
 #  include <variant>
 #  include <vector>
 #  include <cstdint>
@@ -21,6 +22,7 @@
 
 enum class CmdId : uint8_t {
 	RegKeySeq      = 0x01,
+	ExecKeySeq     = 0x02,
 	DefKey         = 0x10,
 	DefMod         = 0x11,
 	DefSync        = 0x12,
@@ -204,9 +206,16 @@ struct CmdArgsAssignMod {
 /// Tag-only struct for the payload-free Commit command
 struct CmdArgsCommit {};
 
+/// Ad-hoc key sequence execution (scripter -> engine)
+struct CmdArgsExecKeySeq {
+	std::vector<CmdAction>  actions;
+	TriggerInfo             context;  ///< echo back from ExecUserFunc
+};
+
 /// A fully-parsed command, covering all CmdId values
 using CmdArgs = std::variant<
 	CmdArgsRegKeySeq,
+	CmdArgsExecKeySeq,
 	CmdArgsDefKey,
 	CmdArgsDefMod,
 	CmdArgsDefSync,

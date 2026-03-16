@@ -14,7 +14,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <PreprocessorDefinitions>VERSION="$(VERSION)";LOGNAME="$(USERNAME)";COMPUTERNAME="$(COMPUTERNAME)";_CRT_SECURE_NO_WARNINGS;MAYU64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>

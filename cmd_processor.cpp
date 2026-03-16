@@ -41,11 +41,14 @@ const ModNameEntry g_modNameMap[] = {
 
 
 CmdProcessor::CmdProcessor(SyncObject *soLog, std::wostream *log)
-	: m_soLog(soLog), m_log(log) {}
+	: m_soLog(soLog), m_log(log)
+	, m_setting(std::make_shared<Setting>())
+	, m_materializer(*m_setting)
+{}
 
 
 void CmdProcessor::onCommit(CommitCallback cb) { m_commitCallback = std::move(cb); }
-
+void CmdProcessor::onExecKeySeq(ExecKeySeqCallback cb) { m_execKeySeqCallback = std::move(cb); }
 
 
 void CmdProcessor::error(const std::wstring &msg)
@@ -80,7 +83,7 @@ Keymap::AssignMode CmdProcessor::parseAssignMode(const wstringi &s)
 
 void CmdProcessor::process(CmdStreamReader &cr)
 {
-	m_builder = std::make_unique<SettingBuilder>();
+	m_builder = std::make_unique<SettingBuilder>(*m_setting);
 	ActionFunction af(createFunctionData(L"OtherWindowClass"));
 	KeySeq *globalDefault = m_builder->addKeySeq(KeySeq(L"").add(af));
 	m_builder->setCurrentKeymap(m_builder->addKeymap(
@@ -97,6 +100,14 @@ void CmdProcessor::process(CmdStreamReader &cr)
 void CmdProcessor::operator()(CmdArgsRegKeySeq &bks)
 {
 	m_builder->pushKeySeqRef(m_builder->materializeKeySeq(bks));
+}
+
+
+void CmdProcessor::operator()(CmdArgsExecKeySeq &data)
+{
+	auto item = m_materializer.materialize(data.actions, data.context);
+	if (!item || !item->keySeq) return;
+	if (m_execKeySeqCallback) m_execKeySeqCallback(std::move(item));
 }
 
 
@@ -254,10 +265,8 @@ void CmdProcessor::operator()(CmdArgsAssignMod &data)
 }
 
 
-
 void CmdProcessor::operator()(CmdArgsCommit)
 {
-	if (m_commitCallback && m_builder)
-		m_commitCallback(m_builder->build());
 	m_builder.reset();
+	if (m_commitCallback) m_commitCallback(m_setting);
 }

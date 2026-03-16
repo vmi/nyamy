@@ -29,6 +29,8 @@ public:
 	void writeAssignEvent(const CmdArgsAssignEvent &data);
 	void writeAssignMod(const CmdArgsAssignMod &data);
 	void writeCommit();
+	void writeExecKeySeq(const std::vector<CmdAction> &actions,
+	                     const TriggerInfo &ctx);
 
 private:
 	std::ostream &m_out;

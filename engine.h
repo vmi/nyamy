@@ -7,19 +7,26 @@
 
 #  include "multithread.h"
 #  include "setting.h"
+#  include "adhoc_keyseq.h"
 #  include "msgstream.h"
 #  include "hook.h"
 #  include <atomic>
+#  include <deque>
+#  include <functional>
 #  include <memory>
 #  include <set>
 #  include <queue>
 #  include <mutex>
+#  include <variant>
 
 
 enum {
 	///
 	WM_APP_engineNotify = WM_APP + 110,
 };
+
+/// An item in the Engine input queue: either a raw keyboard event or an ad-hoc key sequence
+using InputEvent = std::variant<KEYBOARD_INPUT_DATA, AdHocKeySeq>;
 
 
 ///
@@ -72,6 +79,8 @@ private:
 		ModifiedKey m_mkey;		/// current processing key that user inputed
 		/// index in currentFocusOfThread-&gt;keymaps
 		Keymaps::KeymapPtrList::iterator m_i;
+		/// non-null for ExecKeySeq: bypasses keymap lookup in generateKeyboardEvents
+		const KeySeq *m_adhocKeySeq = nullptr;
 
 	public:
 		///
@@ -186,12 +195,12 @@ private:
 	// setting
 	HWND m_hwndAssocWindow;			/** associated window (we post
                                                     message to it) */
-	std::atomic<Setting*> m_setting;		/// setting
+	std::atomic<std::shared_ptr<Setting>> m_setting;  ///< current setting
 
 	// engine thread state
 	HANDLE m_threadHandle;
 	unsigned m_threadId;
-	std::unique_ptr<std::deque<KEYBOARD_INPUT_DATA>> m_inputQueue;
+	std::unique_ptr<std::deque<InputEvent>> m_inputQueue;
 	HANDLE m_queueMutex;
 	MSLLHOOKSTRUCT m_msllHookCurrent;
 	bool m_buttonPressed;
@@ -327,6 +336,17 @@ private:
 	/// set current keymap
 	void setCurrentKeymap(const Keymap *i_keymap,
 						  bool i_doesAddToHistory = false);
+
+	/// ExecUserFunc callback type (called from engine thread when a user function is invoked)
+	using ExecUserFuncCallback = std::function<void(const wstringi &,
+	                                                const std::vector<FuncArg> &,
+	                                                const TriggerInfo &)>;
+
+	/// reconstruct a Current from a TriggerInfo
+	Current reconstructCurrentFromContext(const TriggerInfo &ctx,
+	                                      const std::shared_ptr<Setting> &s);
+
+	ExecUserFuncCallback m_execUserFuncCallback;  ///< callback for ExecUserFunc
 private:
 	// BEGINING OF FUNCTION DEFINITION
 	/// send a default key to Windows
@@ -536,12 +556,6 @@ public:
 	/// release engine resources after the engine thread handle has been waited on.
 	void cleanupAfterStop(HANDLE hEngineThread);
 
-	/// pause keyboard handler thread and close device
-	bool pause();
-
-	/// resume keyboard handler thread and re-open device
-	bool resume();
-
 	/// do some procedure before quit which must be done synchronously
 	/// (i.e. not on WM_QUIT)
 	bool prepairQuit();
@@ -583,7 +597,15 @@ public:
 	}
 
 	/// setting
-	bool setSetting(Setting *i_setting);
+	bool setSetting(std::shared_ptr<Setting> newSetting);
+
+	/// schedule an ad-hoc key sequence for processing in the engine thread
+	void scheduleAdHocKeySeq(AdHocKeySeq item);
+
+	void setExecUserFuncCallback(ExecUserFuncCallback callback);
+	void callExecUserFuncCallback(const wstringi &name,
+	                              const std::vector<FuncArg> &args,
+	                              const TriggerInfo &ctx);
 
 	/// focus
 	bool setFocus(HWND i_hwndFocus, DWORD i_threadId,

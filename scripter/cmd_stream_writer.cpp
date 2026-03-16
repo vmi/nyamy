@@ -277,3 +277,17 @@ void CmdStreamWriter::writeCommit()
 {
 	writeU8(static_cast<uint8_t>(CmdId::Commit));
 }
+
+
+void CmdStreamWriter::writeExecKeySeq(const std::vector<CmdAction> &actions,
+                                      const TriggerInfo &ctx)
+{
+	writeU8(static_cast<uint8_t>(CmdId::ExecKeySeq));
+	writeU32(static_cast<uint32_t>(actions.size()));
+	for (const auto &action : actions)
+		writeAction(action);
+	writeU8(ctx.scanCode);
+	writeU8(ctx.extended ? 1 : 0);
+	writeString(wstringi(ctx.windowClass));
+	writeString(wstringi(ctx.windowTitle));
+}

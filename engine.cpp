@@ -255,7 +255,7 @@ Modifier Engine::getCurrentModifiers(Key *i_key, bool i_isPressed)
 // generate keyboard event for a key
 void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 {
-	Setting* s = m_setting.load(std::memory_order_relaxed);
+	auto s = m_setting.load(std::memory_order_relaxed);
 	// check if key is event
 	bool isEvent = false;
 	for (Key **e = Event::events; *e; ++ e)
@@ -331,7 +331,7 @@ void Engine::generateEvents(Current i_c, const Keymap *i_keymap, Key *i_event)
 // genete modifier events
 void Engine::generateModifierEvents(const Modifier &i_mod)
 {
-	Setting* s = m_setting.load(std::memory_order_relaxed);
+	auto s = m_setting.load(std::memory_order_relaxed);
 	{
 		Acquire a(&m_log, 1);
 		m_log << L"* Gen Modifiers\t{" << std::endl;
@@ -507,22 +507,27 @@ void Engine::generateKeyboardEvents(const Current &i_c)
 		Acquire a(&m_log);
 		m_log << L"error: too deep keymap recursion.  there may be a loop."
 		<< std::endl;
+		-- m_generateKeyboardEventsRecursionGuard;
 		return;
 	}
 
-	const Keymap::KeyAssignment *keyAssign
-	= i_c.m_keymap->searchAssignment(i_c.m_mkey);
-	if (!keyAssign) {
-		const KeySeq *keySeq = i_c.m_keymap->getDefaultKeySeq();
-		ASSERT( keySeq );
-		generateKeySeqEvents(i_c, keySeq, i_c.isPressed() ? Part_down : Part_up);
+	if (i_c.m_adhocKeySeq) {
+		generateKeySeqEvents(i_c, i_c.m_adhocKeySeq, Part_all);
 	} else {
-		if (keyAssign->m_modifiedKey.m_modifier.isOn(Modifier::Type_Up) ||
-				keyAssign->m_modifiedKey.m_modifier.isOn(Modifier::Type_Down))
-			generateKeySeqEvents(i_c, keyAssign->m_keySeq, Part_all);
-		else
-			generateKeySeqEvents(i_c, keyAssign->m_keySeq,
-								 i_c.isPressed() ? Part_down : Part_up);
+		const Keymap::KeyAssignment *keyAssign
+		= i_c.m_keymap->searchAssignment(i_c.m_mkey);
+		if (!keyAssign) {
+			const KeySeq *keySeq = i_c.m_keymap->getDefaultKeySeq();
+			ASSERT( keySeq );
+			generateKeySeqEvents(i_c, keySeq, i_c.isPressed() ? Part_down : Part_up);
+		} else {
+			if (keyAssign->m_modifiedKey.m_modifier.isOn(Modifier::Type_Up) ||
+					keyAssign->m_modifiedKey.m_modifier.isOn(Modifier::Type_Down))
+				generateKeySeqEvents(i_c, keyAssign->m_keySeq, Part_all);
+			else
+				generateKeySeqEvents(i_c, keyAssign->m_keySeq,
+									 i_c.isPressed() ? Part_down : Part_up);
+		}
 	}
 	m_generateKeyboardEventsRecursionGuard --;
 }
@@ -532,7 +537,7 @@ void Engine::generateKeyboardEvents(const Current &i_c)
 void Engine::beginGeneratingKeyboardEvents(
 	const Current &i_c, bool i_isModifier)
 {
-	Setting* s = m_setting.load(std::memory_order_relaxed);
+	auto s = m_setting.load(std::memory_order_relaxed);
 	//             (1)             (2)             (3)  (4)   (1)
 	// up/down:    D-              U-              D-   U-    D-
 	// keymap:     m_currentKeymap m_currentKeymap X    X     m_currentKeymap
@@ -744,7 +749,7 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 // pop all pressed key on win32
 void Engine::keyboardResetOnWin32()
 {
-	Setting* s = m_setting.load(std::memory_order_relaxed);
+	auto s = m_setting.load(std::memory_order_relaxed);
 	for (Keyboard::KeyIterator
 			i = s->m_keyboard.getKeyIterator();  *i; ++ i) {
 		if ((*i)->m_isPressedOnWin32)
@@ -800,7 +805,7 @@ unsigned int WINAPI Engine::mouseDetour(Engine *i_this, WPARAM i_wParam, LPARAM 
 
 unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 {
-	Setting* s = m_setting.load(std::memory_order_acquire);
+	auto s = m_setting.load(std::memory_order_acquire);
 	if (i_mid->flags & LLMHF_INJECTED || !m_isEnabled || !s || !s->m_mouseEvent) {
 		return 0;
 	} else {
@@ -974,7 +979,7 @@ void Engine::keyboardHandler()
 	// loop
 	Key key;
 	while (1) {
-		KEYBOARD_INPUT_DATA kid;
+		InputEvent event;
 
 		WaitForSingleObject(m_queueMutex, INFINITE);
 		while (SignalObjectAndWait(m_queueMutex, m_readEvent, INFINITE, true) == WAIT_OBJECT_0) {
@@ -988,7 +993,7 @@ void Engine::keyboardHandler()
 				continue;
 			}
 
-			kid = m_inputQueue->front();
+			event = std::move(m_inputQueue->front());
 			m_inputQueue->pop_front();
 			if (m_inputQueue->empty()) {
 				ResetEvent(m_readEvent);
@@ -1002,7 +1007,26 @@ void Engine::keyboardHandler()
 		checkFocusWindow();
 
 		std::lock_guard<std::recursive_mutex> lock(m_mutex);
-		Setting* s = m_setting.load(std::memory_order_relaxed);
+		auto s = m_setting.load(std::memory_order_acquire);
+
+		// Handle AdHocKeySeq via the same entry point as normal keys
+		if (std::holds_alternative<AdHocKeySeq>(event)) {
+			if (s && m_isEnabled) {
+				auto &item = std::get<AdHocKeySeq>(event);
+				if (item && item->keySeq) {
+					if (!m_currentFocusOfThread) continue;
+					Current i_c = reconstructCurrentFromContext(item->context, s);
+					i_c.m_adhocKeySeq = item->keySeq.get();
+					i_c.m_mkey.m_modifier.on(Modifier::Type_Down);
+					beginGeneratingKeyboardEvents(i_c, false);
+				}
+			}
+			continue;
+		}
+
+		// KEYBOARD_INPUT_DATA processing
+		KEYBOARD_INPUT_DATA &kid = std::get<KEYBOARD_INPUT_DATA>(event);
+
 		if (!s ||						// m_setting has not been loaded
 				!m_isEnabled) {	// disabled
 			if (m_isLogMode) {
@@ -1164,7 +1188,7 @@ void Engine::keyboardHandler()
 
 Engine::Engine(womsgstream &i_log)
 		: m_hwndAssocWindow(NULL),
-		m_setting(nullptr),
+		m_setting(std::shared_ptr<Setting>{}),
 		m_buttonPressed(false),
 		m_dragging(false),
 		m_keyboardHandler(installKeyboardHook, Engine::keyboardDetour),
@@ -1228,7 +1252,7 @@ void Engine::start() {
 	m_keyboardHandler.start(this);
 	m_mouseHandler.start(this);
 
-	m_inputQueue = std::make_unique<std::deque<KEYBOARD_INPUT_DATA>>();
+	m_inputQueue = std::make_unique<std::deque<InputEvent>>();
 	CHECK_TRUE( m_queueMutex = CreateMutex(NULL, FALSE, NULL) );
 	CHECK_TRUE( m_readEvent = CreateEvent(NULL, TRUE, FALSE, NULL) );
 	m_ol.Offset = 0;
@@ -1301,16 +1325,18 @@ Engine::~Engine() {
 
 
 // set m_setting
-bool Engine::setSetting(Setting *i_setting) {
+bool Engine::setSetting(std::shared_ptr<Setting> newSetting) {
 	std::lock_guard<std::recursive_mutex> lock(m_mutex);
 	if (m_isSynchronizing)
 		return false;
 
-	Setting* old = m_setting.load(std::memory_order_relaxed);
+	Setting *raw = newSetting.get();
+
+	auto old = m_setting.load(std::memory_order_relaxed);
 	if (old) {
 		for (Keyboard::KeyIterator i = old->m_keyboard.getKeyIterator();
 				*i; ++ i) {
-			Key *key = i_setting->m_keyboard.searchKey(*(*i));
+			Key *key = raw->m_keyboard.searchKey(*(*i));
 			if (key) {
 				key->m_isPressed = (*i)->m_isPressed;
 				key->m_isPressedOnWin32 = (*i)->m_isPressedOnWin32;
@@ -1319,25 +1345,25 @@ bool Engine::setSetting(Setting *i_setting) {
 		}
 		if (m_lastGeneratedKey)
 			m_lastGeneratedKey =
-				i_setting->m_keyboard.searchKey(*m_lastGeneratedKey);
+				raw->m_keyboard.searchKey(*m_lastGeneratedKey);
 		for (size_t i = 0; i < NUMBER_OF(m_lastPressedKey); ++ i)
 			if (m_lastPressedKey[i])
 				m_lastPressedKey[i] =
-					i_setting->m_keyboard.searchKey(*m_lastPressedKey[i]);
+					raw->m_keyboard.searchKey(*m_lastPressedKey[i]);
 	}
 
-	m_setting.store(i_setting, std::memory_order_release);
+	m_setting.store(std::move(newSetting), std::memory_order_release);
 
-	g_hookData->m_correctKanaLockHandling = i_setting->m_correctKanaLockHandling;
+	g_hookData->m_correctKanaLockHandling = raw->m_correctKanaLockHandling;
 	if (m_currentFocusOfThread) {
 		for (FocusOfThreads::iterator i = m_focusOfThreads.begin();
 				i != m_focusOfThreads.end(); i ++) {
 			FocusOfThread *fot = &(*i).second;
-			i_setting->m_keymaps.searchWindow(&fot->m_keymaps,
-											  fot->m_className, fot->m_titleName);
+			raw->m_keymaps.searchWindow(&fot->m_keymaps,
+										fot->m_className, fot->m_titleName);
 		}
 	}
-	i_setting->m_keymaps.searchWindow(&m_globalFocus.m_keymaps, L"", L"");
+	raw->m_keymaps.searchWindow(&m_globalFocus.m_keymaps, L"", L"");
 	if (m_globalFocus.m_keymaps.empty()) {
 		Acquire a(&m_log, 0);
 		m_log << L"internal error: m_globalFocus.m_keymap is empty"
@@ -1347,6 +1373,53 @@ bool Engine::setSetting(Setting *i_setting) {
 	setCurrentKeymap(m_globalFocus.m_keymaps.front());
 	m_hwndFocus = NULL;
 	return true;
+}
+
+
+void Engine::scheduleAdHocKeySeq(AdHocKeySeq item) {
+	WaitForSingleObject(m_queueMutex, INFINITE);
+	m_inputQueue->push_back(std::move(item));
+	SetEvent(m_readEvent);
+	ReleaseMutex(m_queueMutex);
+}
+
+
+void Engine::callExecUserFuncCallback(const wstringi &name,
+                                      const std::vector<FuncArg> &args,
+                                      const TriggerInfo &ctx)
+{
+	if (m_execUserFuncCallback) m_execUserFuncCallback(name, args, ctx);
+}
+
+
+void Engine::setExecUserFuncCallback(ExecUserFuncCallback callback)
+{
+	m_execUserFuncCallback = std::move(callback);
+}
+
+
+Engine::Current Engine::reconstructCurrentFromContext(const TriggerInfo &ctx,
+                                                      const std::shared_ptr<Setting> &s)
+{
+	Current c;
+	c.m_keymap = m_currentKeymap;
+	// m_i must point into m_currentFocusOfThread->m_keymaps (not a local copy),
+	// because funcKeymapParent compares it against that list's end().
+	c.m_i = m_currentFocusOfThread->m_keymaps.begin();
+	if (ctx.scanCode != 0) {
+		Key key;
+		key.addScanCode(ScanCode(ctx.scanCode, ctx.extended ? ScanCode::E0 : 0));
+		c.m_mkey = s->m_keyboard.searchKey(key);
+	}
+	if (!ctx.windowClass.empty() || !ctx.windowTitle.empty()) {
+		KeymapPtrList keymaps;
+		s->m_keymaps.searchWindow(&keymaps, ctx.windowClass, ctx.windowTitle);
+		if (!keymaps.empty())
+			c.m_keymap = keymaps.front();
+		// NOTE: do NOT set c.m_i from local 'keymaps' -- it would be a
+		// dangling iterator after the list is destroyed on return.
+	}
+	return c;
 }
 
 void Engine::unlocked()
@@ -1482,7 +1555,7 @@ bool Engine::setFocus(HWND i_hwndFocus, DWORD i_threadId,
 	fot->m_className = i_className;
 	fot->m_titleName = i_titleName;
 
-	if (Setting* s = m_setting.load(std::memory_order_relaxed)) {
+	if (auto s = m_setting.load(std::memory_order_relaxed)) {
 		s->m_keymaps.searchWindow(&fot->m_keymaps,
 										  i_className, i_titleName);
 		ASSERT(0 < fot->m_keymaps.size());

@@ -5,6 +5,7 @@
 #ifndef _CMD_PROCESSOR_H
 #  define _CMD_PROCESSOR_H
 
+#  include "adhoc_keyseq.h"
 #  include "setting_builder.h"
 #  include "cmd_stream_reader.h"
 #  include "multithread.h"
@@ -15,18 +16,22 @@
 class CmdProcessor
 {
 public:
-	using CommitCallback = std::function<void(std::unique_ptr<Setting>)>;
+	// onCommit: passes std::shared_ptr<Setting>
+	using CommitCallback = std::function<void(std::shared_ptr<Setting>)>;
+	void onCommit(CommitCallback cb);
+
+	// onExecKeySeq: passes AdHocKeySeq
+	using ExecKeySeqCallback = std::function<void(AdHocKeySeq)>;
+	void onExecKeySeq(ExecKeySeqCallback cb);
 
 	CmdProcessor(SyncObject *soLog, std::wostream *log);
-
-	/// Register a callback invoked each time CmdArgsCommit is received.
-	void onCommit(CommitCallback cb);
 
 	/// Read commands from cr in a loop until EOF.
 	void process(CmdStreamReader &cr);
 
 	// Visitor operators (public: required by std::visit)
 	void operator()(CmdArgsRegKeySeq &);
+	void operator()(CmdArgsExecKeySeq &);
 	void operator()(CmdArgsDefKey &);
 	void operator()(CmdArgsDefMod &);
 	void operator()(CmdArgsDefSync &);
@@ -47,8 +52,14 @@ private:
 
 	SyncObject *m_soLog;
 	std::wostream *m_log;
-	CommitCallback m_commitCallback;
-	std::unique_ptr<SettingBuilder> m_builder;
+
+	// NOTE: m_setting must be declared before m_materializer (initialization order guarantee)
+	std::shared_ptr<Setting>        m_setting;      ///< shared Setting being built
+	AdHocMaterializer               m_materializer; ///< uses m_setting (init order: after m_setting)
+	std::unique_ptr<SettingBuilder> m_builder;       ///< valid only during process()
+
+	CommitCallback     m_commitCallback;
+	ExecKeySeqCallback m_execKeySeqCallback;
 };
 
 

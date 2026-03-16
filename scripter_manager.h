@@ -11,12 +11,14 @@
 
 
 #  include "ctrl_stream_writer.h"
+#  include "adhoc_keyseq.h"
+#  include "ctrl_stream.h"     // FuncArg, TriggerInfo
 #  include "symbols.h"
 #  include "setting.h"
 #  include "multithread.h"
 #  include <future>
+#  include <functional>
 #  include <memory>
-#  include <mutex>
 #  include <ostream>
 #  include <streambuf>
 #  include <windows.h>
@@ -41,8 +43,15 @@ public:
 	/// close and null out all process/thread/pipe handles (call after WaitForMultipleObjects)
 	void closeHandles();
 
-	/// call from WM_ScripterSettingReady handler: take received Setting
-	std::unique_ptr<Setting> takeNewSetting();
+	/// ExecKeySeq callback type (called from background thread with the materialized item)
+	using ExecKeySeqCallback = std::function<void(AdHocKeySeq)>;
+	/// Register callback for ExecKeySeq commands received from scripter
+	void setExecKeySeqCallback(ExecKeySeqCallback cb);
+
+	/// Send ExecUserFunc to scripter (called from Engine callback)
+	void execUserFunc(const wstringi &name,
+	                  const std::vector<FuncArg> &args,
+	                  const TriggerInfo &ctx);
 
 	/// notification message ID
 	static const UINT WM_ScripterSettingReady;
@@ -63,15 +72,13 @@ private:
 	std::unique_ptr<std::ostream>    m_ctrlStream;
 	std::unique_ptr<CtrlStreamWriter> m_ctrlWriter;
 
-	// received setting (shared between threads)
-	std::mutex m_mutex;
-	std::unique_ptr<Setting> m_pendingSetting;
-
 	bool m_quitSent;
 
 	SyncObject *m_soLog;
 	std::wostream   *m_log;
 	HWND        m_hwndNotify;
+
+	ExecKeySeqCallback m_execKeySeqCallback;
 
 	// async start/restart
 	std::future<bool> m_startFuture;

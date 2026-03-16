@@ -8,6 +8,7 @@
 
 #  include "ctrl_stream.h"
 #  include <ostream>
+#  include <vector>
 
 
 //=============================================================================
@@ -24,6 +25,11 @@ public:
 
 	/// Send a quit request
 	void writeQuit();
+
+	/// Send an ExecUserFunc request to scripter
+	void writeExecUserFunc(const wstringi &funcName,
+	                       const std::vector<FuncArg> &args,
+	                       const TriggerInfo &ctx);
 
 private:
 	std::ostream &m_out;

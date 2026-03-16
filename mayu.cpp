@@ -79,7 +79,6 @@ class Mayu
 	DWORD m_sessionState;
 	std::unique_ptr<FixScancodeMap> m_fixScancodeMap;
 
-	std::unique_ptr<Setting> m_setting;		/// current setting
 	bool m_isSettingDialogOpened;			/// is setting dialog opened ?
 
 	Engine m_engine;				/// engine
@@ -510,13 +509,13 @@ private:
 				break;
 
 			case WM_APP_scripterSettingReady: {
-				if (!This->m_scripter) break;
-				auto newSetting = This->m_scripter->takeNewSetting();
+				auto *p = reinterpret_cast<std::shared_ptr<Setting>*>(i_lParam);
+				auto newSetting = std::move(*p);
+				delete p;
 				if (!newSetting) break;
 				This->m_log << L"successfully loaded (scripter)." << std::endl;
-				while (!This->m_engine.setSetting(newSetting.get()))
-					Sleep(1000);
-				This->m_setting = std::move(newSetting);
+				while (!This->m_engine.setSetting(newSetting))
+					Sleep(100);
 				return 0;
 			}
 
@@ -754,8 +753,17 @@ private:
 				initialSymbols.insert(__wargv[i] + 2);
 		}
 
-		if (!m_scripter)
+		if (!m_scripter) {
 			m_scripter = std::make_unique<ScripterManager>(&m_log, &m_log, m_hwndTaskTray);
+			m_scripter->setExecKeySeqCallback([this](AdHocKeySeq item) {
+				m_engine.scheduleAdHocKeySeq(std::move(item));
+			});
+			m_engine.setExecUserFuncCallback(
+				[this](const wstringi &name, const std::vector<FuncArg> &args,
+				       const TriggerInfo &ctx) {
+					if (m_scripter) m_scripter->execUserFunc(name, args, ctx);
+				});
+		}
 
 		// Start (or restart) scripter asynchronously; result notified via WM_APP_scripterSettingReady.
 		m_scripter->start(initialSymbols);
@@ -1233,8 +1241,6 @@ public:
 			SendMessageTimeout(HWND_BROADCAST, WM_NULL, 0, 0, 0, 1000, &result);
 		}
 
-		// remove setting
-		m_setting.reset();
 	}
 
 	/// message loop

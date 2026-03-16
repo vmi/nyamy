@@ -32,6 +32,19 @@
 
 
 //-----------------------------------------------------------------------------
+// execUserFunc - stub for scripter-side user function dispatch
+//-----------------------------------------------------------------------------
+
+static void execUserFunc(const wstringi &name,
+                         const std::vector<FuncArg> &args,
+                         const TriggerInfo &context)
+{
+	// stub: scripter-side user function dispatch (to be implemented)
+	(void)name; (void)args; (void)context;
+}
+
+
+//-----------------------------------------------------------------------------
 // doReload - compile .mayu files and write CmdStream to stdout
 //-----------------------------------------------------------------------------
 
@@ -116,6 +129,9 @@ SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[])
 			Symbols syms = ctrlReader.readStart();
 			doCompile(syms, dataWriter);
 			dataStream.flush();
+		} else if (id == CtrlId::ExecUserFunc) {
+			auto req = ctrlReader.readExecUserFunc();
+			execUserFunc(req.name, req.args, req.context);
 		}
 	}
 

@@ -25,6 +25,7 @@ std::optional<CmdArgs> CmdStreamReader::readCmd()
 	if (!readNext(cmdId)) return std::nullopt;
 	switch (cmdId) {
 	case CmdId::RegKeySeq:     return readRegKeySeq();
+	case CmdId::ExecKeySeq:    return readExecKeySeq();
 	case CmdId::DefKey:        return readDefKey();
 	case CmdId::DefMod:   return readDefMod();
 	case CmdId::DefSync:       return readDefSync();
@@ -212,6 +213,20 @@ CmdArgsRegKeySeq CmdStreamReader::readKeySequence()
 CmdArgsRegKeySeq CmdStreamReader::readRegKeySeq()
 {
 	return readKeySequence();
+}
+
+
+CmdArgsExecKeySeq CmdStreamReader::readExecKeySeq()
+{
+	CmdArgsExecKeySeq data;
+	uint32_t count = readU32();
+	for (uint32_t i = 0; i < count; ++i)
+		data.actions.push_back(readAction());
+	data.context.scanCode = readU8();
+	data.context.extended = (readU8() != 0);
+	data.context.windowClass = std::wstring(readString());
+	data.context.windowTitle = std::wstring(readString());
+	return data;
 }
 
 
@@ -481,6 +496,7 @@ static const wchar_t *cmdIdToString(CmdId id)
 {
 	switch (id) {
 	case CmdId::RegKeySeq:    return L"RegKeySeq";
+	case CmdId::ExecKeySeq:   return L"ExecKeySeq";
 	case CmdId::DefKey:       return L"DefKey";
 	case CmdId::DefMod:  return L"DefMod";
 	case CmdId::DefSync:      return L"DefSync";

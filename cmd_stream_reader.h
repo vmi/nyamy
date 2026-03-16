@@ -22,6 +22,7 @@ public:
 
 	// Data readers - call after readNext() returns the corresponding CmdId
 	CmdArgsRegKeySeq readRegKeySeq();
+	CmdArgsExecKeySeq readExecKeySeq();
 	CmdArgsDefKey readDefKey();
 	CmdArgsDefMod readDefMod();
 	CmdArgsDefSync readDefSync();

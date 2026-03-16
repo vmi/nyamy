@@ -263,10 +263,19 @@ bool ScripterManager::launchScripter(const Symbols &syms)
 }
 
 
-std::unique_ptr<Setting> ScripterManager::takeNewSetting()
+void ScripterManager::setExecKeySeqCallback(ExecKeySeqCallback cb)
 {
-	std::lock_guard<std::mutex> lk(m_mutex);
-	return std::move(m_pendingSetting);
+	m_execKeySeqCallback = std::move(cb);
+}
+
+
+void ScripterManager::execUserFunc(const wstringi &name,
+                                   const std::vector<FuncArg> &args,
+                                   const TriggerInfo &ctx)
+{
+	if (m_ctrlWriter) {
+		try { m_ctrlWriter->writeExecUserFunc(name, args, ctx); } catch (...) {}
+	}
 }
 
 
@@ -288,12 +297,14 @@ void ScripterManager::runReader()
 	CmdStreamReader reader(pipeStream);
 
 	CmdProcessor processor(m_soLog, m_log);
-	processor.onCommit([this](std::unique_ptr<Setting> s) {
-		{
-			std::lock_guard<std::mutex> lk(m_mutex);
-			m_pendingSetting = std::move(s);
-		}
-		PostMessage(m_hwndNotify, WM_ScripterSettingReady, 0, 0);
+	processor.onCommit([this](std::shared_ptr<Setting> s) {
+		auto *p = new std::shared_ptr<Setting>(std::move(s));
+		if (!PostMessage(m_hwndNotify, WM_ScripterSettingReady, 0,
+		                 reinterpret_cast<LPARAM>(p)))
+			delete p;
+	});
+	processor.onExecKeySeq([this](AdHocKeySeq item) {
+		if (m_execKeySeqCallback) m_execKeySeqCallback(std::move(item));
 	});
 
 	processor.process(reader);
