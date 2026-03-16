@@ -6,7 +6,6 @@
 
 #include "cmd_stream_reader.h"
 #include "errormessage.h"
-#include "keyboard.h"
 
 #include <iomanip>
 #include <sstream>
@@ -108,9 +107,9 @@ wstringi CmdStreamReader::readString()
 }
 
 
-CmdModifier CmdStreamReader::readModifier()
+ModifierSpec CmdStreamReader::readModifier()
 {
-	CmdModifier mod;
+	ModifierSpec mod;
 	mod.modifiers = readU64();
 	mod.dontcares = readU64();
 	return mod;
@@ -135,34 +134,30 @@ CmdModifiedKey CmdStreamReader::readModifiedKey()
 }
 
 
-CmdFuncArg CmdStreamReader::readArgument()
+FuncArg CmdStreamReader::readArgument()
 {
-	CmdFuncArg arg;
-	arg.type = static_cast<CmdFuncArg::Type>(readU8());
-	switch (arg.type) {
-	case CmdFuncArg::String:
-	case CmdFuncArg::Regexp:
-		arg.stringValue = readString();
-		break;
-	case CmdFuncArg::Number:
-		arg.numberValue = readI32();
-		arg.stringValue = readString();
-		break;
-	case CmdFuncArg::KeySeqIdx:
-		arg.keySeqIndex = readU32();
-		break;
-	case CmdFuncArg::ModSeq:
-		arg.modifierValue = readModifier();
-		break;
-	case CmdFuncArg::TokenSeq: {
+	switch (static_cast<FuncArgTag>(readU8())) {
+	case FuncArgTag_String:
+		return FuncArgString{ readString() };
+	case FuncArgTag_Number:
+		return FuncArgNumber{ readI32() };
+	case FuncArgTag_Regexp:
+		return FuncArgRegexp{ readString() };
+	case FuncArgTag_KeySeqIdx:
+		return FuncArgKeySeqIdx{ readU32() };
+	case FuncArgTag_ModSeq:
+		return FuncArgModSeq{ readModifier() };
+	case FuncArgTag_TokenSeq: {
 		uint16_t count = readU16();
-		arg.tokens.resize(count);
+		FuncArgTokenSeq ts;
+		ts.resize(count);
 		for (uint16_t i = 0; i < count; ++i)
-			arg.tokens[i] = readString();
-		break;
+			ts[i] = readString();
+		return ts;
 	}
+	default:
+		return FuncArgString{};
 	}
-	return arg;
 }
 
 
@@ -361,95 +356,6 @@ CmdArgsAssignMod CmdStreamReader::readAssignMod()
 
 //=============================================================================
 // Dump helpers
-//=============================================================================
-
-static const struct {
-	Modifier::Type type;
-	const wchar_t *name;
-} g_modNameTable[] = {
-	{ Modifier::Type_Shift,          L"S-" },
-	{ Modifier::Type_Alt,            L"A-" },
-	{ Modifier::Type_Control,        L"C-" },
-	{ Modifier::Type_Windows,        L"W-" },
-	{ Modifier::Type_Up,             L"U-" },
-	{ Modifier::Type_Down,           L"D-" },
-	{ Modifier::Type_Repeat,         L"R-" },
-	{ Modifier::Type_ImeLock,        L"IL-" },
-	{ Modifier::Type_ImeComp,        L"IC-" },
-	{ Modifier::Type_NumLock,        L"NL-" },
-	{ Modifier::Type_CapsLock,       L"CL-" },
-	{ Modifier::Type_ScrollLock,     L"SL-" },
-	{ Modifier::Type_KanaLock,       L"KL-" },
-	{ Modifier::Type_Maximized,      L"MAX-" },
-	{ Modifier::Type_Minimized,      L"MIN-" },
-	{ Modifier::Type_MdiMaximized,   L"MMAX-" },
-	{ Modifier::Type_MdiMinimized,   L"MMIN-" },
-	{ Modifier::Type_Mod0,           L"M0-" },
-	{ Modifier::Type_Mod1,           L"M1-" },
-	{ Modifier::Type_Mod2,           L"M2-" },
-	{ Modifier::Type_Mod3,           L"M3-" },
-	{ Modifier::Type_Mod4,           L"M4-" },
-	{ Modifier::Type_Mod5,           L"M5-" },
-	{ Modifier::Type_Mod6,           L"M6-" },
-	{ Modifier::Type_Mod7,           L"M7-" },
-	{ Modifier::Type_Mod8,           L"M8-" },
-	{ Modifier::Type_Mod9,           L"M9-" },
-	{ Modifier::Type_Lock0,          L"L0-" },
-	{ Modifier::Type_Lock1,          L"L1-" },
-	{ Modifier::Type_Lock2,          L"L2-" },
-	{ Modifier::Type_Lock3,          L"L3-" },
-	{ Modifier::Type_Lock4,          L"L4-" },
-	{ Modifier::Type_Lock5,          L"L5-" },
-	{ Modifier::Type_Lock6,          L"L6-" },
-	{ Modifier::Type_Lock7,          L"L7-" },
-	{ Modifier::Type_Lock8,          L"L8-" },
-	{ Modifier::Type_Lock9,          L"L9-" },
-};
-
-
-void CmdStreamReader::dumpModifier(std::wostream &out, const CmdModifier &mod)
-{
-	out << L"{";
-	bool first = true;
-	for (size_t i = 0; i < NUMBER_OF(g_modNameTable); ++i) {
-		uint64_t bit = static_cast<uint64_t>(1) << g_modNameTable[i].type;
-		if (mod.dontcares & bit) {
-			if (!first) out << L" ";
-			out << L"*" << g_modNameTable[i].name;
-			first = false;
-		} else if (mod.modifiers & bit) {
-			if (!first) out << L" ";
-			out << g_modNameTable[i].name;
-			first = false;
-		}
-	}
-	out << L"}";
-}
-
-
-void CmdStreamReader::dumpArgument(std::wostream &out, const CmdFuncArg &arg)
-{
-	switch (arg.type) {
-	case CmdFuncArg::String:
-		out << L"\"" << arg.stringValue << L"\"";
-		break;
-	case CmdFuncArg::Number:
-		out << arg.numberValue;
-		break;
-	case CmdFuncArg::Regexp:
-		out << L"/" << arg.stringValue << L"/";
-		break;
-	case CmdFuncArg::KeySeqIdx:
-		out << L"@" << arg.keySeqIndex;
-		break;
-	case CmdFuncArg::ModSeq:
-		out << L"mod";
-		dumpModifier(out, arg.modifierValue);
-		break;
-	}
-}
-
-
 void CmdStreamReader::dumpAction(std::wostream &out, const CmdAction &action,
 								 int indent)
 {
@@ -458,31 +364,24 @@ void CmdStreamReader::dumpAction(std::wostream &out, const CmdAction &action,
 
 	switch (action.type) {
 	case CmdAction::Key:
-		out << L"KEY mod=";
-		dumpModifier(out, action.modifier);
-		out << L" \"" << action.name << L"\"";
+		out << L"KEY mod=" << action.modifier << L" \"" << action.name << L"\"";
 		break;
 	case CmdAction::KeySeqRef:
-		out << L"REF mod=";
-		dumpModifier(out, action.modifier);
-		out << L" $" << action.name;
+		out << L"REF mod=" << action.modifier << L" $" << action.name;
 		break;
 	case CmdAction::FuncCall:
-		out << L"FUNC mod=";
-		dumpModifier(out, action.modifier);
-		out << L" &" << action.name;
+		out << L"FUNC mod=" << action.modifier << L" &" << action.name;
 		if (!action.arguments.empty()) {
 			out << L"(";
 			for (size_t i = 0; i < action.arguments.size(); ++i) {
 				if (i > 0) out << L", ";
-				dumpArgument(out, action.arguments[i]);
+				out << action.arguments[i];
 			}
 			out << L")";
 		}
 		break;
 	case CmdAction::SubSeq:
-		out << L"SUBSEQ mod=";
-		dumpModifier(out, action.modifier);
+		out << L"SUBSEQ mod=" << action.modifier;
 		out << std::endl;
 		for (const auto &sub : action.subActions)
 			dumpAction(out, sub, indent + 1);

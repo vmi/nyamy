@@ -75,14 +75,14 @@ CtrlStreamReader::ExecUserFuncData CtrlStreamReader::readExecUserFunc()
 	data.name = readString();
 	uint16_t argCount = readU16();
 	for (uint16_t i = 0; i < argCount; ++i) {
-		uint8_t tag = readU8();
-		if (tag == 0x00) {
-			uint64_t v = 0;
+		auto tag = static_cast<FuncArgTag>(readU8());
+		if (tag == FuncArgTag_Number) {
+			int32_t v = 0;
 			for (int j = 0; j < 8; ++j)
-				v |= static_cast<uint64_t>(readU8()) << (8 * j);
-			data.args.push_back(static_cast<int64_t>(v));
+				v |= static_cast<int32_t>(readU8()) << (8 * j);
+			data.args.push_back(FuncArgNumber{ v });
 		} else {
-			data.args.push_back(std::wstring(readString()));
+			data.args.push_back(FuncArgString{ readString() });
 		}
 	}
 	data.context.scanCode = readU8();

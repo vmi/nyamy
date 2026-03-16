@@ -14,18 +14,19 @@
 #include <algorithm>
 #include <process.h>
 
-VKey loadVKeyFromCmd(const CmdFuncArg &arg)
+VKey loadVKeyFromCmd(const FuncArg &arg)
 {
-	// Mirrors the VKey encoding logic used in the scripter pipeline.
-	// Accepts Number (pre-encoded), String (bare key name), or
-	// TokenSeq (prefix tokens + key name, e.g. ["U-", "D-", "RButton"]).
+	// Number: already encoded
+	if (std::holds_alternative<FuncArgNumber>(arg))
+		return static_cast<VKey>(getFuncArgNumber(arg));
+
+	// String or TokenSeq: parse prefix tokens + key name
 	std::vector<wstringi> toks;
-	if (arg.type == CmdFuncArg::TokenSeq)
-		toks = arg.tokens;
-	else if (arg.type == CmdFuncArg::String)
-		toks.push_back(arg.stringValue);
-	else
-		return static_cast<VKey>(arg.numberValue); // Number: already encoded
+	std::visit(overloaded{
+		[&](const FuncArgTokenSeq& a) { toks = a; },
+		[&](const FuncArgString&   a) { toks.push_back(a); },
+		[](auto&&) {},
+	}, arg);
 
 	int vkey = 0;
 	for (const auto &tok : toks) {
@@ -546,80 +547,18 @@ std::wostream &operator<<(std::wostream &i_ost, const FunctionData *i_data)
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// FunctionData_UserFunc
-//
-// Implements &UserFunc("name", arg1, arg2, ...) - invokes a user-defined
-// function in the scripter process via Engine::callExecUserFuncCallback().
-//
-// NOTE: FuncArg, TriggerInfo, and callExecUserFuncCallback() are
-// added in Stage 2 (ctrl_stream.h / engine.h changes).  This class will
-// compile once those definitions are in place.
-
-
-class FunctionData_UserFunc : public FunctionData
+std::wostream &outputFuncArgs(std::wostream &i_ost, const std::vector<FuncArg> &i_args)
 {
-	wstringi m_name;                  ///< function name (args[0])
-	std::vector<FuncArg> m_args;      ///< additional arguments (args[1..])
-
-public:
-	static FunctionData *create() { return new FunctionData_UserFunc; }
-
-	void exec(Engine *i_engine, FunctionParam *i_param) const override
-	{
-		TriggerInfo ctx;
-
-		// Trigger key info: read from Current::m_mkey.m_key
-		// getScanCodes() returns const ScanCode*; check size via getScanCodesSize()
-		if (i_param && i_param->m_c.m_mkey.m_key) {
-			const Key *key = i_param->m_c.m_mkey.m_key;
-			if (key->getScanCodesSize() > 0) {
-				const ScanCode &sc = key->getScanCodes()[0];
-				ctx.scanCode = static_cast<uint8_t>(sc.m_scan);
-				ctx.extended = (sc.m_flags & ScanCode::E0) != 0;
-			}
-		}
-
-		// Focus window info: use Engine public accessors
-		// (FunctionParam does not expose m_currentFocusOfThread)
-		ctx.windowClass = i_engine->getCurrentWindowClassName();
-		ctx.windowTitle = i_engine->getCurrentWindowTitleName();
-
-		i_engine->callExecUserFuncCallback(m_name, m_args, ctx);
-	}
-
-	const wchar_t *getName() const override { return L"UserFunc"; }
-
-	std::wostream &output(std::wostream &i_ost) const override
-	{
-		i_ost << L"&" << getName() << L"(" << m_name;
-		for (const auto &arg : m_args) {
+	bool next = false;
+	for (const auto& arg : i_args) {
+		if (next)
 			i_ost << L", ";
-			if (std::holds_alternative<int64_t>(arg))
-				i_ost << std::get<int64_t>(arg);
-			else
-				i_ost << L"\"" << std::get<std::wstring>(arg) << L"\"";
-		}
-		i_ost << L")";
-		return i_ost;
+		else
+			next = true;
+		i_ost << arg;
 	}
-
-	void loadFromCmd(const std::vector<CmdFuncArg> &i_args, CmdLoadContext *) override
-	{
-		if (!i_args.empty())
-			m_name = i_args[0].stringValue;
-		for (size_t i = 1; i < i_args.size(); ++i) {
-			const auto &a = i_args[i];
-			if (a.type == CmdFuncArg::Number)
-				m_args.push_back(static_cast<int64_t>(a.numberValue));
-			else
-				m_args.push_back(std::wstring(a.stringValue));
-		}
-	}
-
-	FunctionData *clone() const override { return new FunctionData_UserFunc(*this); }
-};
-
+	return i_ost;
+}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // FunctionCreator
@@ -649,8 +588,6 @@ FunctionData *createFunctionData(const std::wstring &i_name)
 	for (size_t i = 0; i != NUMBER_OF(functionCreators); ++ i)
 		if (i_name == functionCreators[i].m_name)
 			return functionCreators[i].m_creator();
-	if (i_name == L"UserFunc")
-		return FunctionData_UserFunc::create();
 	return NULL;
 }
 
@@ -2304,6 +2241,30 @@ void Engine::funcMouseHook(FunctionParam *i_param,
 void Engine::funcCancelPrefix(FunctionParam *i_param)
 {
 	m_isPrefix = false;
+}
+
+// execute user function
+void Engine::funcExecUserFunc(FunctionParam *i_param, const wstringq &i_name,
+	const std::vector<FuncArg> &i_args)
+{
+	TriggerInfo ctx;
+
+	// Trigger key info: read from Current::m_mkey.m_key
+	// getScanCodes() returns const ScanCode*; check size via getScanCodesSize()
+	if (i_param && i_param->m_c.m_mkey.m_key) {
+		const Key* key = i_param->m_c.m_mkey.m_key;
+		if (key->getScanCodesSize() > 0) {
+			const ScanCode& sc = key->getScanCodes()[0];
+			ctx.scanCode = static_cast<uint8_t>(sc.m_scan);
+			ctx.extended = (sc.m_flags & ScanCode::E0) != 0;
+		}
+	}
+
+	// Focus window info: use Engine public accessors
+	// (FunctionParam does not expose m_currentFocusOfThread)
+	ctx.windowClass = getCurrentWindowClassName();
+	ctx.windowTitle = getCurrentWindowTitleName();
+	callExecUserFuncCallback(i_name, i_args, ctx);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

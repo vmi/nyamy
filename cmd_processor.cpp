@@ -43,6 +43,7 @@ const ModNameEntry g_modNameMap[] = {
 CmdProcessor::CmdProcessor(SyncObject *soLog, std::wostream *log)
 	: m_soLog(soLog), m_log(log)
 	, m_setting(std::make_shared<Setting>())
+	, m_builder(std::make_unique<SettingBuilder>(*m_setting))
 	, m_materializer(*m_setting)
 {}
 
@@ -83,7 +84,6 @@ Keymap::AssignMode CmdProcessor::parseAssignMode(const wstringi &s)
 
 void CmdProcessor::process(CmdStreamReader &cr)
 {
-	m_builder = std::make_unique<SettingBuilder>(*m_setting);
 	ActionFunction af(createFunctionData(L"OtherWindowClass"));
 	KeySeq *globalDefault = m_builder->addKeySeq(KeySeq(L"").add(af));
 	m_builder->setCurrentKeymap(m_builder->addKeymap(

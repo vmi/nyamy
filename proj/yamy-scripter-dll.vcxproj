@@ -87,13 +87,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\scripter_types.cpp" />
     <ClCompile Include="..\scripter\lexer.cpp" />
     <ClCompile Include="..\scripter\mayu_parser.cpp" />
     <ClCompile Include="..\scripter\mayu_compiler.cpp" />
     <ClCompile Include="..\scripter\cmd_stream_writer.cpp" />
     <ClCompile Include="..\scripter\config_files.cpp" />
     <ClCompile Include="..\scripter\ctrl_stream_reader.cpp" />
-    <ClCompile Include="..\ctrl_stream_writer.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
     <ClCompile Include="..\registry.cpp" />
     <ClCompile Include="..\scripter\yamy_scripter.cpp" />
@@ -101,7 +101,9 @@
     <ClCompile Include="..\windowstool.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\adhoc_keyseq.h" />
     <ClInclude Include="..\errormessage.h" />
+    <ClInclude Include="..\scripter_types.h" />
     <ClInclude Include="..\misc.h" />
     <ClInclude Include="..\pipe_streambuf.h" />
     <ClInclude Include="..\scripter\ast.h" />

@@ -29,6 +29,7 @@ public:
 	void writeAssignEvent(const CmdArgsAssignEvent &data);
 	void writeAssignMod(const CmdArgsAssignMod &data);
 	void writeCommit();
+	// The following can be executed only after running writeCommit.
 	void writeExecKeySeq(const std::vector<CmdAction> &actions,
 	                     const TriggerInfo &ctx);
 
@@ -42,10 +43,10 @@ private:
 	void writeI32(int32_t v);
 	void writeU64(uint64_t v);
 	void writeString(const wstringi &s);
-	void writeModifier(const CmdModifier &mod);
+	void writeModifier(const ModifierSpec &mod);
 	void writeScanCode(const CmdScanCode &sc);
 	void writeModifiedKey(const CmdModifiedKey &mk);
-	void writeArgument(const CmdFuncArg &arg);
+	void writeArgument(const FuncArg &arg);
 	void writeAction(const CmdAction &action);
 	void writeKeySequence(const CmdArgsRegKeySeq &ks);
 };

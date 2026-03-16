@@ -532,6 +532,9 @@ private:
 	void funcMouseHook(FunctionParam *i_param, MouseHookType i_hookType, int i_hookParam);
 	/// cancel prefix
 	void funcCancelPrefix(FunctionParam *i_param);
+	/// exec user function
+	void funcExecUserFunc(FunctionParam *i_param, const wstringq &i_name,
+		const std::vector<FuncArg> &i_args);
 
 	// END OF FUNCTION DEFINITION
 #  define FUNCTION_FRIEND

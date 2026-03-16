@@ -96,6 +96,7 @@
   <ItemGroup>
     <ClCompile Include="..\cmd_processor.cpp" />
     <ClCompile Include="..\cmd_stream_reader.cpp" />
+    <ClCompile Include="..\scripter_types.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
     <ClCompile Include="..\ctrl_stream_writer.cpp" />
     <ClCompile Include="..\dlgeditsetting.cpp" />
@@ -120,6 +121,7 @@
     <ClCompile Include="..\windowstool.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\adhoc_keyseq.h" />
     <ClInclude Include="..\cmd_processor.h" />
     <ClInclude Include="..\cmd_stream_reader.h" />
     <ClInclude Include="..\compiler_specific.h" />
@@ -135,6 +137,7 @@
     <ClInclude Include="..\focus.h" />
     <ClInclude Include="..\function.h" />
     <ClInclude Include="..\functions.h" />
+    <ClInclude Include="..\scripter_types.h" />
     <ClInclude Include="..\hook.h" />
     <ClInclude Include="..\keyboard.h" />
     <ClInclude Include="..\keymap.h" />

@@ -117,10 +117,10 @@ void MayuCompiler::error(const AstSourceLoc &loc, const std::wstring &msg)
 }
 
 
-CmdModifier MayuCompiler::compileModifierSpecs(
+ModifierSpec MayuCompiler::compileModifierSpecs(
 	const std::vector<AstModifierSpec> &specs)
 {
-	CmdModifier mod;
+	ModifierSpec mod;
 
 	// Collect which modifier bits were explicitly specified (not wildcard).
 	// Wildcards ("*" / "~" sentinels) are recognised by their name value.
@@ -188,42 +188,27 @@ CmdScanCode MayuCompiler::compileScanCode(const AstScanCode &sc)
 }
 
 
-CmdFuncArg MayuCompiler::compileArgument(const AstArgument &arg)
+FuncArg MayuCompiler::compileArgument(const AstArgument &arg)
 {
-	CmdFuncArg ba;
 	switch (arg.kind) {
 	case AstArgument::Kind_String:
-		ba.type = CmdFuncArg::String;
-		ba.stringValue = arg.stringValue;
-		break;
+		return FuncArgString{ arg.stringValue };
 	case AstArgument::Kind_Number:
-		ba.type = CmdFuncArg::Number;
-		ba.numberValue = arg.numberValue;
-		break;
+		return FuncArgNumber{ static_cast<int32_t>(arg.numberValue) };
 	case AstArgument::Kind_Regexp:
-		ba.type = CmdFuncArg::Regexp;
-		ba.stringValue = arg.stringValue;
-		break;
+		return FuncArgRegexp{ arg.stringValue };
 	case AstArgument::Kind_KeySeqRef:
-		ba.type = CmdFuncArg::String;
-		ba.stringValue = arg.stringValue;
-		break;
+		return FuncArgString{ arg.stringValue };
 	case AstArgument::Kind_KeySeqLiteral:
-		if (arg.keySeq) {
-			ba.type = CmdFuncArg::KeySeqIdx;
-			ba.keySeqIndex = compileKeySequence(*arg.keySeq);
-		}
+		if (arg.keySeq)
+			return FuncArgKeySeqIdx{ compileKeySequence(*arg.keySeq) };
 		break;
 	case AstArgument::Kind_ModifierSeq:
-		ba.type = CmdFuncArg::ModSeq;
-		ba.modifierValue = compileModifierSpecs(arg.modifierSeq);
-		break;
+		return FuncArgModSeq{ compileModifierSpecs(arg.modifierSeq) };
 	case AstArgument::Kind_TokenSeq:
-		ba.type = CmdFuncArg::TokenSeq;
-		ba.tokens = arg.tokens;
-		break;
+		return FuncArgTokenSeq{ arg.tokens };
 	}
-	return ba;
+	return FuncArgString{};
 }
 
 

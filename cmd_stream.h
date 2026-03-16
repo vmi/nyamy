@@ -15,6 +15,9 @@
 #  include <vector>
 #  include <cstdint>
 
+// ModifierSpec, FuncArg and related types are defined in scripter_types.h
+// (included transitively via ctrl_stream.h)
+
 
 //=============================================================================
 // Command IDs
@@ -42,15 +45,6 @@ enum class CmdId : uint8_t {
 // Bytecode sub-structures (transferred from bytecode.h)
 //=============================================================================
 
-/// Modifier state (bitfield, resolved from string form at compile time)
-struct CmdModifier {
-	uint64_t modifiers;
-	uint64_t dontcares;
-
-	CmdModifier() : modifiers(0), dontcares(0) {}
-};
-
-
 /// Scan code with flags
 struct CmdScanCode {
 	uint16_t scan;
@@ -62,30 +56,8 @@ struct CmdScanCode {
 
 /// Modified key reference (modifier + key name)
 struct CmdModifiedKey {
-	CmdModifier modifier;
+	ModifierSpec modifier;
 	wstringi keyName;
-};
-
-
-/// Function argument in bytecode
-struct CmdFuncArg {
-	enum Type : uint8_t {
-		String,
-		Number,
-		Regexp,
-		KeySeqIdx,		///< index into keySeqPool
-		ModSeq,			///< modifier sequence
-		TokenSeq,		///< raw token sequence (e.g. U- D- RButton)
-	};
-
-	Type type;
-	wstringi stringValue;
-	int32_t numberValue;
-	uint32_t keySeqIndex;
-	CmdModifier modifierValue;
-	std::vector<wstringi> tokens;		///< for TokenSeq
-
-	CmdFuncArg() : type(String), numberValue(0), keySeqIndex(0) {}
 };
 
 
@@ -99,9 +71,9 @@ struct CmdAction {
 	};
 
 	Type type;
-	CmdModifier modifier;
+	ModifierSpec modifier;
 	wstringi name;				///< key name / keyseq name / func name
-	std::vector<CmdFuncArg> arguments;	///< for FuncCall only
+	std::vector<FuncArg> arguments;		///< for FuncCall only
 	std::vector<CmdAction> subActions;	///< for SubSeq only
 
 	CmdAction() : type(Key) {}

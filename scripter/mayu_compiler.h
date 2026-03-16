@@ -36,16 +36,16 @@ private:
 	uint32_t m_nextKeySeqIdx;		///< auto-incrementing keySeq index
 
 	/// Modifier default state (inherited through includes)
-	CmdModifier m_defaultAssignModifier;
-	CmdModifier m_defaultKeySeqModifier;
+	ModifierSpec m_defaultAssignModifier;
+	ModifierSpec m_defaultKeySeqModifier;
 
 private:
 	// Compilation helpers
 	uint32_t compileKeySequence(const AstKeySequence &seq);
 	CmdAction compileAction(const AstAction &action);
-	CmdModifier compileModifierSpecs(
+	ModifierSpec compileModifierSpecs(
 		const std::vector<AstModifierSpec> &specs);
-	CmdFuncArg compileArgument(const AstArgument &arg);
+	FuncArg compileArgument(const AstArgument &arg);
 	CmdScanCode compileScanCode(const AstScanCode &sc);
 
 	void error(const AstSourceLoc &loc, const std::wstring &msg);

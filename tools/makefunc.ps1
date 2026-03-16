@@ -173,12 +173,15 @@ foreach ($stmt in $statements) {
 
         for ($i = 0; $i -lt $argc; $i++) {
             $a = $cleanArgs[$i]
+            $t = " << L`", `""
             if ($i -eq $argc - 1) {
                 # Last arg
-                $null = $sb.AppendLine("    i_ost << m_$($a.ArgName);")
+                $t = ""
             }
-            else {
-                $null = $sb.AppendLine("    i_ost << m_$($a.ArgName) << L`", `";")
+            if ($a.Type.Trim() -eq "std::vector<FuncArg>") {
+                $null = $sb.AppendLine("    outputFuncArgs(i_ost, m_$($a.ArgName))$t;")
+            } else {
+                $null = $sb.AppendLine("    i_ost << m_$($a.ArgName)$t;")
             }
         }
 
@@ -190,7 +193,7 @@ foreach ($stmt in $statements) {
         $null = $sb.AppendLine("")
         
         # loadCmd
-        $null = $sb.AppendLine("  virtual void loadFromCmd(const std::vector<CmdFuncArg> &i_args,")
+        $null = $sb.AppendLine("  virtual void loadFromCmd(const std::vector<FuncArg> &i_args,")
         $null = $sb.AppendLine("                                CmdLoadContext *i_ctx)")
         $null = $sb.AppendLine("  {")
 
@@ -201,55 +204,59 @@ foreach ($stmt in $statements) {
 
             $null = $sb.AppendLine("    if (i_args.size() <= $i) return;")
 
-            # Determine how to convert CmdFuncArg to the target type
+            # Determine how to convert FuncArg to the target type
             switch -Regex ($type) {
                 "^bool\s*\*?$" {
-                    $null = $sb.AppendLine("    $member = !(i_args[$i].stringValue == L`"false`");")
+                    $null = $sb.AppendLine("    $member = !(getFuncArgString(i_args[$i]) == L`"false`");")
                 }
                 "^(int|long)$" {
-                    $null = $sb.AppendLine("    $member = static_cast<$type>(i_args[$i].numberValue);")
+                    $null = $sb.AppendLine("    $member = static_cast<$type>(getFuncArgNumber(i_args[$i]));")
                 }
                 "^unsigned\s+int$" {
-                    $null = $sb.AppendLine("    $member = static_cast<unsigned int>(i_args[$i].numberValue);")
+                    $null = $sb.AppendLine("    $member = static_cast<unsigned int>(getFuncArgNumber(i_args[$i]));")
                 }
                 "^unsigned\s+__int64$" {
-                    $null = $sb.AppendLine("    $member = static_cast<unsigned __int64>(i_args[$i].numberValue);")
+                    $null = $sb.AppendLine("    $member = static_cast<unsigned __int64>(getFuncArgNumber(i_args[$i]));")
                 }
                 "^__int64$" {
-                    $null = $sb.AppendLine("    $member = static_cast<__int64>(i_args[$i].numberValue);")
+                    $null = $sb.AppendLine("    $member = static_cast<__int64>(getFuncArgNumber(i_args[$i]));")
                 }
                 "^(LONG|UINT|WPARAM|LPARAM|DWORD)$" {
-                    $null = $sb.AppendLine("    $member = static_cast<$type>(i_args[$i].numberValue);")
+                    $null = $sb.AppendLine("    $member = static_cast<$type>(getFuncArgNumber(i_args[$i]));")
                 }
                 "^wstringq$" {
-                    $null = $sb.AppendLine("    $member = i_args[$i].stringValue;")
+                    $null = $sb.AppendLine("    $member = getFuncArgString(i_args[$i]);")
                 }
                 "^std::list<wstringq>$" {
                     # Consume remaining string args from position $i onward
                     $null = $sb.AppendLine("    for (size_t _j = $i; _j < i_args.size(); ++_j)")
-                    $null = $sb.AppendLine("      $member.push_back(i_args[_j].stringValue);")
+                    $null = $sb.AppendLine("      $member.push_back(getFuncArgString(i_args[_j]));")
+                }
+                "^std::vector<FuncArg>$" {
+                    # Consume remaining args from position $i onward
+                    $null = $sb.AppendLine("    $member.assign(i_args.begin() + $i, i_args.end());")
                 }
                 "^wregex_stored$" {
-                    $null = $sb.AppendLine("    $member = wregex_stored(i_args[$i].stringValue, wregex_stored::ECMAScript | wregex_stored::icase);")
+                    $null = $sb.AppendLine("    $member = wregex_stored(getFuncArgString(i_args[$i]), wregex_stored::ECMAScript | wregex_stored::icase);")
                 }
                 "^VKey$" {
                     $null = $sb.AppendLine("    $member = loadVKeyFromCmd(i_args[$i]);")
                 }
                 "^const\s+Keymap\s*\*$" {
-                    $null = $sb.AppendLine("    $member = i_ctx->resolveKeymap(i_args[$i].stringValue);")
+                    $null = $sb.AppendLine("    $member = i_ctx->resolveKeymap(getFuncArgString(i_args[$i]));")
                 }
                 "^const\s+KeySeq\s*\*$" {
-                    $null = $sb.AppendLine("    $member = i_ctx->resolveKeySeq(i_args[$i].keySeqIndex);")
+                    $null = $sb.AppendLine("    $member = i_ctx->resolveKeySeq(getFuncArgKeySeq(i_args[$i]));")
                 }
                 "^Modifier$" {
-                    $null = $sb.AppendLine("    $member = i_ctx->resolveModifier(i_args[$i].modifierValue);")
+                    $null = $sb.AppendLine("    $member = i_ctx->resolveModifier(getFuncArgModSeq(i_args[$i]));")
                 }
                 "^StrExprArg$" {
-                    $null = $sb.AppendLine("    $member = StrExprArg(i_args[$i].stringValue, StrExprArg::Literal);")
+                    $null = $sb.AppendLine("    $member = StrExprArg(getFuncArgString(i_args[$i]), StrExprArg::Literal);")
                 }
                 default {
                     # Enum types that have getTypeValue()
-                    $null = $sb.AppendLine("    getTypeValue(&$member, i_args[$i].stringValue);")
+                    $null = $sb.AppendLine("    getTypeValue(&$member, getFuncArgString(i_args[$i]));")
                 }
             }
         }

@@ -187,7 +187,7 @@ int FixScancodeMap::injectThread(DWORD dwPID)
 {
 	int ret = 0;
 	DWORD err = 0;
-	DWORD result = static_cast<DWORD>(-1);
+	DWORD result = -1;
 	BOOL wFlag;
 	WlInfo wi;
 

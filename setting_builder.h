@@ -12,8 +12,8 @@
 #  include <vector>
 
 
-/// Convert a CmdModifier bitmask to a Modifier object
-inline Modifier modifierFromCmd(const CmdModifier &bm)
+/// Convert a ModifierSpec bitmask to a Modifier object
+inline Modifier modifierFromCmd(const ModifierSpec &bm)
 {
 	Modifier mod;
 	for (int i = Modifier::Type_begin; i != Modifier::Type_end; ++i) {
@@ -80,7 +80,7 @@ public:
 		if (index < m_keySeqs.size()) return m_keySeqs[index];
 		return nullptr;
 	}
-	Modifier resolveModifier(const CmdModifier &bm) override {
+	Modifier resolveModifier(const ModifierSpec &bm) override {
 		return modifierFromCmd(bm);
 	}
 
@@ -122,7 +122,7 @@ public:
 	// CmdLoadContext
 	const Keymap *resolveKeymap(const wstringi &name) override;
 	const KeySeq *resolveKeySeq(uint32_t /*index*/) override { return nullptr; }
-	Modifier resolveModifier(const CmdModifier &bm) override { return modifierFromCmd(bm); }
+	Modifier resolveModifier(const ModifierSpec &bm) override { return modifierFromCmd(bm); }
 
 	/// Materialize actions into an AdHocKeySeq (not stored in Setting)
 	AdHocKeySeq materialize(const std::vector<CmdAction> &actions,

@@ -23,7 +23,7 @@ public:
 	virtual ~CmdLoadContext() = default;
 	virtual const Keymap *resolveKeymap(const wstringi &name) = 0;
 	virtual const KeySeq *resolveKeySeq(uint32_t index) = 0;
-	virtual Modifier resolveModifier(const struct CmdModifier &bm) = 0;
+	virtual Modifier resolveModifier(const struct ModifierSpec &bm) = 0;
 };
 
 ///
@@ -33,7 +33,7 @@ public:
 	/// virtual destructor
 	virtual ~FunctionData() = 0;
 	///
-	virtual void loadFromCmd(const std::vector<CmdFuncArg> &i_args,
+	virtual void loadFromCmd(const std::vector<FuncArg> &i_args,
 								  CmdLoadContext *i_ctx) = 0;
 	///
 	virtual void exec(Engine *i_engine, FunctionParam *i_param) const = 0;
@@ -48,9 +48,11 @@ public:
 /// stream output
 extern std::wostream &operator<<(std::wostream &i_ost, const FunctionData *i_data);
 
-
 // create function
 extern FunctionData *createFunctionData(const std::wstring &i_name);
+
+/// stream output for FuncArg vector
+extern std::wostream& outputFuncArgs(std::wostream& i_ost, const std::vector<FuncArg>& i_args);
 
 ///
 enum VKey {
@@ -62,9 +64,9 @@ enum VKey {
 /// stream output
 extern std::wostream &operator<<(std::wostream &i_ost, VKey i_data);
 
-/// Resolve a CmdFuncArg (String, TokenSeq, or Number) to a VKey value.
+/// Resolve a FuncArg (String, TokenSeq, or Number) to a VKey value.
 /// Handles prefix tokens E-, U-, D- followed by a key name or number.
-extern VKey loadVKeyFromCmd(const CmdFuncArg &arg);
+extern VKey loadVKeyFromCmd(const FuncArg &arg);
 
 
 ///

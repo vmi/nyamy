@@ -52,17 +52,15 @@ private:
 	int32_t readI32();
 	uint64_t readU64();
 	wstringi readString();
-	CmdModifier readModifier();
+	ModifierSpec readModifier();
 	CmdScanCode readScanCode();
 	CmdModifiedKey readModifiedKey();
-	CmdFuncArg readArgument();
+	FuncArg readArgument();
 	CmdAction readAction();
 	CmdArgsRegKeySeq readKeySequence();
 
 	// Dump helpers
-	static void dumpModifier(std::wostream &out, const CmdModifier &mod);
 	static void dumpAction(std::wostream &out, const CmdAction &action, int indent);
-	static void dumpArgument(std::wostream &out, const CmdFuncArg &arg);
 };
 
 

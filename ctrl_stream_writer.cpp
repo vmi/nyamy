@@ -67,15 +67,19 @@ void CtrlStreamWriter::writeExecUserFunc(const wstringi &funcName,
 	writeString(funcName);
 	writeU16(static_cast<uint16_t>(args.size()));
 	for (const auto &arg : args) {
-		if (std::holds_alternative<int64_t>(arg)) {
-			writeU8(0x00);
-			uint64_t v = static_cast<uint64_t>(std::get<int64_t>(arg));
-			for (int i = 0; i < 8; ++i)
-				writeU8(static_cast<uint8_t>((v >> (8 * i)) & 0xFF));
-		} else {
-			writeU8(0x01);
-			writeString(wstringi(std::get<std::wstring>(arg)));
-		}
+		std::visit(overloaded{
+			[&](const FuncArgNumber& a) {
+				writeU8(FuncArgTag_Number);
+				uint64_t v = static_cast<uint64_t>(a);
+				for (int i = 0; i < 8; ++i)
+					writeU8(static_cast<uint8_t>((v >> (8 * i)) & 0xFF));
+			},
+			[&](const FuncArgString& a) {
+				writeU8(FuncArgTag_String);
+				writeString(a);
+			},
+			[](auto&&) {},
+		}, arg);
 	}
 	writeU8(ctx.scanCode);
 	writeU8(ctx.extended ? 1 : 0);
