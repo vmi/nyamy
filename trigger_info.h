@@ -16,8 +16,8 @@
 
 /// Snapshot of the keyboard/focus state when a user function was triggered.
 struct TriggerInfo {
-	uint8_t      scanCode;      ///< trigger key scan code (0 = unknown)
-	bool         extended;      ///< E0 prefix presence
+	uint8_t      scanCode{};    ///< trigger key scan code (0 = unknown)
+	bool         extended{};    ///< E0 prefix presence
 	std::wstring windowClass;   ///< focus window class name
 	std::wstring windowTitle;   ///< focus window title
 };

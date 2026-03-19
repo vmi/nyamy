@@ -673,20 +673,20 @@ public:
 				target = L"ToMainWindow";
 			else {
 				// Function::toOverlappedWindow
-				HWND h = hf;
-				while (h) {
-					LONG_PTR style = GetWindowLongPtr(h, GWL_STYLE);
+				HWND h2 = hf;
+				while (h2) {
+					LONG_PTR style = GetWindowLongPtr(h2, GWL_STYLE);
 					if ((style & WS_CHILD) == 0)
 						break;
-					h = GetParent(h);
+					h2 = GetParent(h2);
 				}
-				if (i_hwnd == h)
+				if (i_hwnd == h2)
 					target = L"ToOverlappedWindow";
 				else {
 					// number
-					HWND h = hf;
-					for (number_target = 0; h; number_target ++, h = GetParent(h))
-						if (i_hwnd == h)
+					HWND h3 = hf;
+					for (number_target = 0; h3; number_target ++, h3 = GetParent(h3))
+						if (i_hwnd == h3)
 							break;
 					return;
 				}

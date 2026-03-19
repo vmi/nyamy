@@ -92,28 +92,7 @@ std::wstring interpretMetaCharacters(const wchar_t *i_str, size_t i_len,
 std::wstring addSessionId(const wchar_t *i_str);
 
 /// copy
-size_t strlcpy(char *o_dest, const char *i_src, size_t i_destSize);
-/// copy
-size_t mbslcpy(unsigned char *o_dest, const unsigned char *i_src,
-			   size_t i_destSize);
-/// copy
 size_t wcslcpy(wchar_t *o_dest, const wchar_t *i_src, size_t i_destSize);
-/// copy
-inline size_t tcslcpy(char *o_dest, const char *i_src, size_t i_destSize)
-{
-	return strlcpy(o_dest, i_src, i_destSize);
-}
-/// copy
-inline size_t tcslcpy(unsigned char *o_dest, const unsigned char *i_src,
-					  size_t i_destSize)
-{
-	return mbslcpy(o_dest, i_src, i_destSize);
-}
-/// copy
-inline size_t tcslcpy(wchar_t *o_dest, const wchar_t *i_src, size_t i_destSize)
-{
-	return wcslcpy(o_dest, i_src, i_destSize);
-}
 
 /// converter
 std::wstring to_wstring(const std::string &i_str);

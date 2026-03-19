@@ -28,7 +28,6 @@ public:
 
 	/// WM_INITDIALOG
 	BOOL wmInitDialog(HWND /* i_focus */, LPARAM i_lParam) {
-		TCHAR *mayudVersion = (TCHAR*)i_lParam;
 		setSmallIcon(m_hwnd, IDI_ICON_mayu);
 		setBigIcon(m_hwnd, IDI_ICON_mayu);
 

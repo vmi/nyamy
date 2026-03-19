@@ -76,7 +76,7 @@ HICON setBigIcon(HWND i_hwnd, UINT i_id)
 // remove icon from a window that is set by setSmallIcon
 void unsetSmallIcon(HWND i_hwnd)
 {
-	HICON hicon = setSmallIcon(i_hwnd, -1);
+	HICON hicon = setSmallIcon(i_hwnd, static_cast<UINT>(-1));
 	if (hicon)
 		CHECK_TRUE( DestroyIcon(hicon) );
 }
@@ -85,7 +85,7 @@ void unsetSmallIcon(HWND i_hwnd)
 // remove icon from a window that is set by setBigIcon
 void unsetBigIcon(HWND i_hwnd)
 {
-	HICON hicon = setBigIcon(i_hwnd, -1);
+	HICON hicon = setBigIcon(i_hwnd, static_cast<UINT>(-1));
 	if (hicon)
 		CHECK_TRUE( DestroyIcon(hicon) );
 }
@@ -210,7 +210,7 @@ bool setForegroundWindow(HWND i_hwnd)
 	//return false;
 	AttachThreadInput(nTargetID, nForegroundID, TRUE);
 
-	DWORD sp_time;
+	DWORD sp_time = 0;
 	SystemParametersInfo(SPI_GETFOREGROUNDLOCKTIMEOUT, 0, &sp_time, 0);
 	SystemParametersInfo(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, (void *)0, 0);
 

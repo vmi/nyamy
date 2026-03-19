@@ -209,4 +209,20 @@
       <Filter>リソース ファイル</Filter>
     </ResourceCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\r\mayu.ico">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="..\r\mayufile.ico">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+    <Image Include="..\r\mayudisabled.ico">
+      <Filter>リソース ファイル</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\r\target.cur">
+      <Filter>リソース ファイル</Filter>
+    </None>
+  </ItemGroup>
 </Project>

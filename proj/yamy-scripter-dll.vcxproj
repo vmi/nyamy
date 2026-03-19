@@ -57,7 +57,7 @@
     <ClCompile>
       <PreprocessorDefinitions>_DEBUG;YAMYSCRIPTERDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader />
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)..;$(ProjectDir)..\scripter;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -78,7 +78,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..;$(ProjectDir)..\scripter;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader />
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

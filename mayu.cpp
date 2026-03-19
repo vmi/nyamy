@@ -32,6 +32,7 @@
 #include <commctrl.h>
 #include <wtsapi32.h>
 #include <aclapi.h>
+#include <cwchar>
 
 
 ///
@@ -114,11 +115,11 @@ private:
 		BOOL result;
 
 		if (i_len) {
-			COPYDATASTRUCT cd;
-
-			cd.dwData = reinterpret_cast<Notify *>(m_notifyBuf)->m_type;
-			cd.cbData = i_len;
-			cd.lpData = m_notifyBuf;
+			COPYDATASTRUCT cd = {
+				.dwData = static_cast<ULONG_PTR>(reinterpret_cast<Notify*>(m_notifyBuf)->m_type),
+				.cbData = i_len,
+				.lpData = m_notifyBuf,
+			};
 			notifyHandler(&cd);
 		}
 
@@ -130,17 +131,18 @@ private:
 
 	/// register class for tasktray
 	ATOM Register_tasktray() {
-		WNDCLASS wc;
-		wc.style         = 0;
-		wc.lpfnWndProc   = tasktray_wndProc;
-		wc.cbClsExtra    = 0;
-		wc.cbWndExtra    = sizeof(Mayu *);
-		wc.hInstance     = g_hInst;
-		wc.hIcon         = NULL;
-		wc.hCursor       = NULL;
-		wc.hbrBackground = NULL;
-		wc.lpszMenuName  = NULL;
-		wc.lpszClassName = L"mayuTasktray";
+		WNDCLASS wc = {
+			.style = 0,
+			.lpfnWndProc = tasktray_wndProc,
+			.cbClsExtra = 0,
+			.cbWndExtra = sizeof(Mayu*),
+			.hInstance = g_hInst,
+			.hIcon = NULL,
+			.hCursor = NULL,
+			.hbrBackground = NULL,
+			.lpszMenuName = NULL,
+			.lpszClassName = L"mayuTasktray",
+		};
 		return RegisterClass(&wc);
 	}
 
@@ -445,7 +447,7 @@ private:
 						wregex_stored getName(L"^([^;]*);");
 						for (int index = 0; ; index ++) {
 							wchar_t buf[100];
-							_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
+							std::swprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
 							wstringi dot_mayu;
 							if (!reg.read(buf, &dot_mayu))
 								break;
@@ -509,8 +511,8 @@ private:
 				break;
 
 			case WM_APP_scripterSettingReady: {
-				auto *p = reinterpret_cast<std::shared_ptr<Setting>*>(i_lParam);
-				auto newSetting = std::move(*p);
+				std::shared_ptr<Setting> *p = reinterpret_cast<std::shared_ptr<Setting>*>(i_lParam);
+				std::shared_ptr<Setting> newSetting = std::move(*p);
 				delete p;
 				if (!newSetting) break;
 				This->m_log << L"successfully loaded (scripter)." << std::endl;
@@ -576,7 +578,7 @@ private:
 								asyncKey = GetAsyncKeyState(i);
 								This->m_log << std::hex;
 								if (asyncKey & 0x8000) {
-									This->m_log << L"  " << VK2TCHAR[i]
+									This->m_log << L"  " << VK2WCHAR[i]
 									<< L"(0x" << i << L"): pressed!"
 									<< std::endl;
 								}
@@ -587,7 +589,7 @@ private:
 										i == 0x91    // VK_SCROLL
 								   ) {
 									if (keys[i] & 1) {
-										This->m_log << L"  " << VK2TCHAR[i]
+										This->m_log << L"  " << VK2WCHAR[i]
 										<< L"(0x" << i << L"): locked!"
 										<< std::endl;
 									}
@@ -775,8 +777,8 @@ private:
 			if (i_doesShow) {
 				std::wstring helpMessage, helpTitle;
 				m_engine.getHelpMessages(&helpMessage, &helpTitle);
-				tcslcpy(m_ni.szInfo, helpMessage.c_str(), NUMBER_OF(m_ni.szInfo));
-				tcslcpy(m_ni.szInfoTitle, helpTitle.c_str(),
+				wcslcpy(m_ni.szInfo, helpMessage.c_str(), NUMBER_OF(m_ni.szInfo));
+				wcslcpy(m_ni.szInfoTitle, helpTitle.c_str(),
 						NUMBER_OF(m_ni.szInfoTitle));
 				m_ni.dwInfoFlags = NIIF_INFO;
 			} else
@@ -847,27 +849,27 @@ private:
 		wchar_t title[1024];
 		wchar_t text[1024];
 
-		_snwprintf_s(title, NUMBER_OF(title), _TRUNCATE, loadString(IDS_mayu).c_str());
-		_snwprintf_s(text, NUMBER_OF(text), _TRUNCATE, loadString(ids).c_str(), code);
+		std::swprintf(title, NUMBER_OF(title), loadString(IDS_mayu).c_str());
+		std::swprintf(text, NUMBER_OF(text), loadString(ids).c_str(), code);
  		return MessageBox((HWND)NULL, text, title, style);
 	}
 
 	int enableToWriteByUser(HANDLE hdl)
 	{
-		TCHAR userName[GANA_MAX_ATOM_LENGTH];
+		WCHAR userName[GANA_MAX_ATOM_LENGTH];
 		DWORD userNameSize = NUMBER_OF(userName);
 
 		SID_NAME_USE sidType;
 		PSID pSid = NULL;
 		DWORD sidSize = 0;
-		TCHAR *pDomain = NULL;
+		WCHAR *pDomain = NULL;
 		DWORD domainSize = 0;
 
-		PSECURITY_DESCRIPTOR pSd;
+		PSECURITY_DESCRIPTOR pSd = nullptr;
 		PACL pOrigDacl;
-		ACL_SIZE_INFORMATION aclInfo;
+		ACL_SIZE_INFORMATION aclInfo = {};
 
-		PACL pNewDacl;
+		PACL pNewDacl = nullptr;
 		DWORD newDaclSize;
 
 		DWORD aceIndex;
@@ -891,7 +893,7 @@ private:
 		}
 
 		pSid = reinterpret_cast<PSID>(LocalAlloc(LPTR, sidSize));
-		pDomain = reinterpret_cast<TCHAR*>(LocalAlloc(LPTR, domainSize * sizeof(TCHAR)));
+		pDomain = reinterpret_cast<WCHAR*>(LocalAlloc(LPTR, domainSize * sizeof(WCHAR)));
 		if (pSid == NULL || pDomain == NULL) {
 			err = YAMY_ERROR_NO_MEMORY;
 			goto exit;
@@ -1063,17 +1065,19 @@ public:
 		m_usingSN = wtsRegisterSessionNotification(m_hwndTaskTray,
 					NOTIFY_FOR_THIS_SESSION);
 
-		DlgLogData dld;
-		dld.m_log = &m_log;
-		dld.m_hwndTaskTray = m_hwndTaskTray;
+		DlgLogData dld = {
+			.m_log = &m_log,
+			.m_hwndTaskTray = m_hwndTaskTray,
+		};
 		m_hwndLog =
 			CreateDialogParam(g_hInst, MAKEINTRESOURCE(IDD_DIALOG_log), NULL,
 							  dlgLog_dlgProc, (LPARAM)&dld);
 		CHECK_TRUE( m_hwndLog );
 
-		DlgInvestigateData did;
-		did.m_engine = &m_engine;
-		did.m_hwndLog = m_hwndLog;
+		DlgInvestigateData did = {
+			.m_engine = &m_engine,
+			.m_hwndLog = m_hwndLog,
+		};
 		m_hwndInvestigate =
 			CreateDialogParam(g_hInst, MAKEINTRESOURCE(IDD_DIALOG_investigate), NULL,
 							  dlgInvestigate_dlgProc, (LPARAM)&did);
@@ -1116,7 +1120,7 @@ public:
 		m_ni.hIcon  = m_tasktrayIcon[1];
 		m_ni.uCallbackMessage = WM_APP_taskTrayNotify;
 		std::wstring tip = loadString(IDS_mayu);
-		tcslcpy(m_ni.szTip, tip.c_str(), NUMBER_OF(m_ni.szTip));
+		wcslcpy(m_ni.szTip, tip.c_str(), NUMBER_OF(m_ni.szTip));
 		if (m_canUseTasktrayBaloon) {
 			m_ni.cbSize = NOTIFYICONDATA_V3_SIZE;
 			m_ni.uFlags |= NIF_INFO;
@@ -1152,18 +1156,18 @@ public:
 		BOOL result = CreateProcess(yamydPath.c_str(), NULL, NULL, NULL, FALSE,
 							   NORMAL_PRIORITY_CLASS, 0, NULL, &m_si, &m_pi);
 		if (result == FALSE) {
-			TCHAR buf[1024];
-			TCHAR text[1024];
-			TCHAR title[1024];
+			WCHAR buf[1024];
+			WCHAR text[1024];
+			WCHAR title2[1024];
 
 			m_pi.hProcess = NULL;
 			LoadString(GetModuleHandle(NULL), IDS_cannotInvoke,
 					   text, sizeof(text)/sizeof(text[0]));
 			LoadString(GetModuleHandle(NULL), IDS_mayu,
-					   title, sizeof(title)/sizeof(title[0]));
-			swprintf_s(buf, sizeof(buf)/sizeof(buf[0]),
+					   title2, sizeof(title2)/sizeof(title2[0]));
+			std::swprintf(buf, NUMBER_OF(buf),
 						text, L"yamyd32", GetLastError());
-	 		MessageBox((HWND)NULL, buf, title, MB_OK | MB_ICONSTOP);
+	 		MessageBox((HWND)NULL, buf, title2, MB_OK | MB_ICONSTOP);
 		} else {
 			CloseHandle(m_pi.hThread);
 		}
@@ -1188,7 +1192,7 @@ public:
 		HANDLE hEngineThread = m_engine.signalStop();
 
 		// --- Phase D: wait for all remaining threads/processes in parallel ---
-		HANDLE handles[6];
+		HANDLE handles[6] = {};
 		DWORD n = 0;
 		if (m_pi.hProcess) handles[n++] = m_pi.hProcess;
 		if (m_scripter)
@@ -1251,8 +1255,7 @@ public:
 		mailslotHandler(0, 0);
 		while (1) {
 			HANDLE handles[] = { m_hNotifyEvent };
-			DWORD ret;
-			switch (ret = MsgWaitForMultipleObjectsEx(NUMBER_OF(handles), &handles[0],
+			switch (DWORD ret = MsgWaitForMultipleObjectsEx(NUMBER_OF(handles), &handles[0],
 						  INFINITE, QS_ALLINPUT, MWMO_ALERTABLE | MWMO_INPUTAVAILABLE)) {
 			case WAIT_OBJECT_0:			// m_hNotifyEvent
 				break;
@@ -1304,8 +1307,8 @@ static LONG WINAPI crashExceptionFilter(EXCEPTION_POINTERS *i_ep)
 }
 
 
-int WINAPI wWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
-					 LPWSTR /* i_lpszCmdLine */, int /* i_nCmdShow */)
+int WINAPI wWinMain(_In_ HINSTANCE i_hInstance, _In_opt_ HINSTANCE /* i_hPrevInstance */,
+	_In_ PWSTR /* i_lpszCmdLine */, _In_ int /* i_nCmdShow */)
 {
 	g_hInst = i_hInstance;
 
@@ -1313,21 +1316,32 @@ int WINAPI wWinMain(HINSTANCE i_hInstance, HINSTANCE /* i_hPrevInstance */,
 	s_prevExceptionFilter = SetUnhandledExceptionFilter(crashExceptionFilter);
 
 	// set locale
-	CHECK_TRUE( _wsetlocale(LC_ALL, L"") );
+	CHECK_TRUE(_wsetlocale(LC_ALL, L""));
 
 	// common controls
-	INITCOMMONCONTROLSEX icc;
-	icc.dwSize = sizeof(icc);
-	icc.dwICC = ICC_LISTVIEW_CLASSES;
+	INITCOMMONCONTROLSEX icc = {
+		.dwSize = sizeof(icc),
+		.dwICC = ICC_LISTVIEW_CLASSES,
+	};
 	CHECK_TRUE( InitCommonControlsEx(&icc) );
 
 	// is another mayu running ?
 	HANDLE mutex = CreateMutex((SECURITY_ATTRIBUTES *)NULL, TRUE,
 							   MUTEX_MAYU_EXCLUSIVE_RUNNING);
-	if (GetLastError() == ERROR_ALREADY_EXISTS) {
-		// another mayu already running
-		std::wstring text = loadString(IDS_mayuAlreadyExists);
+	if (mutex == nullptr) {
 		std::wstring title = loadString(IDS_mayu);
+		std::wstring text;
+		DWORD err = GetLastError();
+		if (err == ERROR_ALREADY_EXISTS) {
+			// another mayu already running
+			text = loadString(IDS_mayuAlreadyExists);
+		}
+		else {
+			// failed to create mutex for unknown reason
+			wchar_t buf[1024]{ L"" };
+			std::swprintf(buf, NUMBER_OF(buf), loadString(IDS_unexpectedError).c_str(), err);
+			text = buf;
+		}
 		if (g_hookData) {
 			UINT WM_TaskbarRestart = RegisterWindowMessage(L"TaskbarCreated");
 			PostMessage(g_hookData->getHwndTaskTray(),

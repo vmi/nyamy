@@ -49,7 +49,10 @@ VKey loadVKeyFromCmd(const FuncArg &arg)
 
 
 #define FUNCTION_DATA
+#pragma warning(push)
+#pragma warning(disable: 26495) // Disable "uninitialized member" warning for FunctionData subclasses
 #include "functions.h"
+#pragma warning(pop)
 #undef FUNCTION_DATA
 
 
@@ -104,7 +107,7 @@ std::wostream &operator<<(std::wostream &i_ost, VKey i_data)
 	if (i_data & VKey_pressed)
 		i_ost << L"D-";
 
-	u_int8 code = i_data & ~(VKey_extended | VKey_released | VKey_pressed);
+	u_int8 code = static_cast<u_int8>(i_data & ~(VKey_extended | VKey_released | VKey_pressed));
 	const VKeyTable *vkt;
 	for (vkt = g_vkeyTable; vkt->m_name; ++ vkt)
 		if (vkt->m_code == code)
@@ -2090,9 +2093,9 @@ class PlugIn
 
 private:
 	HMODULE m_dll;
-	FARPROC m_func;
+	FARPROC m_func{};
 	Type m_type;
-	wstringq m_funcParam;
+	wstringq m_funcParam{};
 
 public:
 	PlugIn() : m_dll(NULL) {

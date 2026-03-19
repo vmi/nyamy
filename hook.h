@@ -129,7 +129,7 @@ struct NotifyLog : public Notify {
 
 
 ///
-enum MouseHookType {
+enum MouseHookType : int {
 	MouseHookType_None = 0,				/// none
 	MouseHookType_Wheel = 1 << 0,			/// wheel
 	MouseHookType_WindowMove = 1 << 1,		/// window move

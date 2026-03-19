@@ -15,7 +15,7 @@ using FpCloseHandle = BOOL (WINAPI *)(HANDLE);
 struct InjectInfo {
 	DWORD isVistaOrLater_;
 	DWORD pid_;
-	TCHAR advapi32_[64];
+	WCHAR advapi32_[64];
 	CHAR impersonateLoggedOnUser_[32];
 	CHAR revertToSelf_[32];
 	CHAR openProcessToken_[32];

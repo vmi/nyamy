@@ -113,6 +113,7 @@ public:
 	///
 	void releaseString() {
 		m_str.resize(0);
+#pragma warning(suppress: 26110) // m_mutex is locked in acquireString() and releaseString() is called only after acquireString()
 		m_mutex.unlock();
 	}
 
@@ -165,6 +166,7 @@ public:
 		if (!m_str.empty())
 			PostMessage(m_hwnd, m_messageId, 0, reinterpret_cast<LPARAM>(this));
 		m_msgDebugLevel = m_debugLevel;
+#pragma warning(suppress: 26110) // m_mutex is locked in acquire() and release() is called only after acquire()
 		m_mutex.unlock();
 	}
 };

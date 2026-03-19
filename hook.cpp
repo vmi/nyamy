@@ -97,7 +97,6 @@ static Globals g;
 
 static void notifyThreadDetach();
 static void notifyShow(NotifyShow::Show i_show, bool i_isMDI);
-static void notifyLog(wchar_t *i_msg);
 static bool mapHookData(bool i_isYamy);
 static void unmapHookData();
 static bool initialize(bool i_isYamy);
@@ -379,8 +378,8 @@ static void notifyName(HWND i_hwnd, Notify::Type i_type = Notify::Type_name)
 	nfc.m_type = i_type;
 	nfc.m_threadId = GetCurrentThreadId();
 	nfc.setHwnd(i_hwnd);
-	tcslcpy(nfc.m_className, className.c_str(), NUMBER_OF(nfc.m_className));
-	tcslcpy(nfc.m_titleName, titleName.c_str(), NUMBER_OF(nfc.m_titleName));
+	wcslcpy(nfc.m_className, className.c_str(), NUMBER_OF(nfc.m_className));
+	wcslcpy(nfc.m_titleName, titleName.c_str(), NUMBER_OF(nfc.m_titleName));
 
 	notify(&nfc, sizeof(nfc));
 }
@@ -448,16 +447,6 @@ static void notifyShow(NotifyShow::Show i_show, bool i_isMDI)
 }
 
 
-/// notify log
-static void notifyLog(wchar_t *i_msg)
-{
-	NotifyLog nl;
-	nl.m_type = Notify::Type_log;
-	tcslcpy(nl.m_msg, i_msg, NUMBER_OF(nl.m_msg));
-	notify(&nl, sizeof(nl));
-}
-
-
 /// &Recenter
 static void funcRecenter(HWND i_hwnd)
 {
@@ -486,7 +475,7 @@ static void funcRecenter(HWND i_hwnd)
 		int ci = static_cast<int>(SendMessage(i_hwnd, EM_CHARFROMPOS, 0, (LPARAM)&p));
 		line = static_cast<int>(SendMessage(i_hwnd, EM_EXLINEFROMCHAR, 0, ci));
 	}
-	int caretLine = static_cast<int>(SendMessage(i_hwnd, EM_LINEFROMCHAR, -1, 0));
+	int caretLine = static_cast<int>(SendMessage(i_hwnd, EM_LINEFROMCHAR, static_cast<WPARAM>(-1), 0));
 	SendMessage(i_hwnd, EM_LINESCROLL, 0, caretLine - line);
 }
 
@@ -501,7 +490,7 @@ static void funcSetImeStatus(HWND i_hwnd, int i_status)
 		return;
 
 	if (i_status < 0)
-		i_status = !ImmGetOpenStatus(hIMC);
+		i_status = static_cast<int>(!ImmGetOpenStatus(hIMC));
 
 	ImmSetOpenStatus(hIMC, i_status);
 	ImmReleaseContext(i_hwnd, hIMC);
@@ -679,7 +668,7 @@ LRESULT CALLBACK callWndProc(int i_nCode, WPARAM i_wParam, LPARAM i_lParam)
 			default:
 				break;
 			}
-			/* through below */
+			[[fallthrough]];
 		case WM_COMMAND:
 			notifyCommand(cwps.hwnd, cwps.message, cwps.wParam, cwps.lParam);
 			break;
@@ -781,8 +770,6 @@ through:
 
 static LRESULT CALLBACK lowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-	KBDLLHOOKSTRUCT *pKbll = (KBDLLHOOKSTRUCT*)lParam;
-
 	if (!g.m_isInitialized)
 		initialize(false);
 

@@ -1,4 +1,4 @@
-const wchar_t * const VK2TCHAR[] = {
+const wchar_t * const VK2WCHAR[] = {
 	L"VK_Unknown_0x00",
 	L"VK_LBUTTON",
 	L"VK_RBUTTON",

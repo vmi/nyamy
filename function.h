@@ -106,7 +106,7 @@ extern bool getTypeValue(GravityType *o_type, const std::wstring &i_name);
 
 
 /// enum MouseHookType is defined in hook.h
-enum MouseHookType;
+enum MouseHookType : int;
 
 /// stream output
 extern std::wostream &operator<<(std::wostream &i_ost, MouseHookType i_data);

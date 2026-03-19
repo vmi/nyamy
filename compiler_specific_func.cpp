@@ -13,7 +13,7 @@
 // get compiler version string
 std::wstring getCompilerVersionString()
 {
-	TCHAR buf[200];
+	WCHAR buf[200];
 	_snwprintf(buf, NUMBER_OF(buf),
 			   L"Microsoft (R) 32-bit C/C++ Optimizing Compiler Version %d.%02d",
 			   _MSC_VER / 100,

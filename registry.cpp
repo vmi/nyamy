@@ -23,9 +23,6 @@ bool Registry::remove(HKEY i_root, const std::wstring &i_path,
 		return r == ERROR_SUCCESS;
 	} else {
 		return false;
-		if (i_name.empty())
-			return false;
-		return WritePrivateProfileString(L"yamy", i_name.c_str(), NULL, i_path.c_str()) == TRUE;
 	}
 }
 
@@ -243,7 +240,7 @@ static bool string2logfont(LOGFONT *o_lf, const std::wstring &i_strlf)
 	o_lf->lfClipPrecision  = (BYTE)_wtoi(what.str(11).c_str());
 	o_lf->lfQuality        = (BYTE)_wtoi(what.str(12).c_str());
 	o_lf->lfPitchAndFamily = (BYTE)_wtoi(what.str(13).c_str());
-	tcslcpy(o_lf->lfFaceName, what.str(14).c_str(), NUMBER_OF(o_lf->lfFaceName));
+	wcslcpy(o_lf->lfFaceName, what.str(14).c_str(), NUMBER_OF(o_lf->lfFaceName));
 	return true;
 }
 

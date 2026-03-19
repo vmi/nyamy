@@ -32,7 +32,7 @@ Token::Token(int i_value, const wstringi &i_display)
 }
 
 Token::Token(const wstringi &i_value, bool i_isValueQuoted, bool i_isRegexp)
-		: m_type(i_isRegexp ? Type_regexp : Type_string),
+		: m_type(static_cast<u_char>(i_isRegexp ? Type_regexp : Type_string)),
 		m_isValueQuoted(i_isValueQuoted),
 		m_numericValue(0),
 		m_stringValue(i_value),
@@ -41,7 +41,7 @@ Token::Token(const wstringi &i_value, bool i_isValueQuoted, bool i_isRegexp)
 }
 
 Token::Token(Type i_m_type)
-		: m_type(i_m_type),
+		: m_type(static_cast<u_char>(i_m_type)),
 		m_isValueQuoted(false),
 		m_numericValue(0),
 		m_stringValue(L""),
@@ -173,7 +173,7 @@ bool Lexer::getLine(wstringi *o_line)
 				m_ptr += 2;
 				goto got_line_end;
 			}
-			// fall through
+			[[fallthrough]];
 		default:
 			++ m_ptr;
 			break;

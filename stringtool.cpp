@@ -137,49 +137,9 @@ static inline size_t xstrlcpy(T *o_dest, const T *i_src, size_t i_destSize)
 
 
 // copy
-size_t strlcpy(char *o_dest, const char *i_src, size_t i_destSize)
-{
-	return xstrlcpy(o_dest, i_src, i_destSize);
-}
-
-
-// copy
 size_t wcslcpy(wchar_t *o_dest, const wchar_t *i_src, size_t i_destSize)
 {
 	return xstrlcpy(o_dest, i_src, i_destSize);
-}
-
-
-// copy
-size_t mbslcpy(unsigned char *o_dest, const unsigned char *i_src,
-			   size_t i_destSize)
-{
-	unsigned char *d = o_dest;
-	const unsigned char *s = i_src;
-	size_t n = i_destSize;
-
-	ASSERT( o_dest != NULL );
-	ASSERT( i_src != NULL );
-
-	if (n == 0)
-		return strlen(reinterpret_cast<const char *>(i_src));
-
-	// Copy as many bytes as will fit
-	for (-- n; *s && 0 < n; -- n) {
-		if (_ismbblead(*s)) {
-			if (!(s[1] && 2 <= n))
-				break;
-			*d++ = *s++;
-			-- n;
-		}
-		*d++ = *s++;
-	}
-	*d = '\0';
-
-	for (; *s; ++ s)
-		;
-
-	return s - i_src;
 }
 
 
@@ -421,10 +381,9 @@ std::wstring toLower(const std::wstring &i_str)
 {
 	std::wstring str(i_str);
 	for (size_t i = 0; i < str.size(); ++ i) {
-		if (_ismbblead(str[i]))
-			++ i;
-		else
-			str[i] = tolower(str[i]);
+		wchar_t c = str[i];
+		if (c <= 0x007f)
+			str[i] = static_cast<wchar_t>(tolower(c)); // ASCII only
 	}
 	return str;
 }

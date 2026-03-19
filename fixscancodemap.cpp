@@ -8,7 +8,7 @@
 static DWORD WINAPI invokeFunc(InjectInfo *info)
 {
 	BOOL ret;
-	HANDLE hToken;
+	HANDLE hToken = 0;
 	HMODULE hAdvapi32;
 	DWORD result = 0;
 
@@ -154,8 +154,6 @@ DWORD FixScancodeMap::getWinLogonPid()
 
 bool FixScancodeMap::clean(WlInfo wl)
 {
-	int ret = 0;
-
 	if (wl.m_hThread != NULL) {
 		DWORD result;
 
@@ -187,7 +185,7 @@ int FixScancodeMap::injectThread(DWORD dwPID)
 {
 	int ret = 0;
 	DWORD err = 0;
-	DWORD result = -1;
+	DWORD result = static_cast<DWORD>(-1);
 	BOOL wFlag;
 	WlInfo wi;
 
@@ -302,7 +300,8 @@ exit:
 
 int FixScancodeMap::fix()
 {
-	ScancodeMap *origMap, *fixMap;
+	ScancodeMap* origMap = nullptr;
+	ScancodeMap* fixMap = nullptr;
 	DWORD origSize, fixSize;
 	bool ret;
 	int result = 0;
@@ -434,7 +433,7 @@ unsigned int WINAPI FixScancodeMap::threadLoop(void *i_this)
 			break;
 		case WAIT_OBJECT_0 + 2:		// m_hQuiteEvent
 			ResetEvent(This->m_hQuitEvent);
-			// through below
+			[[fallthrough]];
 		default:
 			return 0;
 			break;

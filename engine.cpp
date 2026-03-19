@@ -349,10 +349,10 @@ void Engine::generateModifierEvents(const Modifier &i_mod)
 		{
 			bool noneIsPressed = true;
 			bool noneIsPressedByAssign = true;
-			for (Keyboard::Mods::iterator i = mods.begin(); i != mods.end(); ++ i) {
-				if ((*i)->m_isPressedOnWin32)
+			for (Keyboard::Mods::iterator i2 = mods.begin(); i2 != mods.end(); ++ i2) {
+				if ((*i2)->m_isPressedOnWin32)
 					noneIsPressed = false;
-				if ((*i)->m_isPressedByAssign)
+				if ((*i2)->m_isPressedByAssign)
 					noneIsPressedByAssign = false;
 			}
 			if (noneIsPressed) {
@@ -360,9 +360,9 @@ void Engine::generateModifierEvents(const Modifier &i_mod)
 					generateKeyEvent(mods.front(), true, false);
 				else
 					for (Keyboard::Mods::iterator
-							i = mods.begin(); i != mods.end(); ++ i)
-						if ((*i)->m_isPressedByAssign)
-							generateKeyEvent((*i), true, false);
+							it = mods.begin(); it != mods.end(); ++ it)
+						if ((*it)->m_isPressedByAssign)
+							generateKeyEvent((*it), true, false);
 			}
 		}
 
@@ -373,14 +373,14 @@ void Engine::generateModifierEvents(const Modifier &i_mod)
 			if (i == Modifier::Type_Alt || i == Modifier::Type_Windows) {
 				for (Keyboard::Mods::iterator j = mods.begin(); j != mods.end(); ++ j)
 					if ((*j) == m_lastGeneratedKey) {
-						Keyboard::Mods *mods =
+						Keyboard::Mods *mods2 =
 							&s->m_keyboard.getModifiers(Modifier::Type_Shift);
-						if (mods->size() == 0)
-							mods = &s->m_keyboard.getModifiers(
+						if (mods2->size() == 0)
+							mods2 = &s->m_keyboard.getModifiers(
 									   Modifier::Type_Control);
-						if (0 < mods->size()) {
-							generateKeyEvent(mods->front(), true, false);
-							generateKeyEvent(mods->front(), false, false);
+						if (0 < mods2->size()) {
+							generateKeyEvent(mods2->front(), true, false);
+							generateKeyEvent(mods2->front(), false, false);
 						}
 						break;
 					}
@@ -654,7 +654,7 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 			if (i_kid->Flags & KEYBOARD_INPUT_DATA::BREAK) {
 				return 1;
 			} else {
-				kid[0].mi.mouseData = -WHEEL_DELTA;
+				kid[0].mi.mouseData = static_cast<DWORD>(- WHEEL_DELTA);
 				kid[0].mi.dwFlags = MOUSEEVENTF_WHEEL;
 			}
 			break;
@@ -686,7 +686,7 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 			if (i_kid->Flags & KEYBOARD_INPUT_DATA::BREAK) {
 				return 1;
 			} else {
-				kid[0].mi.mouseData = -WHEEL_DELTA;
+				kid[0].mi.mouseData = static_cast<DWORD>(- WHEEL_DELTA);
 				kid[0].mi.dwFlags = MOUSEEVENTF_HWHEEL;
 			}
 			break;
@@ -818,16 +818,19 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 		switch (i_message) {
 		case WM_LBUTTONUP:
 			kid.Flags |= KEYBOARD_INPUT_DATA::BREAK;
+			[[fallthrough]];
 		case WM_LBUTTONDOWN:
 			kid.MakeCode = 1;
 			break;
 		case WM_RBUTTONUP:
 			kid.Flags |= KEYBOARD_INPUT_DATA::BREAK;
+			[[fallthrough]];
 		case WM_RBUTTONDOWN:
 			kid.MakeCode = 2;
 			break;
 		case WM_MBUTTONUP:
 			kid.Flags |= KEYBOARD_INPUT_DATA::BREAK;
+			[[fallthrough]];
 		case WM_MBUTTONDOWN:
 			kid.MakeCode = 3;
 			break;
@@ -840,6 +843,7 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			break;
 		case WM_XBUTTONUP:
 			kid.Flags |= KEYBOARD_INPUT_DATA::BREAK;
+			[[fallthrough]];
 		case WM_XBUTTONDOWN:
 			switch ((i_mid->mouseData >> 16) & 0xFFFFU) {
 			case XBUTTON1:
@@ -1030,9 +1034,9 @@ void Engine::keyboardHandler()
 		if (!s ||						// m_setting has not been loaded
 				!m_isEnabled) {	// disabled
 			if (m_isLogMode) {
-				Key key;
-				key.addScanCode(ScanCode(kid.MakeCode, kid.Flags));
-				outputToLog(&key, ModifiedKey(), 0);
+				Key key2;
+				key2.addScanCode(ScanCode(kid.MakeCode, kid.Flags));
+				outputToLog(&key2, ModifiedKey(), 0);
 				if (kid.Flags & KEYBOARD_INPUT_DATA::E1) {
 					// through mouse event even if log mode
 					injectInput(&kid, NULL);
@@ -1211,6 +1215,7 @@ Engine::Engine(womsgstream &i_log)
 		m_afShellExecute(NULL),
 		m_variable(0),
 		m_log(i_log) {
+#pragma warning(suppress: 6387)
 	BOOL (WINAPI *pChangeWindowMessageFilter)(UINT, DWORD) =
 		reinterpret_cast<BOOL (WINAPI*)(UINT, DWORD)>(GetProcAddress(GetModuleHandle(L"user32.dll"), "ChangeWindowMessageFilter"));
 
