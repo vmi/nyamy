@@ -11,6 +11,9 @@
 extern "C"
 {
 #endif // __cplusplus
+#if 0 // Dummy code to prevent the IDE from indenting inside extern "C"
+}
+#endif
 
 extern SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[]);
 
