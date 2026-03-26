@@ -54,7 +54,7 @@
     <ClInclude Include="..\adhoc_keyseq.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="..\func_arg.h">
+    <ClInclude Include="..\scripter_types.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
@@ -90,6 +90,9 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="..\scripter\yamy_scripter.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripter_types.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
