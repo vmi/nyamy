@@ -52,35 +52,35 @@ YS_API bool ys_func_args_push(YsFuncArgs* fas, YsType type, int64_t value, int64
 YS_API bool ys_strs_push(YsStrs* ss, const char* value, size_t length);
 
 // ユーザー定義関数呼び出し時の入力コンテキスト (不完全型)。
-// Engineが生成したコンテキストで、exec_user_func → ys_exec_keyseq の際に再利用する。
+// Engineが生成したコンテキストで、on_exec_user_func → ys_exec_keyseq の際に再利用する。
 typedef struct YsTriggerInfo YsTriggerInfo;
 
-// 設定情報構築要求
-typedef bool (*ys_ctrl_load_setting)(void);
+// 設定ロードが要求されたときに呼び出されるコールバック
+typedef bool (*ys_on_load_setting)(void);
 
-// ユーザー定義関数実行要求
-typedef void (*ys_ctrl_exec_user_func)(const char* /* user_func_name */,
-                                       const YsFuncArgs* /* preset_args */,
-                                       const YsTriggerInfo* /* trigger_info */);
+// Engine側で &ExecUserFunc() が実行されたときに呼び出されるコールバック
+typedef void (*ys_on_exec_user_func)(const char* /* user_func_name */,
+                                     const YsFuncArgs* /* preset_args */,
+                                     const YsTriggerInfo* /* trigger_info */);
 
 // ys_start に渡すコールバック構造体
 typedef struct YsCallbacks {
-    // 初期設定が完了したら呼び出される
-    ys_ctrl_load_setting load_setting;
-    // Yamy側で &ExecUserFunc() が実行されたら呼び出される
-    ys_ctrl_exec_user_func exec_user_func;
+    // 設定ロードが要求されたとき呼び出される
+    ys_on_load_setting   on_load_setting;
+    // Engine側で &ExecUserFunc() が実行されたとき呼び出される
+    ys_on_exec_user_func on_exec_user_func;
 } YsCallbacks;
 
 // scripterのメインループを開始。以下の場合、処理を終了する
 // - Engineから終了コマンドを受信した場合 (返り値: 0)
-// - ys_ctrl_load_setting()がfalseを返した場合 (返り値: 1)
+// - callbacks->on_load_setting()がfalseを返した場合 (返り値: 1)
 YS_API int ys_start(const YsCallbacks *callbacks);
 
 // バージョン確認 (FFI 利用時の互換性検証用)
 YS_API uint32_t ys_version(void);
 
-// 各項目設定。callbacks->load_setting内で下記APIを呼び出して設定情報を構築する。
-// callbacks->load_setting終了時までキューイングしておき、trueが返却されたらEngineにCmdCommitとともに送信される。
+// 各項目設定。callbacks->on_load_setting内で下記APIを呼び出して設定情報を構築する。
+// callbacks->on_load_setting終了時までキューイングしておき、trueが返却されたらEngineにCmdCommitとともに送信される。
 // falseが返却されたら、キューをキャンセルしてCmdAbortが送信される。
 
 // キーシーケンスを登録する。登録が成功した場合、もしくは既存のキーシーケンスが存在した場合は0以上のインデックス値を返す。
@@ -155,32 +155,41 @@ YS_API bool ys_assign_mod(const YsStrs* prefixes, const char* modifier_name, con
 // 登録したキーシーケンスのインデックスを取得する。未登録の場合は -1 を返す
 YS_API int ys_get_keyseq_idx(const char* name);
 
-// ユーザー定義関数を登録する。Engineから呼び出されると callbacks->exec_user_func が呼ばれる
+// ユーザー定義関数を登録する。Engineから呼び出されると callbacks->on_exec_user_func が呼ばれる
 // func_name: 登録する関数名
-// preset_args: Engineに送信され、呼び出し時に callbacks->exec_user_func の引数として返される (NULL可)
+// preset_args: Engineに送信され、呼び出し時に callbacks->on_exec_user_func の引数として返される (NULL可)
 YS_API bool ys_reg_user_func(const char* func_name, const YsFuncArgs* preset_args);
 
 // キューに登録した設定情報をリセットする。
 YS_API bool ys_reset_setting(void);
 
 // ys_reset_settingを呼んだ後、*.mayuを読み込む処理を行う。
-// これを使用する場合は、callbacks->load_setting内で "return ys_load_mayu();" のように記述すること。
+// これを使用する場合は、callbacks->on_load_setting内で "return ys_load_mayu();" のように記述すること。
 YS_API bool ys_load_mayu(void);
 
 // adhocなキーシーケンスの実行をEngine側に要求する
-// - キーシーケンスでの &ExecUserFunc は使用禁止
-// - callbacks->exec_user_func内で使用する
-// - callbacks->load_setting内では使用禁止 (falseを返す)
-// trigger_info: exec_user_funcで受け取った YsTriggerInfo* を再利用する
+// - キーシーケンスでの &ExecUserFunc は使用禁止 (無限ループ防止のため実装内でガード、falseを返す)
+// - callbacks->on_exec_user_func内で使用する
+// - callbacks->on_load_setting内では使用禁止 (falseを返す)
+// trigger_info: on_exec_user_funcで受け取った YsTriggerInfo* を再利用する
 YS_API bool ys_exec_keyseq(const char* actions, const YsTriggerInfo* trigger_info);
+
+// 指定パスの .mayu ファイルをコンパイルしてキューに積む
+// path: UTF-8 ファイルパス (相対パスは設定ファイルと同ディレクトリから解決)
+// callbacks->on_load_setting 内でのみ有効
+YS_API bool ys_include_mayu(const char* path);
+
+// 最後のエラーメッセージを返す (UTF-8 NUL 終端)
+// エラーなし / 未発生の場合は NULL を返す
+YS_API const char* ys_last_error(void);
 ```
 
 ### 初期化処理とイベントループ
 
-1. scripterプロセスが起動し、ys_start()を呼ぶと、内部初期化処理を行なった後に callbacks->load_setting が呼ばれる。
-2. callbacks->load_settingがtrueを返すと、キューイングした設定情報およびCmdCommitを送信。以後コマンド要求待ち。
+1. scripterプロセスが起動し、ys_start()を呼ぶと、内部初期化処理を行なった後に callbacks->on_load_setting が呼ばれる。
+2. callbacks->on_load_settingがtrueを返すと、キューイングした設定情報およびCmdCommitを送信。以後コマンド要求待ち。
     - falseを返すとキューを破棄してCmdAbortを送信。
-3. Engineがユーザー定義関数呼び出しを実行すると、ctrlチャネル経由で callbacks->call_user_func が呼ばれる。
-    - ユーザー定義関数内で、Engineの関数を実行したい場合は、ys_call_engine_func()を呼び出す。
+3. Engineがユーザー定義関数呼び出しを実行すると、ctrlチャネル経由で callbacks->on_exec_user_func が呼ばれる。
+    - ユーザー定義関数内で、Engineのキーシーケンスを実行したい場合は、ys_exec_keyseq()を呼び出す。
 4. Engineが再読み込みもしくは終了を選択すると、ys_start()が終了する。
     - 再読み込み時はscripterプロセス終了後、再起動される。
