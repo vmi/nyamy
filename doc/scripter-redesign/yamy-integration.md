@@ -28,14 +28,18 @@ public:
     ScripterManager(SyncObject *i_soLog, std::wostream *i_log, HWND i_hwndNotify);
     ~ScripterManager();
 
-    bool start();                        // プロセス起動・パイプ確立
+    bool start(const Symbols &syms);     // プロセス起動・パイプ確立・Start(syms) 送信
     void sendQuit();                     // Quit 送信 (non-blocking, idempotent)
     DWORD collectHandles(HANDLE*, DWORD); // WaitForMultipleObjects 用
     void closeHandles();
 
-    void reload(const Symbols &syms);    // CtrlStream: Reload(syms) 送信
+    using ExecKeySeqCallback = std::function<void(AdHocKeySeq)>;
+    void setExecKeySeqCallback(ExecKeySeqCallback cb);  // ExecKeySeq 受信コールバック設定
 
-    std::unique_ptr<Setting> takeNewSetting();
+    void execUserFunc(const wstringi &name,             // CtrlStream: ExecUserFunc 送信
+                      const std::vector<FuncArg> &args,
+                      const TriggerInfo &ctx);
+
     static const UINT WM_ScripterSettingReady;
 
 private:
@@ -49,14 +53,19 @@ private:
 };
 ```
 
-`reload(syms)` は CtrlStream の Reload コマンド (0x01) でシンボルセットを送信する。
-scripter 側は受信後に .mayu を再コンパイルし、CmdStream (cmd パイプ) を返す。
+`start(syms)` はプロセスを起動し、CtrlStream の Start コマンド (0x01) でシンボルセットを送信する。
+scripter 側は受信後に .mayu をコンパイルし、CmdStream (cmd パイプ) を返す。
+
+`execUserFunc(name, args, ctx)` は CtrlStream の ExecUserFunc コマンド (0x02) を送信する。
+scripter 側は受信後に `on_exec_user_func` コールバックを呼び出す。
+scripter が `ys_exec_keyseq()` を呼ぶと CmdStream の ExecKeySeq (0x02) が返り、
+`setExecKeySeqCallback` で登録したコールバックが呼ばれる。
 
 `m_hMsgRead` は scripter の stdout+stderr をマージした msg パイプ。
 `msgThread` / `runMsgReader()` が `PipeReadWStreambuf` (wchar_t 単位) で読み取り、
 1 行ずつ yamy のログウィンドウに表示する。
 
-### `start()` — コマンドライン構築
+### `start(syms)` — コマンドライン構築とシンボル送信
 
 ```cpp
 wchar_t cmdLine[1024];
@@ -79,43 +88,32 @@ CreateProcess(NULL, cmdLine, NULL, NULL, TRUE /*bInheritHandles*/, ...);
 
 以下は設計済みだが未実装の変更。
 
-- `scripter_manager.cpp/h` — reload = 再起動、callFunc 追加、ExecFunc 処理
-- `ctrl_stream_writer.cpp/h` — writeReload 削除、writeCallFunc 追加
-- `ctrl_stream.h` — Reload 削除、CallFunc (0x01) 追加
-- `cmd_stream.h` — ExecFunc (0x30) 追加
-- `cmd_stream_reader.cpp/h` — ExecFunc 読み取り
-- `cmd_processor.h/cpp` — ExecFunc コールバック追加
-- `mayu.cpp` — WM_ScripterExecFunc ハンドラ追加
+- `scripter_manager.cpp/h` — reload = 再起動 (プロセス再起動方式)
 - `yamy.ini` — [yamy-scripter] セクション追加
 
 ---
 
 ## ScripterManager の将来の変更 (未実装)
 
-### インターフェース変更
+### インターフェース変更 (プロセス再起動方式)
 
 ```cpp
 class ScripterManager
 {
 public:
-    // start(syms) に変更 (コマンドラインにシンボルを付加して起動)
-    bool start(const Symbols& syms);
+    bool start(const Symbols& syms);  // 現在と同じシグネチャ (引数は argv に変わる)
 
     // reload = 旧プロセス終了 + 新プロセス起動
     void reload(const Symbols& syms);  // sendQuit() + start(syms)
 
-    // ユーザー定義関数の呼び出し (fire-and-forget)
-    void callFunc(const wstringi& name,
-                  const std::vector<YamyArg>& args,
-                  const YamyFuncCallContext& ctx_info);
+    // 以下は実装済み (現在のインターフェースを参照)
+    // execUserFunc / setExecKeySeqCallback
 
-    std::unique_ptr<Setting> takeNewSetting();
     static const UINT WM_ScripterSettingReady;
-    static const UINT WM_ScripterExecFunc;      // 新規追加
 };
 ```
 
-### start() の将来形
+### start() の将来形 (プロセス再起動方式)
 
 ```cpp
 bool ScripterManager::start(const Symbols& syms)
@@ -140,142 +138,58 @@ bool ScripterManager::start(const Symbols& syms)
 }
 ```
 
-### callFunc() の将来形
+### execUserFunc() — 実装済み
 
-```cpp
-void ScripterManager::callFunc(const wstringi& name,
-                                const std::vector<YamyArg>& args,
-                                const YamyFuncCallContext& ctx_info)
-{
-    if (!m_ctrlWriter) return;
-    try {
-        m_ctrlWriter->writeCallFunc(name, args, ctx_info);
-    } catch (...) {}
-}
-```
+`execUserFunc()` は `CtrlStreamWriter::writeExecUserFunc()` を呼び出す形で実装済み。
+詳細は「CtrlStream の現在の実装」セクションを参照。
 
 ---
+
+## CtrlStream の現在の実装 (実装済み)
+
+`ctrl_stream.h`、`ctrl_stream_writer.cpp/h`、`scripter/ctrl_stream_reader.cpp/h` はすべて実装済み。
+
+```cpp
+// ctrl_stream.h (現在)
+enum class CtrlId : uint8_t {
+    Start        = 0x01,  ///< (Re)compile with symbols; sent on every scripter startup
+    ExecUserFunc = 0x02,  ///< Engine -> scripter: invoke user-defined function
+    Quit         = 0xFF,
+};
+```
+
+```cpp
+// ctrl_stream_writer.h (yamy 側)
+class CtrlStreamWriter {
+public:
+    void writeStart(const Symbols &syms);
+    void writeExecUserFunc(const wstringi &funcName,
+                           const std::vector<FuncArg> &args,
+                           const TriggerInfo &ctx);
+    void writeQuit();
+};
+```
+
+```cpp
+// scripter/ctrl_stream_reader.h (scripter 側)
+class CtrlStreamReader {
+public:
+    bool readNext(CtrlId &ctrlId);
+    Symbols readStart();
+
+    struct ExecUserFuncData {
+        wstringi             name;
+        std::vector<FuncArg> args;
+        TriggerInfo          context;
+    };
+    ExecUserFuncData readExecUserFunc();
+};
+```
 
 ## CtrlStream の将来の変更 (未実装)
 
-### ctrl_stream.h
-
-```cpp
-enum class CtrlId : uint8_t {
-    CallFunc = 0x01,  // 旧 Reload 0x01 を置き換え
-    Quit     = 0xFF,  // 変更なし
-};
-```
-
-### ctrl_stream_writer.h/cpp
-
-```cpp
-class CtrlStreamWriter
-{
-public:
-    // 削除: writeReload()
-    // 追加:
-    void writeCallFunc(const wstringi& name,
-                       const std::vector<YamyArg>& args,
-                       const YamyFuncCallContext& ctx_info);
-    void writeQuit();  // 変更なし
-};
-```
-
-### ctrl_stream_reader.h/cpp (scripter 側)
-
-```cpp
-class CtrlStreamReader
-{
-public:
-    bool readNext(CtrlId& ctrlId);
-    // 削除: readReload()
-    // 追加:
-    void readCallFunc(wstringi& name,
-                      std::vector<YamyArg>& args,
-                      YamyFuncCallContext& ctx_info);
-};
-```
-
----
-
-## CmdStream の将来の変更 (未実装)
-
-### cmd_stream.h
-
-```cpp
-enum class CmdId : uint8_t {
-    // 既存は変更なし (0x01〜0x25, 0xFF)
-    ExecFunc = 0x30,  // 新規追加
-};
-```
-
-### cmd_stream_reader.h/cpp
-
-```cpp
-struct CmdExecFuncData {
-    wstringi                name;
-    std::vector<YamyArg>    args;
-};
-
-using AnyCmd = std::variant<
-    // 既存型...
-    CmdExecFuncData   // 新規追加
->;
-```
-
----
-
-## CmdProcessor の将来の変更 (未実装)
-
-```cpp
-class CmdProcessor
-{
-public:
-    // 既存: onCommit()
-    // 追加:
-    void onExecFunc(std::function<void(const wstringi& name,
-                                       const std::vector<YamyArg>& args)> cb);
-};
-```
-
-### データスレッドの動作変更
-
-Commit 受信後もパイプを読み続け、ExecFunc を処理する:
-
-```cpp
-void ScripterManager::runReader()
-{
-    // ...
-    processor.onCommit([this](std::unique_ptr<Setting> s) {
-        { lock; m_pendingSetting = move(s); }
-        PostMessage(m_hwndNotify, WM_ScripterSettingReady, 0, 0);
-        // Commit 後もループ継続 (return しない)
-    });
-
-    processor.onExecFunc([this](const wstringi& name,
-                                 const std::vector<YamyArg>& args) {
-        auto* p = new ExecFuncPayload{name, args};
-        PostMessage(m_hwndNotify, WM_ScripterExecFunc,
-                    0, reinterpret_cast<LPARAM>(p));
-    });
-
-    processor.process(reader);  // パイプ EOF まで読み続ける
-}
-```
-
----
-
-## mayu.cpp の将来の変更 (未実装)
-
-```cpp
-case WM_APP_scripterExecFunc: {
-    auto* p = reinterpret_cast<ExecFuncPayload*>(lParam);
-    std::unique_ptr<ExecFuncPayload> payload(p);
-    This->m_engine.dispatchScripterFunc(payload->name, payload->args);
-    return 0;
-}
-```
+プロセス再起動方式では `Start` が不要になる (`ctrl_stream.h` から削除)。
+`writeStart` / `readStart` も削除される。
 
 ---
 
@@ -298,5 +212,5 @@ case WM_APP_scripterExecFunc: {
 ## 未決事項
 
 - `Engine::dispatchScripterFunc()` の実装詳細 (スレッド安全性、エラー処理)
-- `YamyFuncCallContext` を Engine が KBDLLHOOKSTRUCT 等から構築するコード
-- CallFunc を発行するトリガー: .mayu 言語の `&ScriptFunc("name")` をどう表現するか
+- `TriggerInfo` を Engine が KBDLLHOOKSTRUCT 等から構築するコード
+- ExecUserFunc を発行するトリガー: .mayu 言語の `&ExecUserFunc("name")` をどう表現するか

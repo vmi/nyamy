@@ -35,28 +35,29 @@ extern "C" SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[]);
 
 ### `scripter/yamy_scripter.cpp` — `scripter_engine()` の実装
 
-yamy から継承ハンドルの番号を `--ctrl=N` / `--cmd=N` で受け取り、
+継承ハンドルの番号を環境変数 `YSCR_CTRL` / `YSCR_CMD` から取得し、
 それぞれ CtrlStream / CmdStream の通信チャネルとして使用する。
 stdin/stdout/stderr はバイナリプロトコルに使用しない。
 
 ```cpp
 SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[])
 {
-    // argv から --ctrl=N, --cmd=N を解析
+    // 環境変数 YSCR_CTRL / YSCR_CMD からハンドルを取得
     HANDLE hCtrlRead  = INVALID_HANDLE_VALUE;
     HANDLE hDataWrite = INVALID_HANDLE_VALUE;
-    for (int i = 1; i < argc; i++) {
-        if (wcsncmp(argv[i], L"--ctrl=", 7) == 0)
+    {
+        wchar_t buf[32];
+        if (GetEnvironmentVariableW(L"YSCR_CTRL", buf, 32) > 0)
             hCtrlRead  = reinterpret_cast<HANDLE>(
-                             static_cast<uintptr_t>(wcstoull(argv[i] + 7, nullptr, 10)));
-        else if (wcsncmp(argv[i], L"--cmd=", 6) == 0)
+                             static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
+        if (GetEnvironmentVariableW(L"YSCR_CMD",  buf, 32) > 0)
             hDataWrite = reinterpret_cast<HANDLE>(
-                             static_cast<uintptr_t>(wcstoull(argv[i] + 6, nullptr, 10)));
+                             static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
     }
 
     if (hCtrlRead == INVALID_HANDLE_VALUE || hDataWrite == INVALID_HANDLE_VALUE) {
         _setmode(_fileno(stderr), _O_U16TEXT);
-        std::wcerr << L"error: --ctrl and --cmd handle arguments are required" << std::endl;
+        std::wcerr << L"error: YSCR_CTRL and YSCR_CMD environment variables are required" << std::endl;
         return;
     }
 
@@ -79,10 +80,13 @@ SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[])
 
         if (id == CtrlId::Quit) {
             break;
-        } else if (id == CtrlId::Reload) {
-            Symbols syms = ctrlReader.readReload();
-            doReload(syms, dataWriter);
+        } else if (id == CtrlId::Start) {
+            Symbols syms = ctrlReader.readStart();
+            doCompile(syms, dataWriter);
             dataStream.flush();
+        } else if (id == CtrlId::ExecUserFunc) {
+            auto req = ctrlReader.readExecUserFunc();
+            execUserFunc(req.name, req.args, req.context);
         }
     }
 
@@ -91,7 +95,7 @@ SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[])
 }
 ```
 
-`doReload()` は ConfigFiles → MayuParser → MayuCompiler → CmdStreamWriter の順に処理。
+`doCompile()` は ConfigFiles → MayuParser → MayuCompiler → CmdStreamWriter の順に処理。
 エラー時は Commit を書かず、`std::wcerr` に報告 (msg パイプ経由でログに表示される)。
 
 ---
@@ -115,31 +119,31 @@ pipe_streambuf.h
 
 ### argv シンボル渡し (プロセス再起動方式)
 
-`--ctrl` / `--cmd` に加えて `-D` フラグでシンボルを渡す。
+`-D` フラグでシンボルを渡す。ハンドルは引き続き `YSCR_CTRL`/`YSCR_CMD` 環境変数で渡す。
 
 ```
-yamy-scripter.exe --ctrl=N --cmd=M [-DSYM1 [-DSYM2 ...]]
+yamy-scripter.exe [-DSYM1 [-DSYM2 ...]]
 ```
 
 ### .mayu EXE の main.cpp (将来形)
 
-ハンドルは DLL が環境変数から取得するため、main.cpp は callbacks を渡して
-`yscr_start()` を呼ぶだけでよい。
+ハンドルは DLL が `YSCR_CTRL`/`YSCR_CMD` 環境変数から取得するため (現行実装と同様)、
+main.cpp は callbacks を渡して `ys_start()` を呼ぶだけでよい。
 
 ```cpp
 #include "yamy_scripter.h"
 
 static bool on_load_setting()
 {
-    return yscr_load_mayu();  // .mayu ファイルをコンパイルしてキューに積む
+    return ys_load_mayu();  // .mayu ファイルをコンパイルしてキューに積む
 }
 
 int wmain(int argc, wchar_t* argv[])
 {
-    YscrCallbacks cb = {};
-    cb.load_setting = on_load_setting;
-    return yscr_start(&cb);
-    // 返り値: 0 = Engine から終了コマンド受信, 1 = load_setting が false を返した
+    YsCallbacks cb = {};
+    cb.on_load_setting = on_load_setting;
+    return ys_start(&cb);
+    // 返り値: 0 = Engine から終了コマンド受信, 1 = on_load_setting が false を返した
 }
 ```
 
@@ -153,13 +157,14 @@ static mrb_state* g_mrb = nullptr;
 
 static bool on_load_setting()
 {
-    // mruby スクリプト実行 → yscr_* API 呼び出しで設定を構築
+    // mruby スクリプト実行 → ys_* API 呼び出しで設定を構築
     mrb_load_file(g_mrb, ...);
     return mrb_nil_p(g_mrb->exc);
 }
 
-static void on_call_user_func(YscrInputCtx* ctx, const char* name,
-                               const YscrTypedVal* args, int arg_count)
+static void on_exec_user_func(const char* name,
+                               const YsFuncArgs* preset_args,
+                               const YsTriggerInfo* trigger_info)
 {
     mrb_funcall(g_mrb, mrb_top_self(g_mrb), name, 0);
 }
@@ -167,12 +172,12 @@ static void on_call_user_func(YscrInputCtx* ctx, const char* name,
 int wmain(int argc, wchar_t* argv[])
 {
     g_mrb = mrb_open();
-    bind_yscr_to_mruby(g_mrb);  // yscr_* 関数を mruby モジュールとして登録
+    bind_ys_to_mruby(g_mrb);  // ys_* 関数を mruby モジュールとして登録
 
-    YscrCallbacks cb = {};
-    cb.load_setting   = on_load_setting;
-    cb.call_user_func = on_call_user_func;
-    int ret = yscr_start(&cb);
+    YsCallbacks cb = {};
+    cb.on_load_setting   = on_load_setting;
+    cb.on_exec_user_func = on_exec_user_func;
+    int ret = ys_start(&cb);
 
     mrb_close(g_mrb);
     return ret;
@@ -190,24 +195,25 @@ import ctypes
 lib = ctypes.CDLL("yamy-scripter.dll")
 
 LoadSettingFn  = ctypes.CFUNCTYPE(ctypes.c_bool)
-CallUserFuncFn = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_char_p,
-                                   ctypes.c_void_p, ctypes.c_int)
+ExecUserFuncFn = ctypes.CFUNCTYPE(None, ctypes.c_char_p,   # name
+                                        ctypes.c_void_p,   # preset_args (YsFuncArgs*)
+                                        ctypes.c_void_p)   # trigger_info (YsTriggerInfo*)
 
-class YscrCallbacks(ctypes.Structure):
+class YsCallbacks(ctypes.Structure):
     _fields_ = [
-        ("load_setting",   LoadSettingFn),
-        ("call_user_func", CallUserFuncFn),
+        ("on_load_setting",   LoadSettingFn),
+        ("on_exec_user_func", ExecUserFuncFn),
     ]
 
-def load_setting():
-    return bool(lib.yscr_load_mayu())  # .mayu コンパイル
+def on_load_setting():
+    return bool(lib.ys_load_mayu())  # .mayu コンパイル
 
-def call_user_func(ctx, name, args, arg_count):
+def on_exec_user_func(name, preset_args, trigger_info):
     pass  # ユーザー定義関数の実行
 
-cb = YscrCallbacks(LoadSettingFn(load_setting), CallUserFuncFn(call_user_func))
-lib.yscr_start.restype = ctypes.c_int
-lib.yscr_start(ctypes.byref(cb))
+cb = YsCallbacks(LoadSettingFn(on_load_setting), ExecUserFuncFn(on_exec_user_func))
+lib.ys_start.restype = ctypes.c_int
+lib.ys_start(ctypes.byref(cb))
 ```
 
 ---
@@ -228,5 +234,5 @@ compiler_specific_func.cpp        ← DLL に含まれる
 registry.cpp                      ← DLL に含まれる
 stringtool.cpp                    ← DLL に含まれる
 windowstool.cpp                   ← DLL に含まれる
-ctrl_stream_writer.cpp/h          ← DLL に含まれる
+ctrl_stream_writer.cpp/h          ← yamy 側 (root)、DLL には含まれない
 ```

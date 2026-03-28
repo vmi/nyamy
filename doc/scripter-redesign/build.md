@@ -27,6 +27,6 @@ DLL 内部で確保したメモリは DLL 内部で解放すること。
 
 ## 将来の変更予定
 
-詳細 C API (`yscr_start` / `yscr_reg_keyseq` 等) を追加する場合、現状の `scripter_engine()` 一本から
+詳細 C API (`ys_start` / `ys_reg_keyseq` 等) を追加する場合、現状の `scripter_engine()` 一本から
 多関数エクスポートに切り替える。その際のプロジェクト変更は軽微 (ソース追加のみ)。
 プロジェクト名・GUID・TargetName は変更しない予定。

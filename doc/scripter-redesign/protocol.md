@@ -6,8 +6,8 @@ yamy ↔ yamy-scripter 間の通信は **4 本のハンドル** で行う。
 
 | チャネル | 方向 | 渡し方 | 内容 |
 |--------|------|--------|------|
-| ctrl パイプ | yamy → scripter | コマンドライン `--ctrl=N` (継承ハンドル番号) | CtrlStream (バイナリ) |
-| cmd パイプ | scripter → yamy | コマンドライン `--cmd=N` (継承ハンドル番号) | CmdStream (バイナリ) |
+| ctrl パイプ | yamy → scripter | 環境変数 `YSCR_CTRL` (継承ハンドル番号) | CtrlStream (バイナリ) |
+| cmd パイプ | scripter → yamy | 環境変数 `YSCR_CMD` (継承ハンドル番号) | CmdStream (バイナリ) |
 | msg パイプ | scripter → yamy | STARTUPINFO (stdout+stderr をマージ) | ログ出力 (テキスト) |
 | NUL | — | STARTUPINFO stdin | 即 EOF |
 
@@ -23,7 +23,7 @@ CmdStream を汚染しない。
 
 ## プロセス起動とハンドル継承
 
-yamy 側 (`ScripterManager::start()`) の処理:
+yamy 側 (`ScripterManager::launchScripter()`) の処理:
 
 ```cpp
 // パイプ生成 (sa.bInheritHandle = TRUE で子プロセスに継承可能)
@@ -37,27 +37,34 @@ SetHandleInformation(m_hCtrlWrite, HANDLE_FLAG_INHERIT, 0);
 SetHandleInformation(m_hDataRead,  HANDLE_FLAG_INHERIT, 0);
 SetHandleInformation(m_hMsgRead,   HANDLE_FLAG_INHERIT, 0);
 SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
+// hCtrlRead, hDataWrite, hMsgWrite は継承可能 (sa.bInheritHandle=TRUE)
 
-// コマンドラインにハンドル番号を付加
-swprintf_s(cmdLine, L"\"%s\" --ctrl=%llu --cmd=%llu",
-           scripterPath.c_str(),
-           (unsigned long long)(uintptr_t)hCtrlRead,
-           (unsigned long long)(uintptr_t)hDataWrite);
+// 環境変数ブロックにハンドル番号を設定
+wchar_t ctrlVal[32], cmdVal[32];
+swprintf_s(ctrlVal, L"%llu", (unsigned long long)(uintptr_t)hCtrlRead);
+swprintf_s(cmdVal,  L"%llu", (unsigned long long)(uintptr_t)hDataWrite);
+// YSCR_CTRL=ctrlVal, YSCR_CMD=cmdVal を先頭に持つ環境ブロックを構築 (既存 env をマージ)
+
+// コマンドライン (ハンドル引数なし)
+swprintf_s(cmdLine, L"\"%s\"", scripterPath.c_str());
 
 // stdin=NUL, stdout+stderr=msgパイプ
 si.hStdInput  = hNul;
 si.hStdOutput = hMsgWrite;
 si.hStdError  = hMsgWrite;  // 同じパイプにマージ
 
-CreateProcess(NULL, cmdLine, ..., TRUE /*bInheritHandles*/, ..., &si, &pi);
+CreateProcess(NULL, cmdLine, NULL, NULL, TRUE, CREATE_UNICODE_ENVIRONMENT, envBlock, NULL, &si, &pi);
 ```
 
 scripter 側 (`scripter_engine()`) の処理:
 
 ```cpp
-// argv から --ctrl=N, --cmd=N を解析してハンドルを復元
-HANDLE hCtrlRead  = ...; // reinterpret_cast<HANDLE>(wcstoull(argv[i]+7, ...))
-HANDLE hDataWrite = ...; // reinterpret_cast<HANDLE>(wcstoull(argv[i]+6, ...))
+// 環境変数 YSCR_CTRL / YSCR_CMD からハンドルを復元
+wchar_t buf[32];
+GetEnvironmentVariableW(L"YSCR_CTRL", buf, 32);
+HANDLE hCtrlRead  = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
+GetEnvironmentVariableW(L"YSCR_CMD", buf, 32);
+HANDLE hDataWrite = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
 
 // stderr を UTF-16 に設定 (wcerr 経由のログを yamy が wchar_t 単位で読む)
 _setmode(_fileno(stderr), _O_U16TEXT);
@@ -91,27 +98,21 @@ scripter の stdout と stderr を 1 本のパイプにマージして yamy が�
 
 | コマンド | ID | 状態 |
 |---------|-----|------|
-| Reload | 0x01 | 使用中 (シンボルセット送信) |
+| Start | 0x01 | 使用中 (シンボルセット送信、起動時) |
+| ExecUserFunc | 0x02 | 使用中 (ユーザー定義関数呼び出し) |
 | Quit | 0xFF | 使用中 |
-
-### 将来の変更 (未実装)
-
-| コマンド | 旧 | 新 |
-|---------|----|----|
-| Reload | 0x01 (シンボルセット送信) | **廃止** (シンボルは argv で渡す) |
-| CallFunc | なし | **0x01 (新規)** |
-| Quit | 0xFF | 0xFF (変更なし) |
 
 ### コマンド ID (現状)
 
 ```cpp
 enum class CtrlId : uint8_t {
-    Reload = 0x01,  ///< Recompile with the given symbols
-    Quit   = 0xFF,  ///< Terminate scripter
+    Start        = 0x01,  ///< (Re)compile with symbols; sent on every scripter startup
+    ExecUserFunc = 0x02,  ///< Engine -> scripter: invoke user-defined function
+    Quit         = 0xFF,  ///< Terminate scripter
 };
 ```
 
-### Reload (0x01)
+### Start (0x01)
 
 ```
 [0x01]
@@ -121,53 +122,38 @@ enum class CtrlId : uint8_t {
 [symN   : String]
 ```
 
+### ExecUserFunc (0x02)
+
+```
+[0x02]
+[func_name : String]
+[n_args    : U16]
+[arg0      : FuncArg]
+...
+[argN      : FuncArg]
+[context   : TriggerInfo]
+```
+
 ### Quit (0xFF)
 
 ```
 [0xFF]
 ```
 
-### 将来の変更 (未実装)
+### 将来の変更 (未実装、プロセス再起動方式)
 
-| コマンド | 旧 | 新 |
-|---------|----|----|
-| Reload | 0x01 (シンボルセット送信) | **廃止** (シンボルは argv で渡す) |
-| CallFunc | なし | **0x01 (新規)** |
+プロセス再起動方式では、シンボルは argv (`-D` フラグ) で渡すため `Start (0x01)` が不要になる。
+`ExecUserFunc (0x02)` と `Quit (0xFF)` のみ残る。
+
+| コマンド | 現在 | 将来 |
+|---------|------|------|
+| Start | 0x01 (シンボルセット送信) | **廃止** (シンボルは argv で渡す) |
+| ExecUserFunc | 0x02 | 0x02 (変更なし) |
 | Quit | 0xFF | 0xFF (変更なし) |
 
-#### CallFunc (0x01) — 未実装
+#### TriggerInfo バイナリレイアウト
 
-```
-[0x01]
-[func_name : String]
-[n_args    : U16]
-[arg0      : TypedArg]
-...
-[argN      : TypedArg]
-[context   : YamyFuncCallContext]
-```
-
-#### YamyFuncCallContext (未実装、60 bytes)
-
-```c
-typedef struct {
-    uint64_t keyHwnd;
-    uint16_t vkey;
-    uint16_t scanCode;
-    uint8_t  isKeyUp;
-    uint8_t  imeOpen;
-    uint8_t  e0Flag;
-    uint8_t  _pad;
-    uint64_t modifierState;
-    uint32_t keyWindowDpi;
-    uint32_t keyDisplayIndex;
-    uint64_t mouseHwnd;
-    int32_t  mouseX;
-    int32_t  mouseY;
-    uint32_t mouseWindowDpi;
-    uint32_t mouseDisplayIndex;
-} YamyFuncCallContext;
-```
+`TriggerInfo` のバイナリシリアライズ形式は `ctrl_stream_writer.cpp` / `ctrl_stream_reader.cpp` を参照。
 
 ---
 
@@ -177,61 +163,32 @@ typedef struct {
 
 | コマンド | ID | 状態 |
 |---------|-----|------|
-| DefKeySeq〜Commit | 0x01〜0xFF | 使用中 (変更なし) |
-| ExecFunc | 0x30 | 未実装 (将来追加) |
+| RegKeySeq〜Commit | 0x01〜0xFF | 使用中 (変更なし) |
+| ExecKeySeq | 0x02 | 使用中 (adhoc キーシーケンス実行要求) |
 
-**現状のフロー**: scripter は compile 中に CmdStream コマンドを即座に stdout へ書き出す
+**現状のフロー**: scripter は compile 中に CmdStream コマンドを即座にパイプへ書き出す
 (キューイングなし)。エラー発生時は Commit を書かずに終了する。
-
-### 将来の変更 (未実装): キューイング方式
-
-scripter は Def 系コマンドを内部でキューイングし、**Commit (0xFF) が呼ばれた
-時点でエラーなく到達した場合のみ** まとめて yamy に送出する。
-エラー発生時はキューを破棄し、何も送出しない。
-
-Commit 送出後もパイプを維持し、ExecFunc コマンドを継続して送出できる。
 
 ### コマンド ID
 
 ```cpp
 enum class CmdId : uint8_t {
-    RegKeySeq  = 0x01,
-    DefKey     = 0x10,
-    DefMod     = 0x11,
-    DefSync    = 0x12,
-    DefAlias   = 0x13,
-    DefSubst   = 0x14,
-    DefOption  = 0x15,
-    DefSymbol  = 0x16,
+    RegKeySeq   = 0x01,
+    ExecKeySeq  = 0x02,
+    DefKey      = 0x10,
+    DefMod      = 0x11,
+    DefSync     = 0x12,
+    DefAlias    = 0x13,
+    DefSubst    = 0x14,
+    DefOption   = 0x15,
+    DefSymbol   = 0x16,
     BeginKeymap = 0x20,
-    AssignKey  = 0x21,
+    AssignKey   = 0x21,
     AssignEvent = 0x23,
-    AssignMod  = 0x24,
-    Commit     = 0xFF,
-    // 未実装:
-    ExecFunc   = 0x30,
+    AssignMod   = 0x24,
+    Commit      = 0xFF,
 };
 ```
-
-### ExecFunc (0x30) — 未実装
-
-Commit 後にユーザー定義関数コールバック内から送出。yamy 側の組み込み関数を
-即時実行する。
-
-```
-[0x30]
-[func_name : String]
-[n_args    : U16]
-[arg0      : TypedArg]
-...
-[argN      : TypedArg]
-```
-
----
-
-## 型付き引数 (TypedArg) — 未実装
-
-→ [typed-args.md](typed-args.md) 参照
 
 ---
 
@@ -239,53 +196,56 @@ Commit 後にユーザー定義関数コールバック内から送出。yamy �
 
 ### 現在の起動シーケンス
 
-```
-yamy                              yamy-scripter
-  |                                   |
-  |--- CreateProcess(                 |
-  |      "yamy-scripter.exe          |
-  |       --ctrl=N --cmd=M"          |
-  |      stdin=NUL                   |
-  |      stdout=stderr=msgPipe) ---->|
-  |                                   | 1. argv から --ctrl, --cmd を解析
-  |                                   | 2. stderr を UTF-16 に設定
-  |--- CtrlStream: Reload(syms) ----->| 3. .mayu コンパイル
-  |<--- CmdStream (all cmds) ---------|
-  |<--- Commit (0xFF) ---------------|
-  |--- CtrlStream: Reload(syms) ----->| 4. 再コンパイル (設定変更時)
-  |<--- CmdStream (all cmds) ---------|
-  |<--- Commit (0xFF) ---------------|
-  |--- CtrlStream: Quit (0xFF) ------>|
-  |                                   | 5. 終了
+```mermaid
+sequenceDiagram
+    participant yamy
+    participant scripter as yamy-scripter
+
+    yamy->>scripter: CreateProcess("yamy-scripter.exe",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YSCR_CTRL=N, YSCR_CMD=M)
+    Note right of scripter: 1. env から YSCR_CTRL/YSCR_CMD を取得
+    Note right of scripter: 2. stderr を UTF-16 に設定
+    yamy->>scripter: CtrlStream: Start(syms)
+    Note right of scripter: 3. .mayu コンパイル
+    scripter->>yamy: CmdStream (all cmds)
+    scripter->>yamy: Commit (0xFF)
+    yamy->>scripter: CtrlStream: Start(syms)
+    Note right of scripter: 4. 再コンパイル (設定変更時)
+    scripter->>yamy: CmdStream (all cmds)
+    scripter->>yamy: Commit (0xFF)
+    yamy->>scripter: CtrlStream: Quit (0xFF)
+    Note right of scripter: 5. 終了
 ```
 
 ### 将来の起動シーケンス (プロセス再起動方式、未実装)
 
-```
-yamy                              yamy-scripter
-  |                                   |
-  |--- CreateProcess(                 |
-  |      "yamy-scripter.exe          |
-  |       --ctrl=N --cmd=M           |
-  |       -DSYM1 -DSYM2")  -------->|
-  |                                   | 1. argv から --ctrl, --cmd, -D シンボルを解析
-  |                                   | 2. .mayu コンパイル or スクリプト実行
-  |                                   | 3. Commit → CmdStream 送出
-  |<--- CmdStream (batch) -----------|
-  |<--- Commit (0xFF) ---------------|
-  |                                   | 4. CtrlStream 待ちループへ移行
-  |--- CallFunc (0x01) ------------->|
-  |<--- ExecFunc (0x30) -------------|
-  |--- Quit (0xFF) ----------------->|
-  |                                   | 5. 終了
+```mermaid
+sequenceDiagram
+    participant yamy
+    participant scripter as yamy-scripter
+
+    yamy->>scripter: CreateProcess("yamy-scripter.exe -DSYM1 -DSYM2",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YSCR_CTRL=N, YSCR_CMD=M)
+    Note right of scripter: 1. env から YSCR_CTRL/YSCR_CMD を取得<br/>　 argv から -D シンボルを解析
+    Note right of scripter: 2. .mayu コンパイル or スクリプト実行
+    Note right of scripter: 3. Commit → CmdStream 送出
+    scripter->>yamy: CmdStream (batch)
+    scripter->>yamy: Commit (0xFF)
+    Note right of scripter: 4. CtrlStream 待ちループへ移行
+    yamy->>scripter: ExecUserFunc (0x02)
+    scripter->>yamy: ExecKeySeq (0x02)
+    yamy->>scripter: Quit (0xFF)
+    Note right of scripter: 5. 終了
 ```
 
 ### 将来の設定再読み込み (未実装、プロセス再起動方式)
 
-```
-yamy
-  |--- CtrlStream: Quit を送信 OR ctrl パイプをクローズ
-  |--- WaitForSingleObject(process, 5000ms)
-  |--- CloseHandle(process)
-  |--- CreateProcess(新シンボル付きで再起動)
+```mermaid
+sequenceDiagram
+    participant yamy
+    participant old as scripter (旧)
+    participant new as scripter (新)
+
+    yamy->>old: CtrlStream: Quit 送信 OR ctrl パイプをクローズ
+    old-->>yamy: 終了
+    yamy->>yamy: WaitForSingleObject(process, 5000ms) / CloseHandle
+    yamy->>new: CreateProcess(新シンボル付きで再起動)
 ```
