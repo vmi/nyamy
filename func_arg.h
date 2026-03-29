@@ -2,7 +2,7 @@
 // func_arg.h
 //
 // FuncArg: unified function argument type (std::variant).
-// Used in both the CmdStream bytecode pipeline and the CtrlStream IPC pipeline.
+// Used in both the CmdStream pipeline and the CtrlStream IPC pipeline.
 
 #ifndef _FUNC_ARG_H
 #  define _FUNC_ARG_H

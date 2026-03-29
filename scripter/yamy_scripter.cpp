@@ -1,5 +1,5 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// scripter_engine.cpp - yamy-scripter entry point
+// yamy_scripter.cpp - yamy-scripter entry point
 //
 // Reads CtrlStream commands from an inherited pipe handle passed via YSCR_CTRL env var.
 // Compiles .mayu files and writes CmdStream to an inherited pipe handle passed

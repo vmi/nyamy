@@ -4,7 +4,7 @@
 // Types defined by the scripter pipeline and shared with the engine side.
 // ModifierSpec: modifier condition bitfields (resolved from string form at compile time).
 // FuncArg: unified function argument type (std::variant).
-// Used in both the CmdStream bytecode pipeline and the CtrlStream IPC pipeline.
+// Used in both the CmdStream pipeline and the CtrlStream IPC pipeline.
 
 #ifndef _SCRIPTER_TYPES_H
 #  define _SCRIPTER_TYPES_H

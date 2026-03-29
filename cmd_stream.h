@@ -42,7 +42,7 @@ enum class CmdId : uint8_t {
 
 
 //=============================================================================
-// Bytecode sub-structures (transferred from bytecode.h)
+// Sub-structures
 //=============================================================================
 
 /// Scan code with flags
@@ -91,7 +91,7 @@ struct CmdArgsRegKeySeq {
 
 
 //=============================================================================
-// Command data structures (moved from bytecode.h)
+// Command data structures
 //=============================================================================
 
 struct CmdArgsDefKey {
