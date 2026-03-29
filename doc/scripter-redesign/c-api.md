@@ -18,13 +18,13 @@ typedef struct YsStrs YsStrs;
 
 // FuncArgの型
 typedef enum YsType {
-    YT_ERROR      = -1,
-	YT_STRING     = 0,
-	YT_NUMBER     = 1,
-	YT_REGEXP     = 2,
-	YT_KEYSEQ_IDX = 3,
-	YT_MOD        = 4,
-	YT_TOKEN_SEQ  = 5,
+    YsType_Error      = -1,
+	YsType_String     = 0,
+	YsType_Number     = 1,
+	YsType_Regexp     = 2,
+	YsType_KeySeqIdx  = 3,
+	YsType_ModifierSpec    = 4,
+	YsType_TokenSeq   = 5,
 } YsType;
 
 // 書き込み用 YsFuncArgs の作成。コールバック関数から戻った段階で全て解放される。
@@ -36,14 +36,14 @@ YS_API YsStrs* ys_strs_new(void);
 YS_API int ys_func_args_length(const YsFuncArgs* fas);
 YS_API int ys_strs_length(const YsStrs *ss);
 
-// YT_STRING: *p_value is const char*, *p_length is count of bytes (not include the end of NUL).
+// YsType_String: *p_value is const char*, *p_length is count of bytes (not include the end of NUL).
 // (This lifetime same as YsFuncArgs*)
-// YT_NUMBER: *p_value is number (int32_t)
-// YT_REGEXP: *p_value is const char*, *p_length is count of bytes (not include the end of NUL).
+// YsType_Number: *p_value is number (int32_t)
+// YsType_Regexp: *p_value is const char*, *p_length is count of bytes (not include the end of NUL).
 // (This lifetime same as YsFuncArgs*)
-// YT_KEYSEQ_IDX: *p_value is number (uint32_t)
-// YT_MOD: *p_value is modifier bitmask (uint64_t), *p_length is dontcare bitmask (uint64_t).
-// YT_TOKEN_SEQ: *p_value is const YsStrs*, *p_length is length of string array (same as ys_strs_length(*p_value)).
+// YsType_KeySeqIdx: *p_value is number (uint32_t)
+// YsType_ModifierSpec: *p_value is modifier bitmask (uint64_t), *p_length is dontcare bitmask (uint64_t).
+// YsType_TokenSeq: *p_value is const YsStrs*, *p_length is length of string array (same as ys_strs_length(*p_value)).
 YS_API YsType ys_func_args_get(const YsFuncArgs* fas, int idx, int64_t* p_value, int64_t* p_length);
 YS_API bool ys_strs_get(const YsStrs* ss, int idx, const char** p_value, size_t* p_length);
 
@@ -127,7 +127,7 @@ YS_API bool ys_def_option(const char* option_name, const char* value);
 // window_op: "&&", "||", または NULL (window以外は NULL)
 // parent_name: 親キーマップ名 (なければ NULL)
 // default_keyseq_idx: デフォルトキーシーケンスのインデックス (-1 はなし)
-YS_API bool ys_begin_keymap(const char* keymap_type, const char* name,
+YS_API bool ys_begin_keymap(const char* keyword, const char* name,
                             const char* window_class, const char* window_title,
                             const char* op, const char* parent_name,
                             int default_keyseq_idx);
@@ -145,7 +145,6 @@ YS_API bool ys_assign_event(const char* event_name, int rhs_keyseq_idx);
 // mod MOD = ... 相当
 // prefixes: prefix のアサインモード + 修飾子名 ("!Shift", "!!!Ctrl" など) のYsStrs(全ての要素は文字列であること)
 //           (なければ NULL)
-// prefix_count: prefix の数 (なければ 0)
 // modifier_name: モディファイア名 (例: "Shift")
 // op: 代入演算子 "=", "+=", "-=" のいずれか
 // keys: キー名のYsStrs(全ての要素は文字列であること)。
