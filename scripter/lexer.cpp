@@ -23,7 +23,7 @@ Token::Token(const Token &i_token)
 }
 
 Token::Token(int i_value, const wstringi &i_display)
-		: m_type(Type_number),
+		: m_type(Type::Number),
 		m_isValueQuoted(false),
 		m_numericValue(i_value),
 		m_stringValue(i_display),
@@ -32,7 +32,7 @@ Token::Token(int i_value, const wstringi &i_display)
 }
 
 Token::Token(const wstringi &i_value, bool i_isValueQuoted, bool i_isRegexp)
-		: m_type(static_cast<u_char>(i_isRegexp ? Type_regexp : Type_string)),
+		: m_type(i_isRegexp ? Type::Regexp : Type::String),
 		m_isValueQuoted(i_isValueQuoted),
 		m_numericValue(0),
 		m_stringValue(i_value),
@@ -41,31 +41,31 @@ Token::Token(const wstringi &i_value, bool i_isValueQuoted, bool i_isRegexp)
 }
 
 Token::Token(Type i_m_type)
-		: m_type(static_cast<u_char>(i_m_type)),
+		: m_type(i_m_type),
 		m_isValueQuoted(false),
 		m_numericValue(0),
 		m_stringValue(L""),
 		m_data(NULL)
 {
-	ASSERT(m_type == Type_openParen || m_type == Type_closeParen ||
-		   m_type == Type_comma);
+	ASSERT(m_type == Type::OpenParen || m_type == Type::CloseParen ||
+		   m_type == Type::Comma);
 }
 
 // get numeric value
 int Token::getNumber() const
 {
-	if (m_type == Type_number)
+	if (m_type == Type::Number)
 		return m_numericValue;
 	if (m_stringValue.empty())
 		return 0;
 	else
-		throw ErrorMessage() << L"`" << *this << L"' is not a Type_number.";
+		throw ErrorMessage() << L"`" << *this << L"' is not a number.";
 }
 
 // get string value
 wstringi Token::getString() const
 {
-	if (m_type == Type_string)
+	if (m_type == Type::String)
 		return m_stringValue;
 	throw ErrorMessage() << L"`" << *this << L"' is not a string.";
 }
@@ -73,7 +73,7 @@ wstringi Token::getString() const
 // get regexp value
 wstringi Token::getRegexp() const
 {
-	if (m_type == Type_regexp)
+	if (m_type == Type::Regexp)
 		return m_stringValue;
 	throw ErrorMessage() << L"`" << *this << L"' is not a regexp.";
 }
@@ -81,7 +81,7 @@ wstringi Token::getRegexp() const
 // case insensitive equal
 bool Token::operator==(const wchar_t *i_str) const
 {
-	if (m_type == Type_string)
+	if (m_type == Type::String)
 		return m_stringValue == i_str;
 	return false;
 }
@@ -89,8 +89,8 @@ bool Token::operator==(const wchar_t *i_str) const
 // paren equal
 bool Token::operator==(const wchar_t i_c) const
 {
-	if (i_c == L'(') return m_type == Type_openParen;
-	if (i_c == L')') return m_type == Type_openParen;
+	if (i_c == L'(') return m_type == Type::OpenParen;
+	if (i_c == L')') return m_type == Type::CloseParen;
 	return false;
 }
 
@@ -104,22 +104,22 @@ void Token::add(const wstringi &i_str)
 std::wostream &operator<<(std::wostream &i_ost, const Token &i_token)
 {
 	switch (i_token.m_type) {
-	case Token::Type_string:
+	case Token::Type::String:
 		i_ost << i_token.m_stringValue;
 		break;
-	case Token::Type_number:
+	case Token::Type::Number:
 		i_ost << i_token.m_stringValue;
 		break;
-	case Token::Type_regexp:
+	case Token::Type::Regexp:
 		i_ost << i_token.m_stringValue;
 		break;
-	case Token::Type_openParen:
+	case Token::Type::OpenParen:
 		i_ost << L"(";
 		break;
-	case Token::Type_closeParen:
+	case Token::Type::CloseParen:
 		i_ost << L")";
 		break;
-	case Token::Type_comma:
+	case Token::Type::Comma:
 		i_ost << L", ";
 		break;
 	}
@@ -237,14 +237,14 @@ continue_getTokenLoop:
 				if (!isTokenExist)
 					o_tokens->push_back(Token(L"", false));
 				isTokenExist = false;
-				o_tokens->push_back(Token(Token::Type_comma));
+				o_tokens->push_back(Token(Token::Type::Comma));
 				t ++;
 				goto continue_getTokenLoop;
 			}
 
 			// paren
 			if (*t == L'(') {
-				o_tokens->push_back(Token(Token::Type_openParen));
+				o_tokens->push_back(Token(Token::Type::OpenParen));
 				isTokenExist = false;
 				t ++;
 				goto continue_getTokenLoop;
@@ -253,7 +253,7 @@ continue_getTokenLoop:
 				if (!isTokenExist)
 					o_tokens->push_back(Token(L"", false));
 				isTokenExist = true;
-				o_tokens->push_back(Token(Token::Type_closeParen));
+				o_tokens->push_back(Token(Token::Type::CloseParen));
 				t ++;
 				goto continue_getTokenLoop;
 			}

@@ -155,27 +155,27 @@ std::vector<AstModifierSpec> MayuParser::tokensToModifierSpecs(
 	const std::vector<wstringi> &tokens) const
 {
 	std::vector<AstModifierSpec> specs;
-	AstModifierSpec::Flag flag = AstModifierSpec::Press;
+	AstModifierSpec::Flag flag = AstModifierSpec::Flag::Press;
 
 	for (const auto &tok : tokens) {
 		if (tok == L"*") {
-			flag = AstModifierSpec::Dontcare;
+			flag = AstModifierSpec::Flag::Dontcare;
 			continue;
 		}
 		if (tok == L"~") {
-			flag = AstModifierSpec::Release;
+			flag = AstModifierSpec::Flag::Release;
 			continue;
 		}
 		AstModifierSpec spec;
 		spec.name = tok;
 		spec.flag = flag;
 		specs.push_back(spec);
-		flag = AstModifierSpec::Press;
+		flag = AstModifierSpec::Flag::Press;
 	}
 	// Handle trailing bare * or ~
-	if (flag != AstModifierSpec::Press) {
+	if (flag != AstModifierSpec::Flag::Press) {
 		AstModifierSpec wildcard;
-		wildcard.name = (flag == AstModifierSpec::Dontcare) ? L"*" : L"~";
+		wildcard.name = (flag == AstModifierSpec::Flag::Dontcare) ? L"*" : L"~";
 		wildcard.flag = flag;
 		specs.push_back(wildcard);
 	}
@@ -192,7 +192,7 @@ bool MayuParser::isAssignModifierToken(const Token *t) const
 std::vector<AstModifierSpec> MayuParser::parseModifierSpecs()
 {
 	std::vector<AstModifierSpec> specs;
-	AstModifierSpec::Flag flag = AstModifierSpec::Press;
+	AstModifierSpec::Flag flag = AstModifierSpec::Flag::Press;
 
 	while (!isEOL()) {
 		Token *t = lookToken();
@@ -201,12 +201,12 @@ std::vector<AstModifierSpec> MayuParser::parseModifierSpecs()
 
 		if (*t == L"*") {
 			getToken();
-			flag = AstModifierSpec::Dontcare;
+			flag = AstModifierSpec::Flag::Dontcare;
 			continue;
 		}
 		if (*t == L"~") {
 			getToken();
-			flag = AstModifierSpec::Release;
+			flag = AstModifierSpec::Flag::Release;
 			continue;
 		}
 
@@ -218,15 +218,15 @@ std::vector<AstModifierSpec> MayuParser::parseModifierSpecs()
 		spec.flag = flag;
 		specs.push_back(spec);
 		getToken();
-		flag = AstModifierSpec::Press;
+		flag = AstModifierSpec::Flag::Press;
 	}
 
 	// If a bare * or ~ was seen (no following modifier token), add a wildcard
 	// sentinel so the compiler can apply dontcare/release to all unspecified
 	// modifiers.  This replicates the old pipeline's "trailing flag" behavior.
-	if (flag != AstModifierSpec::Press) {
+	if (flag != AstModifierSpec::Flag::Press) {
 		AstModifierSpec wildcard;
-		wildcard.name = (flag == AstModifierSpec::Dontcare) ? L"*" : L"~";
+		wildcard.name = (flag == AstModifierSpec::Flag::Dontcare) ? L"*" : L"~";
 		wildcard.flag = flag;
 		specs.push_back(wildcard);
 	}
@@ -942,35 +942,35 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 
 	Token *t = lookToken();
 
-	// $NAME -> Kind_KeySeqRef
+	// $NAME -> Kind::KeySeqRef
 	if (*t == L"$") {
 		getToken();
-		arg->kind = AstArgument::Kind_KeySeqRef;
+		arg->kind = AstArgument::Kind::KeySeqRef;
 		arg->stringValue = getToken()->getString();
 		return arg;
 	}
 
-	// (KEY_SEQUENCE) -> Kind_KeySeqLiteral
+	// (KEY_SEQUENCE) -> Kind::KeySeqLiteral
 	if (t->isOpenParen()) {
 		getToken();
-		arg->kind = AstArgument::Kind_KeySeqLiteral;
+		arg->kind = AstArgument::Kind::KeySeqLiteral;
 		arg->keySeq = parseKeySequence(true);
 		getToken(); // consume ')'
 		return arg;
 	}
 
-	// NUMBER -> Kind_Number
+	// NUMBER -> Kind::Number
 	if (t->isNumber()) {
 		getToken();
-		arg->kind = AstArgument::Kind_Number;
+		arg->kind = AstArgument::Kind::Number;
 		arg->numberValue = t->getNumber();
 		return arg;
 	}
 
-	// /REGEXP/ -> Kind_Regexp
+	// /REGEXP/ -> Kind::Regexp
 	if (t->isRegexp()) {
 		getToken();
-		arg->kind = AstArgument::Kind_Regexp;
+		arg->kind = AstArgument::Kind::Regexp;
 		arg->stringValue = t->getRegexp();
 		return arg;
 	}
@@ -987,16 +987,16 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 			[this](const wstringi &s) { return isModifierTokenName(s); });
 
 	if (rawTokens.size() == 1 && !isModifierTokenName(rawTokens[0])) {
-		// Single non-modifier token -> Kind_String (backward compatible)
-		arg->kind = AstArgument::Kind_String;
+		// Single non-modifier token -> Kind::String (backward compatible)
+		arg->kind = AstArgument::Kind::String;
 		arg->stringValue = rawTokens[0];
 	} else if (allModifiers) {
-		// All modifier tokens -> Kind_ModifierSeq (backward compatible)
-		arg->kind = AstArgument::Kind_ModifierSeq;
+		// All modifier tokens -> Kind::ModifierSeq (backward compatible)
+		arg->kind = AstArgument::Kind::ModifierSeq;
 		arg->modifierSeq = tokensToModifierSpecs(rawTokens);
 	} else {
-		// Multiple tokens or modifier+non-modifier mix -> Kind_TokenSeq
-		arg->kind = AstArgument::Kind_TokenSeq;
+		// Multiple tokens or modifier+non-modifier mix -> Kind::TokenSeq
+		arg->kind = AstArgument::Kind::TokenSeq;
 		arg->tokens = std::move(rawTokens);
 	}
 	return arg;

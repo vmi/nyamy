@@ -133,15 +133,15 @@ ModifierSpec MayuCompiler::compileModifierSpecs(
 				uint64_t bit = static_cast<uint64_t>(1) << mt;
 				explicitBits |= bit;
 				switch (spec.flag) {
-				case AstModifierSpec::Press:
+				case AstModifierSpec::Flag::Press:
 					mod.modifiers |= bit;
 					mod.dontcares &= ~bit;
 					break;
-				case AstModifierSpec::Release:
+				case AstModifierSpec::Flag::Release:
 					mod.modifiers &= ~bit;
 					mod.dontcares &= ~bit;
 					break;
-				case AstModifierSpec::Dontcare:
+				case AstModifierSpec::Flag::Dontcare:
 					mod.dontcares |= bit;
 					break;
 				}
@@ -158,10 +158,10 @@ ModifierSpec MayuCompiler::compileModifierSpecs(
 			const uint64_t allBits =
 				(static_cast<uint64_t>(1) << Modifier::Type_ASSIGN) - 1;
 			const uint64_t unspecBits = allBits & ~explicitBits;
-			if (spec.flag == AstModifierSpec::Dontcare) {
+			if (spec.flag == AstModifierSpec::Flag::Dontcare) {
 				mod.dontcares |= unspecBits;
 				mod.modifiers  &= ~unspecBits;
-			} else if (spec.flag == AstModifierSpec::Release) {
+			} else if (spec.flag == AstModifierSpec::Flag::Release) {
 				mod.modifiers  &= ~unspecBits;
 				mod.dontcares  &= ~unspecBits;
 			}
@@ -191,21 +191,21 @@ CmdScanCode MayuCompiler::compileScanCode(const AstScanCode &sc)
 FuncArg MayuCompiler::compileArgument(const AstArgument &arg)
 {
 	switch (arg.kind) {
-	case AstArgument::Kind_String:
+	case AstArgument::Kind::String:
 		return FuncArgString{ arg.stringValue };
-	case AstArgument::Kind_Number:
+	case AstArgument::Kind::Number:
 		return FuncArgNumber{ static_cast<int32_t>(arg.numberValue) };
-	case AstArgument::Kind_Regexp:
+	case AstArgument::Kind::Regexp:
 		return FuncArgRegexp{ arg.stringValue };
-	case AstArgument::Kind_KeySeqRef:
+	case AstArgument::Kind::KeySeqRef:
 		return FuncArgString{ arg.stringValue };
-	case AstArgument::Kind_KeySeqLiteral:
+	case AstArgument::Kind::KeySeqLiteral:
 		if (arg.keySeq)
 			return FuncArgKeySeqIdx{ compileKeySequence(*arg.keySeq) };
 		break;
-	case AstArgument::Kind_ModifierSeq:
+	case AstArgument::Kind::ModifierSeq:
 		return FuncArgModSeq{ compileModifierSpecs(arg.modifierSeq) };
-	case AstArgument::Kind_TokenSeq:
+	case AstArgument::Kind::TokenSeq:
 		return FuncArgTokenSeq{ arg.tokens };
 	}
 	return FuncArgString{};

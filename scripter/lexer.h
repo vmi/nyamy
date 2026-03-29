@@ -15,17 +15,17 @@ class Token
 {
 public:
 	///
-	enum Type {
-		Type_string,				///
-		Type_number,				///
-		Type_regexp,				///
-		Type_openParen,				///
-		Type_closeParen,				///
-		Type_comma,					///
+	enum class Type {
+		String,				///
+		Number,				///
+		Regexp,				///
+		OpenParen,				///
+		CloseParen,				///
+		Comma,					///
 	};
 
 private:
-	u_char m_type;				///
+	Type m_type;				///
 	bool m_isValueQuoted;				///
 	int m_numericValue;				///
 	wstringi m_stringValue;			///
@@ -49,31 +49,31 @@ public:
 
 	/// value type
 	Type getType() const {
-		return static_cast<Type>(m_type);
+		return m_type;
 	}
 	///
 	bool isString() const {
-		return m_type == Type_string;
+		return m_type == Type::String;
 	}
 	///
 	bool isNumber() const {
-		return m_type == Type_number;
+		return m_type == Type::Number;
 	}
 	///
 	bool isRegexp() const {
-		return m_type == Type_regexp;
+		return m_type == Type::Regexp;
 	}
 	///
 	bool isOpenParen() const {
-		return m_type == Type_openParen;
+		return m_type == Type::OpenParen;
 	}
 	///
 	bool isCloseParen() const {
-		return m_type == Type_closeParen;
+		return m_type == Type::CloseParen;
 	}
 	///
 	bool isComma() const {
-		return m_type == Type_comma;
+		return m_type == Type::Comma;
 	}
 
 	/// get numeric value

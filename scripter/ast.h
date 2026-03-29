@@ -50,7 +50,7 @@ using AstNodePtr = std::unique_ptr<AstNode>;
 
 /// Modifier specifier within a modifier sequence
 struct AstModifierSpec {
-	enum Flag { Press, Release, Dontcare };
+	enum class Flag { Press, Release, Dontcare };
 	wstringi name;		///< "S-", "C-", "*", "~", etc.
 	Flag flag;
 };
@@ -111,14 +111,14 @@ public:
 class AstArgument
 {
 public:
-	enum Kind {
-		Kind_String,
-		Kind_Number,
-		Kind_Regexp,
-		Kind_KeySeqRef,		///< $name
-		Kind_KeySeqLiteral,	///< (key_sequence)
-		Kind_ModifierSeq,	///< modifier sequence as argument
-		Kind_TokenSeq,		///< multiple raw tokens as one argument (e.g. U- D- RButton)
+	enum class Kind {
+		String,
+		Number,
+		Regexp,
+		KeySeqRef,		///< $name
+		KeySeqLiteral,	///< (key_sequence)
+		ModifierSeq,	///< modifier sequence as argument
+		TokenSeq,		///< multiple raw tokens as one argument (e.g. U- D- RButton)
 	};
 
 	Kind kind;
@@ -126,9 +126,9 @@ public:
 	int numberValue;
 	std::unique_ptr<class AstKeySequence> keySeq;
 	std::vector<AstModifierSpec> modifierSeq;
-	std::vector<wstringi> tokens;		///< for Kind_TokenSeq
+	std::vector<wstringi> tokens;		///< for Kind::TokenSeq
 
-	AstArgument() : kind(Kind_String), numberValue(0) {}
+	AstArgument() : kind(Kind::String), numberValue(0) {}
 };
 
 
