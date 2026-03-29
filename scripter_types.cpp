@@ -75,11 +75,11 @@ std::wostream& operator<<(std::wostream& out, const ModifierSpec& mod)
 std::wostream& operator<<(std::wostream& out, const FuncArg& arg)
 {
 	std::visit(overloaded{
-		[&](const FuncArgString&    a) { out << a; },
-		[&](const FuncArgNumber&    a) { out << a; },
-		[&](const FuncArgRegexp&    a) { out << a; },
-		[&](const FuncArgKeySeqIdx& a) { out << L"@" << a; },
-		[&](const FuncArgModSeq&    a) { out << a; },
+		[&](const FuncArgString&       a) { out << a; },
+		[&](const FuncArgNumber&       a) { out << a; },
+		[&](const FuncArgRegexp&       a) { out << a; },
+		[&](const FuncArgKeySeqIdx&    a) { out << L"@" << a; },
+		[&](const FuncArgModifierSpec& a) { out << a; },
 		[&](const FuncArgTokenSeq&  a) {
 			out << L"[";
 			for (size_t i = 0; i < a.size(); ++i) {

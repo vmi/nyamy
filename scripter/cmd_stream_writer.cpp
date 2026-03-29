@@ -66,7 +66,7 @@ void CmdStreamWriter::writeString(const wstringi &s)
 }
 
 
-void CmdStreamWriter::writeModifier(const ModifierSpec &mod)
+void CmdStreamWriter::writeModifierSpec(const ModifierSpec &mod)
 {
 	writeU64(mod.modifiers);
 	writeU64(mod.dontcares);
@@ -82,7 +82,7 @@ void CmdStreamWriter::writeScanCode(const CmdScanCode &sc)
 
 void CmdStreamWriter::writeModifiedKey(const CmdModifiedKey &mk)
 {
-	writeModifier(mk.modifier);
+	writeModifierSpec(mk.modifier);
 	writeString(mk.keyName);
 }
 
@@ -90,11 +90,11 @@ void CmdStreamWriter::writeModifiedKey(const CmdModifiedKey &mk)
 void CmdStreamWriter::writeArgument(const FuncArg &arg)
 {
 	std::visit(overloaded{
-		[&](const FuncArgString&    a) { writeU8(FuncArgTag_String);    writeString(a); },
-		[&](const FuncArgNumber&    a) { writeU8(FuncArgTag_Number);    writeI32(a); },
-		[&](const FuncArgRegexp&    a) { writeU8(FuncArgTag_Regexp);    writeString(a.str()); },
-		[&](const FuncArgKeySeqIdx& a) { writeU8(FuncArgTag_KeySeqIdx); writeU32(a); },
-		[&](const FuncArgModSeq&    a) { writeU8(FuncArgTag_ModSeq);    writeModifier(a); },
+		[&](const FuncArgString&       a) { writeU8(FuncArgTag_String);       writeString(a); },
+		[&](const FuncArgNumber&       a) { writeU8(FuncArgTag_Number);       writeI32(a); },
+		[&](const FuncArgRegexp&       a) { writeU8(FuncArgTag_Regexp);       writeString(a.str()); },
+		[&](const FuncArgKeySeqIdx&    a) { writeU8(FuncArgTag_KeySeqIdx);    writeU32(a); },
+		[&](const FuncArgModifierSpec& a) { writeU8(FuncArgTag_ModifierSpec); writeModifierSpec(a); },
 		[&](const FuncArgTokenSeq&  a) {
 			writeU8(FuncArgTag_TokenSeq);
 			writeU16(static_cast<uint16_t>(a.size()));
@@ -108,7 +108,7 @@ void CmdStreamWriter::writeArgument(const FuncArg &arg)
 void CmdStreamWriter::writeAction(const CmdAction &action)
 {
 	writeU8(static_cast<uint8_t>(action.type));
-	writeModifier(action.modifier);
+	writeModifierSpec(action.modifier);
 	writeString(action.name);
 
 	switch (action.type) {

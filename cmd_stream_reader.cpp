@@ -107,7 +107,7 @@ wstringi CmdStreamReader::readString()
 }
 
 
-ModifierSpec CmdStreamReader::readModifier()
+ModifierSpec CmdStreamReader::readModifierSpec()
 {
 	ModifierSpec mod;
 	mod.modifiers = readU64();
@@ -128,7 +128,7 @@ CmdScanCode CmdStreamReader::readScanCode()
 CmdModifiedKey CmdStreamReader::readModifiedKey()
 {
 	CmdModifiedKey mk;
-	mk.modifier = readModifier();
+	mk.modifier = readModifierSpec();
 	mk.keyName = readString();
 	return mk;
 }
@@ -145,8 +145,8 @@ FuncArg CmdStreamReader::readArgument()
 		return FuncArgRegexp{ readString() };
 	case FuncArgTag_KeySeqIdx:
 		return FuncArgKeySeqIdx{ readU32() };
-	case FuncArgTag_ModSeq:
-		return FuncArgModSeq{ readModifier() };
+	case FuncArgTag_ModifierSpec:
+		return FuncArgModifierSpec{ readModifierSpec() };
 	case FuncArgTag_TokenSeq: {
 		uint16_t count = readU16();
 		FuncArgTokenSeq ts;
@@ -165,7 +165,7 @@ CmdAction CmdStreamReader::readAction()
 {
 	CmdAction action;
 	action.type = static_cast<CmdAction::Type>(readU8());
-	action.modifier = readModifier();
+	action.modifier = readModifierSpec();
 	action.name = readString();
 
 	switch (action.type) {

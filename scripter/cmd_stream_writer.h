@@ -43,7 +43,7 @@ private:
 	void writeI32(int32_t v);
 	void writeU64(uint64_t v);
 	void writeString(const wstringi &s);
-	void writeModifier(const ModifierSpec &mod);
+	void writeModifierSpec(const ModifierSpec &mod);
 	void writeScanCode(const CmdScanCode &sc);
 	void writeModifiedKey(const CmdModifiedKey &mk);
 	void writeArgument(const FuncArg &arg);

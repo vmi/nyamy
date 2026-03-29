@@ -204,7 +204,7 @@ FuncArg MayuCompiler::compileArgument(const AstArgument &arg)
 			return FuncArgKeySeqIdx{ compileKeySequence(*arg.keySeq) };
 		break;
 	case AstArgument::Kind::ModifierSeq:
-		return FuncArgModSeq{ compileModifierSpecs(arg.modifierSeq) };
+		return FuncArgModifierSpec{ compileModifierSpecs(arg.modifierSeq) };
 	case AstArgument::Kind::TokenSeq:
 		return FuncArgTokenSeq{ arg.tokens };
 	}

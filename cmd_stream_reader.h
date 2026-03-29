@@ -52,7 +52,7 @@ private:
 	int32_t readI32();
 	uint64_t readU64();
 	wstringi readString();
-	ModifierSpec readModifier();
+	ModifierSpec readModifierSpec();
 	CmdScanCode readScanCode();
 	CmdModifiedKey readModifiedKey();
 	FuncArg readArgument();

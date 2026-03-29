@@ -249,7 +249,7 @@ foreach ($stmt in $statements) {
                     $null = $sb.AppendLine("    $member = i_ctx->resolveKeySeq(getFuncArgKeySeq(i_args[$i]));")
                 }
                 "^Modifier$" {
-                    $null = $sb.AppendLine("    $member = i_ctx->resolveModifier(getFuncArgModSeq(i_args[$i]));")
+                    $null = $sb.AppendLine("    $member = i_ctx->resolveModifier(getFuncArgModifierSpec(i_args[$i]));")
                 }
                 "^StrExprArg$" {
                     $null = $sb.AppendLine("    $member = StrExprArg(getFuncArgString(i_args[$i]), StrExprArg::Literal);")
