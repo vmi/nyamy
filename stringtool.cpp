@@ -390,40 +390,37 @@ std::wstring toLower(const std::wstring &i_str)
 
 
 // convert wstring to UTF-8
-std::string to_UTF_8(const std::wstring &i_str)
+std::string to_UTF8(const std::wstring &i_str)
 {
-	// 0xxxxxxx: 00-7F
-	// 110xxxxx 10xxxxxx: 0080-07FF
-	// 1110xxxx 10xxxxxx 10xxxxxx: 0800 - FFFF
+	if (i_str.empty()) return std::string();
+	// Upper bound: a BMP wchar_t produces at most 3 UTF-8 bytes (3*1=3).
+	// A surrogate pair uses 2 wchar_t to produce 4 UTF-8 bytes (4 < 3*2=6).
+	// So size()*3 is always a sufficient upper bound.
+	std::string s(i_str.size() * 3, '\0');
+	int len = WideCharToMultiByte(CP_UTF8, 0,
+	                              i_str.c_str(), static_cast<int>(i_str.size()),
+	                              &s[0], static_cast<int>(s.size()),
+	                              NULL, NULL);
+	if (len <= 0) return std::string();
+	s.resize(len);
+	s.shrink_to_fit();
+	return s;
+}
 
-	int size = 0;
 
-	// count needed buffer size
-	for (std::wstring::const_iterator i = i_str.begin(); i != i_str.end(); ++ i) {
-		if (0x0000 <= *i && *i <= 0x007f)
-			size += 1;
-		else if (0x0080 <= *i && *i <= 0x07ff)
-			size += 2;
-		else if (0x0800 <= *i && *i <= 0xffff)
-			size += 3;
-	}
-
-	std::vector<char> result(size);
-	int ri = 0;
-
-	// make UTF-8
-	for (std::wstring::const_iterator i = i_str.begin(); i != i_str.end(); ++ i) {
-		if (0x0000 <= *i && *i <= 0x007f)
-			result[ri ++] = static_cast<char>(*i);
-		else if (0x0080 <= *i && *i <= 0x07ff) {
-			result[ri ++] = static_cast<char>(((*i & 0x0fc0) >>  6) | 0xc0);
-			result[ri ++] = static_cast<char>(( *i & 0x003f       ) | 0x80);
-		} else if (0x0800 <= *i && *i <= 0xffff) {
-			result[ri ++] = static_cast<char>(((*i & 0xf000) >> 12) | 0xe0);
-			result[ri ++] = static_cast<char>(((*i & 0x0fc0) >>  6) | 0x80);
-			result[ri ++] = static_cast<char>(( *i & 0x003f       ) | 0x80);
-		}
-	}
-
-	return std::string(result.begin(), result.end());
+// convert UTF-8 encoded string to wstring
+std::wstring from_UTF8(const std::string &i_str)
+{
+	if (i_str.empty()) return std::wstring();
+	// Upper bound: UTF-8 byte count >= wchar_t count
+	// (ASCII 1 byte -> 1 wchar_t is the worst case;
+	//  4-byte sequences -> 2 wchar_t, so bytes always outnumber wchar_t units)
+	std::wstring ws(i_str.size(), L'\0');
+	int len = MultiByteToWideChar(CP_UTF8, 0,
+	                              i_str.c_str(), static_cast<int>(i_str.size()),
+	                              &ws[0], static_cast<int>(ws.size()));
+	if (len <= 0) return std::wstring();
+	ws.resize(len);
+	ws.shrink_to_fit();
+	return ws;
 }

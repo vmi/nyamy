@@ -3,7 +3,7 @@
 //
 // Reads CtrlStream commands from an inherited pipe handle passed via YSCR_CTRL env var.
 // Compiles .mayu files and writes CmdStream to an inherited pipe handle passed
-// via YSCR_CMD env var.  stdout and stderr are text log channels (UTF-16 on stderr).
+// via YSCR_CMD env var.  stdout and stderr are binary log channels (UTF-8, one message per line).
 
 
 #include "misc.h"
@@ -21,7 +21,46 @@
 
 #include <fcntl.h>
 #include <io.h>
-#include <iostream>
+
+
+//-----------------------------------------------------------------------------
+// logLine - write a log line to stderr as UTF-8 (binary mode, always appends newline)
+//-----------------------------------------------------------------------------
+
+static void logLine(const std::wstring &msg)
+{
+	std::string utf8 = to_UTF8(msg);
+	utf8 += '\n';
+	fwrite(utf8.c_str(), 1, utf8.size(), stderr);
+}
+
+
+//-----------------------------------------------------------------------------
+// Utf8LineWStreambuf - wstreambuf that routes wide output through logLine
+//-----------------------------------------------------------------------------
+
+class Utf8LineWStreambuf : public std::wstreambuf
+{
+public:
+	~Utf8LineWStreambuf() { flush(); }
+	void flush() {
+		if (!m_buf.empty()) { logLine(m_buf); m_buf.clear(); }
+	}
+protected:
+	int_type overflow(int_type c) override {
+		if (c == traits_type::eof()) { flush(); return traits_type::eof(); }
+		wchar_t wc = static_cast<wchar_t>(c);
+		if (wc == L'\n') { logLine(m_buf); m_buf.clear(); }
+		else              m_buf += wc;
+		return c;
+	}
+	std::streamsize xsputn(const wchar_t *s, std::streamsize n) override {
+		for (std::streamsize i = 0; i < n; ++i) overflow(s[i]);
+		return n;
+	}
+private:
+	std::wstring m_buf;
+};
 
 
 //-----------------------------------------------------------------------------
@@ -57,24 +96,26 @@ static void doCompile(const Symbols &syms, CmdStreamWriter &writer)
 	Symbols symbols = syms;
 
 	if (!cf.getFilename(L"", &path, &regSymbols)) {
-		std::wcerr << L"error: could not find config file." << std::endl;
+		logLine(L"error: could not find config file.");
 		return;
 	}
 	for (const auto &s : regSymbols) symbols.insert(s);
-	std::wcerr << L"  loading: " << path << std::endl;
+	logLine(L"  loading: " + std::wstring(path));
 
 	MayuParser parser;
 	auto ast = parser.parseFile(path, cf);
 	if (parser.hasErrors()) {
 		for (const auto &msg : parser.getMessages())
-			std::wcerr << msg << std::endl;
+			logLine(msg);
 		return;
 	}
 
-	MayuCompiler compiler(writer, symbols, cf, nullptr, &std::wcerr);
+	Utf8LineWStreambuf utf8WBuf;
+	std::wostream      utf8WStream(&utf8WBuf);
+	MayuCompiler compiler(writer, symbols, cf, nullptr, &utf8WStream);
 	compiler.compile(*ast);
 	if (compiler.hasErrors()) {
-		std::wcerr << L"error: compile failed." << std::endl;
+		logLine(L"error: compile failed.");
 		return;
 	}
 
@@ -98,16 +139,14 @@ SCRIPTER_API void scripter_engine(int argc, wchar_t *argv[])
 			                 static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
 	}
 
+	// Set stdout and stderr to binary mode: UTF-8 encoded, one message per line.
+	_setmode(_fileno(stdout), _O_BINARY);
+	_setmode(_fileno(stderr), _O_BINARY);
+
 	if (hCtrlRead == INVALID_HANDLE_VALUE || hDataWrite == INVALID_HANDLE_VALUE) {
-		// Set stderr to UTF-16 before writing the error message
-		_setmode(_fileno(stderr), _O_U16TEXT);
-		std::wcerr << L"error: YSCR_CTRL and YSCR_CMD environment variables are required" << std::endl;
+		logLine(L"error: YSCR_CTRL and YSCR_CMD environment variables are required");
 		return;
 	}
-
-	// stdout/stderr are now text log channels (not used for binary protocol).
-	// Set stderr to UTF-16 so the parent's PipeReadWStreambuf can read wide chars.
-	_setmode(_fileno(stderr), _O_U16TEXT);
 
 	// Wrap inherited pipe handles in streambufs
 	PipeReadStreambuf  ctrlBuf(hCtrlRead);

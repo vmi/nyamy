@@ -324,15 +324,16 @@ unsigned __stdcall ScripterManager::msgThread(void *param)
 
 void ScripterManager::runMsgReader()
 {
-	PipeReadWStreambuf wsb(m_hMsgRead);
-	std::wistream ws(&wsb);
-	std::wstring line;
+	PipeReadStreambuf rsb(m_hMsgRead);
+	std::istream     is(&rsb);
+	std::string      line;
 
-	while (std::getline(ws, line)) {
-		if (!line.empty() && line.back() == L'\r') line.pop_back();
+	while (std::getline(is, line)) {
+		if (!line.empty() && line.back() == '\r') line.pop_back();
+		std::wstring wline = from_UTF8(line);
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << L"[scripter] " << line << std::endl;
+			*m_log << L"[scripter] " << wline << std::endl;
 		}
 	}
 }

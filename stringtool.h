@@ -99,7 +99,9 @@ std::wstring to_wstring(const std::string &i_str);
 /// converter
 std::string to_string(const std::wstring &i_str);
 // convert wstring to UTF-8
-std::string to_UTF_8(const std::wstring &i_str);
+std::string to_UTF8(const std::wstring &i_str);
+// convert UTF-8 encoded string to wstring
+std::wstring from_UTF8(const std::string &i_str);
 
 
 /// case insensitive string

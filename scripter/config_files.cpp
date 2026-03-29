@@ -129,54 +129,27 @@ bool ConfigFiles::readFile(std::wstring *o_data, const wstringi &i_filename) con
 
 	// try UTF-8
 	{
-		std::vector<wchar_t> wbuf(static_cast<size_t>(sbuf.st_size));
-		BYTE *f = buf.data();
-		BYTE *end = buf.data() + sbuf.st_size;
+		const char *bytes = reinterpret_cast<const char *>(buf.data());
+		int size = static_cast<int>(sbuf.st_size);
 		// skip UTF-8 BOM (EF BB BF)
-		if (end - f >= 3 && f[0] == 0xefU && f[1] == 0xbbU && f[2] == 0xbfU)
-			f += 3;
-		wchar_t *d = wbuf.data();
-		enum { STATE_1, STATE_2of2, STATE_2of3, STATE_3of3 } state = STATE_1;
-
-		while (f != end) {
-			switch (state) {
-			case STATE_1:
-				if (!(*f & 0x80))			// 0xxxxxxx: 00-7F
-					*d++ = static_cast<wchar_t>(*f++);
-				else if ((*f & 0xe0) == 0xc0) {	// 110xxxxx 10xxxxxx: 0080-07FF
-					*d = ((static_cast<wchar_t>(*f++) & 0x1f) << 6);
-					state = STATE_2of2;
-				} else if ((*f & 0xf0) == 0xe0)		// 1110xxxx 10xxxxxx 10xxxxxx:
-					// 0800 - FFFF
-				{
-					*d = ((static_cast<wchar_t>(*f++) & 0x0f) << 12);
-					state = STATE_2of3;
-				} else
-					goto not_UTF_8;
-				break;
-
-			case STATE_2of2:
-			case STATE_3of3:
-				if ((*f & 0xc0) != 0x80)
-					goto not_UTF_8;
-				*d++ |= (static_cast<wchar_t>(*f++) & 0x3f);
-				state = STATE_1;
-				break;
-
-			case STATE_2of3:
-				if ((*f & 0xc0) != 0x80)
-					goto not_UTF_8;
-				*d |= ((static_cast<wchar_t>(*f++) & 0x3f) << 6);
-				state = STATE_3of3;
-				break;
-			}
+		if (size >= 3 &&
+		    (unsigned char)bytes[0] == 0xef &&
+		    (unsigned char)bytes[1] == 0xbb &&
+		    (unsigned char)bytes[2] == 0xbf) {
+			bytes += 3;
+			size  -= 3;
 		}
-		o_data->assign(wbuf.data(), d);
-		fclose(fp);
-		return true;
-
-not_UTF_8:
-		;
+		// MB_ERR_INVALID_CHARS: fail (return 0) on invalid UTF-8 sequences
+		int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+		                               bytes, size, NULL, 0);
+		if (wlen > 0) {
+			o_data->resize(wlen);
+			MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+			                    bytes, size, &(*o_data)[0], wlen);
+			fclose(fp);
+			return true;
+		}
+		// fall through to multibyte / ASCII
 	}
 
 	// try multibyte charset

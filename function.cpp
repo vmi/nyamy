@@ -2058,7 +2058,7 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 	request += L"Charset: UTF-8\r\n";
 	request += L"\r\n";
 
-	std::string request_UTF_8 = to_UTF_8(request);
+	std::string request_UTF8 = to_UTF8(request);
 
 	// send request to Direct SSTP Server which matches i_name;
 	for (ParseDirectSSTPData::DirectSSTPServers::iterator
@@ -2067,8 +2067,8 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 		if (std::regex_match(i->second.m_name, what, i_name)) {
 			COPYDATASTRUCT cd;
 			cd.dwData = 9801;
-			cd.cbData = (DWORD)request_UTF_8.size();
-			cd.lpData = (void *)request_UTF_8.c_str();
+			cd.cbData = (DWORD)request_UTF8.size();
+			cd.lpData = (void *)request_UTF8.c_str();
 			DWORD_PTR result;
 			SendMessageTimeout(i->second.m_hwnd, WM_COPYDATA,
 							   reinterpret_cast<WPARAM>(m_hwndAssocWindow),
