@@ -6,4 +6,7 @@ Makefile	eol=lf
 *.html		eol=lf
 *.css		eol=lf
 *.txt		eol=lf
-/tools/*	eol=lf
+/tools/**	eol=lf
+
+/scripter/mruby-dist/** eol=lf
+/scripter/mruby-dist/**/*.lib binary

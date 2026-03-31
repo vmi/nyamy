@@ -87,15 +87,19 @@ MayuCompiler::MayuCompiler(
 // Public entry point
 //=============================================================================
 
-void MayuCompiler::compile(const AstFile &file)
+void MayuCompiler::compile(const AstFile &file,
+						   uint32_t initialKeySeqIdx,
+						   bool writeSymbols)
 {
 	m_hasErrors = false;
-	m_nextKeySeqIdx = 0;
+	m_nextKeySeqIdx = initialKeySeqIdx;
 
-	for (const auto &sym : m_symbols) {
-		CmdArgsDefSymbol data;
-		data.symbolName = sym;
-		m_writer.writeDefSymbol(data);
+	if (writeSymbols) {
+		for (const auto &sym : m_symbols) {
+			CmdArgsDefSymbol data;
+			data.symbolName = sym;
+			m_writer.writeDefSymbol(data);
+		}
 	}
 
 	file.accept(*this);
@@ -117,6 +121,7 @@ void MayuCompiler::error(const AstSourceLoc &loc, const std::wstring &msg)
 }
 
 
+/*static*/
 ModifierSpec MayuCompiler::compileModifierSpecs(
 	const std::vector<AstModifierSpec> &specs)
 {
@@ -173,6 +178,7 @@ ModifierSpec MayuCompiler::compileModifierSpecs(
 }
 
 
+/*static*/
 CmdScanCode MayuCompiler::compileScanCode(const AstScanCode &sc)
 {
 	CmdScanCode bsc;
@@ -248,6 +254,16 @@ uint32_t MayuCompiler::compileKeySequence(const AstKeySequence &seq)
 	uint32_t idx = m_nextKeySeqIdx++;
 	m_writer.writeRegKeySeq(bks);
 	return idx;
+}
+
+
+std::vector<CmdAction> MayuCompiler::compileActions(const AstKeySequence &seq)
+{
+	std::vector<CmdAction> result;
+	result.reserve(seq.actions.size());
+	for (const auto &action : seq.actions)
+		result.push_back(compileAction(*action));
+	return result;
 }
 
 

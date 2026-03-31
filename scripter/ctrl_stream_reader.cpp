@@ -5,6 +5,7 @@
 #include "../misc.h"
 #include "ctrl_stream_reader.h"
 #include "../errormessage.h"
+#include "../stringtool.h"
 
 
 //=============================================================================
@@ -59,34 +60,39 @@ wstringi CtrlStreamReader::readString()
 // CtrlStreamReader - command readers
 //=============================================================================
 
-Symbols CtrlStreamReader::readStart()
+CtrlArgsStart CtrlStreamReader::readStart()
 {
-	Symbols syms;
+	CtrlArgsStart data;
+	data.configName = readString();
+	data.configPath = readString();
 	uint16_t count = readU16();
 	for (uint16_t i = 0; i < count; ++i)
-		syms.insert(readString());
-	return syms;
+		data.symbols.insert(readString());
+	return data;
 }
 
 
-CtrlStreamReader::ExecUserFuncData CtrlStreamReader::readExecUserFunc()
+CtrlArgsExecUserFunc CtrlStreamReader::readExecUserFunc()
 {
-	ExecUserFuncData data;
+	CtrlArgsExecUserFunc data;
 	data.name = readString();
 	uint16_t argCount = readU16();
 	for (uint16_t i = 0; i < argCount; ++i) {
-		auto tag = static_cast<FuncArgTag>(readU8());
-		if (tag == FuncArgTag_Number) {
+		YsFuncArg e;
+		e.type = static_cast<YsType>(readU8());  // FuncArgTag values == YsType values
+		if (e.type == YsType_Number) {
 			int32_t v = 0;
 			for (int j = 0; j < 8; ++j)
 				v |= static_cast<int32_t>(readU8()) << (8 * j);
-			data.args.push_back(FuncArgNumber{ v });
+			e.numval = v;
 		} else {
-			data.args.push_back(FuncArgString{ readString() });
+			wstringi ws = readString();
+			e.str = to_UTF8(std::wstring(ws));
 		}
+		data.args.entries.push_back(std::move(e));
 	}
-	data.context.scanCode = readU8();
-	data.context.extended = (readU8() != 0);
+	data.context.scanCode    = readU8();
+	data.context.extended    = (readU8() != 0);
 	data.context.windowClass = std::wstring(readString());
 	data.context.windowTitle = std::wstring(readString());
 	return data;

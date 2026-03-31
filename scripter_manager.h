@@ -32,9 +32,10 @@ public:
 	~ScripterManager();
 
 	/// Start (or restart) the scripter process asynchronously.
-	/// Sends CtrlId::Start with syms after the process is ready.
+	/// Sends CtrlId::Start with config name, path, and symbols after the process is ready.
 	/// If a previous start is still in progress, returns false and does nothing.
-	bool start(const Symbols &syms);
+	bool start(const wstringi &configName, const wstringi &configPath,
+	           const Symbols &syms);
 
 	/// signal quit to scripter process (non-blocking; idempotent)
 	void sendQuit();
@@ -82,7 +83,8 @@ private:
 
 	// async start/restart
 	std::future<bool> m_startFuture;
-	bool launchScripter(const Symbols &syms);
+	bool launchScripter(const wstringi &configName, const wstringi &configPath,
+	                    const Symbols &syms);
 
 	// background thread entry points
 	static unsigned __stdcall dataThread(void *param);

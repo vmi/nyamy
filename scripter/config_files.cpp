@@ -6,7 +6,6 @@
 
 #include "config_files.h"
 #include "../mayu.h"
-#include "../registry.h"
 #include "../windowstool.h"
 #include "../multithread.h"
 #include <fstream>
@@ -21,47 +20,16 @@ ConfigFiles::ConfigFiles(SyncObject *i_soLog, std::wostream *i_log)
 }
 
 
-// get mayu filename from registry
-bool ConfigFiles::getFilenameFromRegistry(
-	wstringi *o_name, wstringi *o_filename, Symbols *o_symbols) const
-{
-	Registry reg(MAYU_REGISTRY_ROOT);
-	int index;
-	reg.read(L".mayuIndex", &index, 0);
-	wchar_t buf[100];
-	_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
-
-	wstringi entry;
-	if (!reg.read(buf, &entry))
-		return false;
-
-	wregex_stored getFilename(L"^([^;]*);([^;]*);(.*)$");
-	std::wsmatch getFilenameResult;
-	if (!std::regex_match(entry, getFilenameResult, getFilename))
-		return false;
-
-	if (o_name)
-		*o_name = getFilenameResult.str(1);
-	if (o_filename)
-		*o_filename = getFilenameResult.str(2);
-	if (o_symbols) {
-		wstringi symbols = getFilenameResult.str(3);
-		wregex_stored symbol(L"-D([^;]*)(.*)$");
-		std::wsmatch symbolResult;
-		while (std::regex_search(symbols, symbolResult, symbol)) {
-			o_symbols->insert(symbolResult.str(1));
-			symbols = symbolResult.str(2);
-		}
-	}
-	return true;
-}
-
-
 // get home directory path
 void ConfigFiles::getHomeDirectories(HomeDirectories *o_pathes) const
 {
 	wchar_t buf[GANA_MAX_PATH];
 
+	if (GetEnvironmentVariable(L"LOCALAPPDATA", buf, NUMBER_OF(buf))) {
+		std::wstring base = std::wstring(buf) + L"\\Programs\\Yamy";
+		o_pathes->push_back(wstringi(base + L"\\conf"));
+		o_pathes->push_back(wstringi(base));
+	}
 	if (GetModuleFileName(GetModuleHandle(NULL), buf, NUMBER_OF(buf)))
 		o_pathes->push_back(pathRemoveFileSpec(buf));
 }
@@ -196,7 +164,6 @@ bool ConfigFiles::isReadable(const wstringi &i_filename,
 
 // get filename
 bool ConfigFiles::getFilename(const wstringi &i_name, wstringi *o_path,
-							  Symbols *o_symbols,
 							  RetryCallback i_retry,
 							  int i_debugLevel) const
 {
@@ -206,36 +173,6 @@ bool ConfigFiles::getFilename(const wstringi &i_name, wstringi *o_path,
 	bool isFirstTime = true;
 
 	while (true) {
-		// find file from registry
-		if (i_name.empty()) {			// called not from 'include'
-			Symbols symbols;
-			if (getFilenameFromRegistry(NULL, o_path, &symbols)) {
-				if (o_path->empty())
-					// find file from home directory
-				{
-					HomeDirectories pathes;
-					getHomeDirectories(&pathes);
-					for (HomeDirectories::iterator
-							i = pathes.begin(); i != pathes.end(); ++ i) {
-						*o_path = *i + L"\\" + name;
-						if (isReadable(*o_path, i_debugLevel))
-							goto add_symbols;
-					}
-					return false;
-				} else {
-					if (!isReadable(*o_path, i_debugLevel))
-						return false;
-				}
-add_symbols:
-				if (o_symbols) {
-					for (Symbols::iterator
-							i = symbols.begin(); i != symbols.end(); ++ i)
-						o_symbols->insert(*i);
-				}
-				return true;
-			}
-		}
-
 		if (!isFirstTime)
 			return false;
 

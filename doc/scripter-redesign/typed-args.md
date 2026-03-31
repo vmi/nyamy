@@ -2,28 +2,25 @@
 
 ## 概要
 
-scripter と Engine 間で関数引数をやり取りする型システム。主な用途は 2 つ:
-
-1. **`ys_reg_user_func` の preset_args**: ユーザー定義関数に事前引数を紐付けて登録し、
-   Engine から関数が呼ばれたときに `on_exec_user_func` へ `YsFuncArgs*` として渡す。
-2. **`on_exec_user_func` での引数読み取り**: Engine 側の `.mayu` で
-   `&ExecUserFunc("name", arg1, arg2, ...)` と書かれた引数を C API で受け取る。
+scripter と Engine 間で関数引数をやり取りする型システム。主な用途は
+`on_exec_user_func` での引数読み取りで、Engine 側の `.mayu` で
+`&ExecUserFunc("name", arg1, arg2, ...)` と書かれた引数を C API で受け取る。
 
 ---
 
 ## 型の種類: `YsType`
 
-`YsType` は内部 C++ 型 `FuncArg` バリアントに対応する C API の列挙型。
+`YsType` は引数要素の型タグ。`yamy_scripter.h` に定義されている。
 
 ```c
 typedef enum YsType {
-    YT_ERROR      = -1,  // エラー / 型取得失敗
-    YT_STRING     = 0,   // 文字列 (UTF-8)
-    YT_NUMBER     = 1,   // 整数 (int32_t)
-    YT_REGEXP     = 2,   // 正規表現 (UTF-8)
-    YT_KEYSEQ_IDX = 3,   // キーシーケンスインデックス (uint32_t)
-    YT_MOD        = 4,   // モディファイアビットマスク (uint64_t × 2)
-    YT_TOKEN_SEQ  = 5,   // トークン列 (YsStrs*)
+    YsType_Error        = -1,  // エラー / 型取得失敗
+    YsType_String       = 0,   // 文字列 (UTF-8)
+    YsType_Number       = 1,   // 整数 (int32_t)
+    YsType_Regexp       = 2,   // 正規表現 (UTF-8 パターン文字列)
+    YsType_KeySeqIdx    = 3,   // キーシーケンスインデックス (uint32_t)
+    YsType_ModifierSpec = 4,   // モディファイアビットマスク (uint64_t × 2)
+    YsType_TokenSeq     = 5,   // トークン列 (YsStrs*)
 } YsType;
 ```
 
@@ -31,22 +28,22 @@ typedef enum YsType {
 
 | YsType | value の解釈 | length の解釈 |
 |--------|-------------|--------------|
-| YT_STRING | `const char*` (UTF-8, NUL終端) へのポインタ | バイト数 (NUL除く) |
-| YT_NUMBER | `int32_t` を int64_t にキャスト | 未使用 (0) |
-| YT_REGEXP | `const char*` (UTF-8, NUL終端) へのポインタ | バイト数 (NUL除く) |
-| YT_KEYSEQ_IDX | `uint32_t` を int64_t にキャスト | 未使用 (0) |
-| YT_MOD | modifiers ビットマスク (uint64_t) | dontcares ビットマスク (uint64_t) |
-| YT_TOKEN_SEQ | `const YsStrs*` をポインタ→int64_t にキャスト | `ys_strs_length()` と同値 |
+| YsType_String | `const char*` (UTF-8, NUL終端) へのポインタ | バイト数 (NUL除く) |
+| YsType_Number | `int32_t` を int64_t にキャスト | 未使用 (0) |
+| YsType_Regexp | `const char*` (UTF-8, NUL終端) へのポインタ | バイト数 (NUL除く) |
+| YsType_KeySeqIdx | `uint32_t` を int64_t にキャスト | 未使用 (0) |
+| YsType_ModifierSpec | modifiers ビットマスク (uint64_t) | dontcares ビットマスク (uint64_t) |
+| YsType_TokenSeq | `const YsStrs*` をポインタ→int64_t にキャスト | `ys_strs_length()` と同値 |
 
 ---
 
 ## `YsFuncArgs` / `YsStrs` — 不透明型
 
 ```c
-// std::vector<FuncArg> に対するラッパー (不透明型)
+// std::vector<YsFuncArg> に対するラッパー (不透明型; 内部型 YsFuncArg は ys_types.h に定義)
 typedef struct YsFuncArgs YsFuncArgs;
 
-// std::vector<std::wstring> に対するラッパー (不透明型)
+// std::vector<std::string> (UTF-8) に対するラッパー (不透明型)
 typedef struct YsStrs YsStrs;
 ```
 
@@ -56,31 +53,33 @@ typedef struct YsStrs YsStrs;
 
 ## 引数の読み取り (`on_exec_user_func` 内)
 
+Engine 側で `&ExecUserFunc("MyFunc", arg1, arg2, ...)` が実行されると、
+CtrlStream 経由で `on_exec_user_func` が呼ばれる。
+第 2 引数 `args` に Engine から送られた引数列が格納されている。
+
 ```c
-void on_exec_user_func(const char* name,
-                        const YsFuncArgs* preset_args,
-                        const YsTriggerInfo* trigger_info)
+void on_exec_user_func(const char* name, const YsFuncArgs* args)
 {
-    int n = ys_func_args_length(preset_args);
+    int n = ys_func_args_length(args);
     for (int i = 0; i < n; i++) {
         int64_t value = 0, length = 0;
-        YsType t = ys_func_args_get(preset_args, i, &value, &length);
+        YsType t = ys_func_args_get(args, i, &value, &length);
         switch (t) {
-        case YT_STRING:
+        case YsType_String:
             // value = (uintptr_t)(const char*), length = byte count
             printf("string[%d]: %.*s\n", i, (int)length, (const char*)(uintptr_t)value);
             break;
-        case YT_NUMBER:
+        case YsType_Number:
             printf("number[%d]: %d\n", i, (int32_t)value);
             break;
-        case YT_KEYSEQ_IDX:
+        case YsType_KeySeqIdx:
             printf("keyseq_idx[%d]: %u\n", i, (uint32_t)value);
             break;
-        case YT_MOD:
+        case YsType_ModifierSpec:
             printf("mod[%d]: modifiers=0x%llx dontcares=0x%llx\n",
                    i, (unsigned long long)value, (unsigned long long)length);
             break;
-        case YT_TOKEN_SEQ: {
+        case YsType_TokenSeq: {
             const YsStrs* ss = (const YsStrs*)(uintptr_t)value;
             int sn = ys_strs_length(ss);
             for (int j = 0; j < sn; j++) {
@@ -93,38 +92,27 @@ void on_exec_user_func(const char* name,
         default: break;
         }
     }
-    // trigger_info は ys_exec_keyseq に再利用できる
-    ys_exec_keyseq("&SomeAction", trigger_info);
+    // ys_exec_keyseq で yamy 組み込みアクションを呼び出せる
+    ys_exec_keyseq("&SomeAction");
 }
 ```
 
 ---
 
-## 引数の構築 (`ys_reg_user_func` の preset_args)
+## 引数の構築 (`ys_func_args_push`)
 
-`ys_func_args_new()` で作成し、`ys_func_args_push()` で要素を追加する。
-`ys_reg_user_func` 呼び出し後は関数内でコピーされるため、`fas` の寿命は
-`on_load_setting` 終了まで保持すれば十分。
+`ys_func_args_push` を使うと C API 経由で `YsFuncArgs` を組み立てられる。
+現状の主な用途は FFI/mruby から yamy 側に引数付き関数呼び出しをする場合など。
 
 ```c
-static bool on_load_setting(void)
-{
-    // "MyFunc" を文字列 "hello" と数値 42 の preset_args で登録
-    YsFuncArgs* fas = ys_func_args_new();
+YsFuncArgs* fas = ys_func_args_new();
 
-    // YT_STRING: value = (int64_t)(uintptr_t)ptr, length = byte count
-    const char* s = "hello";
-    ys_func_args_push(fas, YT_STRING, (int64_t)(uintptr_t)s, (int64_t)strlen(s));
+// YsType_String: value = (int64_t)(uintptr_t)ptr, length = byte count
+const char* s = "hello";
+ys_func_args_push(fas, YsType_String, (int64_t)(uintptr_t)s, (int64_t)strlen(s));
 
-    // YT_NUMBER: value = int32_t
-    ys_func_args_push(fas, YT_NUMBER, (int64_t)(int32_t)42, 0);
-
-    ys_reg_user_func("MyFunc", fas);
-    // fas は on_load_setting 終了まで生存していれば OK
-    // (関数内でコピーされる)
-
-    return ys_load_mayu();
-}
+// YsType_Number: value = int32_t
+ys_func_args_push(fas, YsType_Number, (int64_t)(int32_t)42, 0);
 ```
 
 ---
@@ -162,21 +150,15 @@ lib.ys_func_args_push.argtypes   = [ctypes.c_void_p, ctypes.c_int,
 lib.ys_strs_push.restype         = ctypes.c_bool
 lib.ys_strs_push.argtypes        = [ctypes.c_void_p, ctypes.c_char_p,
                                      ctypes.c_size_t]
+lib.ys_exec_keyseq.restype       = ctypes.c_bool
+lib.ys_exec_keyseq.argtypes      = [ctypes.c_char_p]
 
-YT_STRING = 0; YT_NUMBER = 1; YT_REGEXP = 2
-YT_KEYSEQ_IDX = 3; YT_MOD = 4; YT_TOKEN_SEQ = 5
-
-# --- 構築 ---
-
-def push_string(fas, s: str) -> bool:
-    b = s.encode("utf-8")
-    # バッファを保持しておくこと (on_load_setting の終わりまで)
-    buf = ctypes.create_string_buffer(b)
-    ptr = ctypes.cast(buf, ctypes.c_void_p).value
-    return lib.ys_func_args_push(fas, YT_STRING, ptr, len(b))
-
-def push_number(fas, n: int) -> bool:
-    return lib.ys_func_args_push(fas, YT_NUMBER, ctypes.c_int64(n).value, 0)
+YsType_String     = 0
+YsType_Number     = 1
+YsType_Regexp     = 2
+YsType_KeySeqIdx  = 3
+YsType_ModSpec    = 4
+YsType_TokenSeq   = 5
 
 # --- 読み取り ---
 
@@ -186,18 +168,18 @@ def read_args(fas) -> list:
     for i in range(n):
         v, l = ctypes.c_int64(0), ctypes.c_int64(0)
         t = lib.ys_func_args_get(fas, i, ctypes.byref(v), ctypes.byref(l))
-        if t == YT_STRING or t == YT_REGEXP:
+        if t == YsType_String or t == YsType_Regexp:
             s = ctypes.string_at(v.value, l.value).decode("utf-8")
-            result.append({"type": "string" if t == YT_STRING else "regexp", "value": s})
-        elif t == YT_NUMBER:
+            result.append({"type": "string" if t == YsType_String else "regexp", "value": s})
+        elif t == YsType_Number:
             result.append({"type": "number", "value": ctypes.c_int32(v.value).value})
-        elif t == YT_KEYSEQ_IDX:
+        elif t == YsType_KeySeqIdx:
             result.append({"type": "keyseq_idx", "value": v.value & 0xFFFFFFFF})
-        elif t == YT_MOD:
+        elif t == YsType_ModSpec:
             result.append({"type": "mod",
                             "modifiers": v.value & 0xFFFFFFFFFFFFFFFF,
                             "dontcares": l.value & 0xFFFFFFFFFFFFFFFF})
-        elif t == YT_TOKEN_SEQ:
+        elif t == YsType_TokenSeq:
             ss = ctypes.c_void_p(v.value)
             sn = lib.ys_strs_length(ss)
             tokens = []
@@ -207,6 +189,25 @@ def read_args(fas) -> list:
                 tokens.append(ctypes.string_at(sp, sl.value).decode("utf-8"))
             result.append({"type": "token_seq", "value": tokens})
     return result
+
+# --- コールバック ---
+
+LoadSettingFn  = ctypes.CFUNCTYPE(ctypes.c_bool)
+ExecUserFuncFn = ctypes.CFUNCTYPE(None,
+    ctypes.c_char_p,   # func_name
+    ctypes.c_void_p)   # args (YsFuncArgs*)
+
+def on_load_setting():
+    return bool(lib.ys_load_mayu())
+
+def on_exec_user_func(name, fas):
+    args = read_args(fas)
+    print(f"called: {name.decode()}, args={args}")
+    lib.ys_exec_keyseq(b"&SomeAction")
+
+lib.ys_start.restype  = ctypes.c_int
+lib.ys_start.argtypes = [LoadSettingFn]
+lib.ys_start(LoadSettingFn(on_load_setting))
 ```
 
 ### Ruby (ffi gem)
@@ -218,12 +219,12 @@ module YamyScripter
   extend FFI::Library
   ffi_lib "yamy-scripter.dll"
 
-  YT_STRING     = 0
-  YT_NUMBER     = 1
-  YT_REGEXP     = 2
-  YT_KEYSEQ_IDX = 3
-  YT_MOD        = 4
-  YT_TOKEN_SEQ  = 5
+  YsType_String     = 0
+  YsType_Number     = 1
+  YsType_Regexp     = 2
+  YsType_KeySeqIdx  = 3
+  YsType_ModSpec    = 4
+  YsType_TokenSeq   = 5
 
   attach_function :ys_func_args_new,    [],                             :pointer
   attach_function :ys_strs_new,         [],                             :pointer
@@ -236,17 +237,9 @@ module YamyScripter
   attach_function :ys_func_args_push,   [:pointer, :int,
                                          :int64, :int64],               :bool
   attach_function :ys_strs_push,        [:pointer, :string, :size_t],   :bool
-
-  # --- 構築 ---
-
-  def self.push_string(fas, s)
-    buf = FFI::MemoryPointer.from_string(s.encode("UTF-8"))
-    ys_func_args_push(fas, YT_STRING, buf.address, s.bytesize)
-  end
-
-  def self.push_number(fas, n)
-    ys_func_args_push(fas, YT_NUMBER, n, 0)
-  end
+  attach_function :ys_exec_keyseq,      [:string],                      :bool
+  attach_function :ys_load_mayu,        [],                             :bool
+  attach_function :ys_start,            [:pointer],                     :int
 
   # --- 読み取り ---
 
@@ -258,17 +251,17 @@ module YamyScripter
       t  = ys_func_args_get(fas, i, vp, lp)
       v, l = vp.read_int64, lp.read_int64
       case t
-      when YT_STRING, YT_REGEXP
-        { type: t == YT_STRING ? :string : :regexp,
+      when YsType_String, YsType_Regexp
+        { type: t == YsType_String ? :string : :regexp,
           value: FFI::Pointer.new(v).read_bytes(l).force_encoding("UTF-8") }
-      when YT_NUMBER
+      when YsType_Number
         { type: :number, value: [v].pack("q<").unpack1("l<") }
-      when YT_KEYSEQ_IDX
+      when YsType_KeySeqIdx
         { type: :keyseq_idx, value: v & 0xFFFFFFFF }
-      when YT_MOD
+      when YsType_ModSpec
         { type: :mod, modifiers: v & 0xFFFFFFFF_FFFFFFFF,
                       dontcares: l & 0xFFFFFFFF_FFFFFFFF }
-      when YT_TOKEN_SEQ
+      when YsType_TokenSeq
         ss   = FFI::Pointer.new(v)
         sn   = ys_strs_length(ss)
         toks = sn.times.map do |j|
@@ -284,6 +277,9 @@ module YamyScripter
     end
   end
 end
+
+on_load = FFI::Function.new(:bool, []) { YamyScripter.ys_load_mayu }
+YamyScripter.ys_start(on_load)
 ```
 
 ---
@@ -294,16 +290,13 @@ end
 `ys_exec_keyseq` を使う。アクション文字列は mayu 構文で記述する。
 
 ```c
-void on_exec_user_func(const char* name,
-                        const YsFuncArgs* preset_args,
-                        const YsTriggerInfo* trigger_info)
+void on_exec_user_func(const char* name, const YsFuncArgs* args)
 {
     // "&関数名(引数)" の形で mayu 構文アクション文字列として指定
-    ys_exec_keyseq("&OSD.Display(\"hello\")", trigger_info);
+    ys_exec_keyseq("&OSD.Display(\"hello\")");
 }
 ```
 
 制約 (c-api.md 参照):
 - `on_exec_user_func` 内でのみ有効 (`on_load_setting` 内では false を返す)
 - `&ExecUserFunc` をアクション文字列に含めることは禁止 (無限ループ防止)
-

@@ -11,7 +11,6 @@
 
 #  include "ast_visitor.h"
 #  include "cmd_stream.h"
-#  include "cmd_stream_reader.h"
 #  include "cmd_stream_writer.h"
 #  include "multithread.h"
 #  include <set>
@@ -43,10 +42,7 @@ private:
 	// Compilation helpers
 	uint32_t compileKeySequence(const AstKeySequence &seq);
 	CmdAction compileAction(const AstAction &action);
-	ModifierSpec compileModifierSpecs(
-		const std::vector<AstModifierSpec> &specs);
 	FuncArg compileArgument(const AstArgument &arg);
-	CmdScanCode compileScanCode(const AstScanCode &sc);
 
 	void error(const AstSourceLoc &loc, const std::wstring &msg);
 
@@ -82,11 +78,34 @@ public:
 				 SyncObject *soLog = NULL,
 				 std::wostream *log = NULL);
 
-	/// Compile an AST file, writing commands to the stream
-	void compile(const AstFile &file);
+	/// Compile an AST file, writing commands to the stream.
+	/// initialKeySeqIdx: starting index for RegKeySeq commands (default 0).
+	/// writeSymbols: if false, the initial DefSymbol commands for m_symbols
+	///              are suppressed (they have already been written by the caller).
+	void compile(const AstFile &file,
+				 uint32_t initialKeySeqIdx = 0,
+				 bool writeSymbols = true);
+
+	/// Compile a key sequence directly to a list of CmdActions without stream I/O.
+	/// KeySeqLiteral arguments within function calls are written to the
+	/// compiler's associated stream as side effects (same as compile()).
+	std::vector<CmdAction> compileActions(const AstKeySequence &seq);
 
 	/// Check if there were any errors
 	bool hasErrors() const { return m_hasErrors; }
+
+	/// Return the next keyseq index that would be assigned.
+	/// After compile(), this equals initialKeySeqIdx + number of keyseqs emitted.
+	uint32_t nextKeySeqIdx() const { return m_nextKeySeqIdx; }
+
+	/// Resolve modifier specifiers to a bitmask.
+	/// Pure function: depends only on the static modifier-name table.
+	static ModifierSpec compileModifierSpecs(
+		const std::vector<AstModifierSpec> &specs);
+
+	/// Convert a parsed scan code to its binary representation.
+	/// Pure function: no member state required.
+	static CmdScanCode compileScanCode(const AstScanCode &sc);
 };
 
 

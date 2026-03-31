@@ -118,6 +118,12 @@ public:
 		const wstringi &filename,
 		ConfigFiles &configFiles);
 
+	/// Parse a bare action sequence string (e.g. "S-A B @Func") as a key sequence.
+	/// No enclosing keyseq statement is required.
+	std::unique_ptr<AstKeySequence> parseActions(
+		const wchar_t *buffer, size_t length,
+		const wstringi &filename = L"<actions>");
+
 	/// Check if there were any errors
 	bool hasErrors() const { return m_hasErrors; }
 
@@ -125,6 +131,18 @@ public:
 	const std::vector<std::wstring> &getMessages() const {
 		return m_messages;
 	}
+
+	/// Parse a modifier-key string (e.g. "C-A", "*-LButton", "S-C-Return")
+	/// into its modifier specifiers and bare key name.
+	/// Returns false if str is empty, contains more than one key action,
+	/// or is not a simple key action.
+	static bool parseModifiedKey(const wstringi &str,
+		std::vector<AstModifierSpec> &mods, wstringi &keyName);
+
+	/// Parse a single scan-code string (e.g. "0x1c", "E0-0x1c", "28")
+	/// into an AstScanCode.
+	/// Returns false if str is empty or not a valid scan code.
+	static bool parseScanCode(const wstringi &str, AstScanCode &out);
 };
 
 

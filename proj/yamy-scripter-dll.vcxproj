@@ -95,7 +95,6 @@
     <ClCompile Include="..\scripter\config_files.cpp" />
     <ClCompile Include="..\scripter\ctrl_stream_reader.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
-    <ClCompile Include="..\registry.cpp" />
     <ClCompile Include="..\scripter\yamy_scripter.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\windowstool.cpp" />

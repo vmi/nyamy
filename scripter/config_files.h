@@ -30,10 +30,6 @@ public:
 	/// get home directory path
 	void getHomeDirectories(HomeDirectories *o_path) const;
 
-	/// get mayu filename from registry
-	bool getFilenameFromRegistry(wstringi *o_name, wstringi *o_filename,
-								 Symbols *o_symbols) const;
-
 	/// read file contents
 	bool readFile(std::wstring *o_data, const wstringi &i_filename) const;
 
@@ -42,7 +38,6 @@ public:
 
 	/// get filename
 	bool getFilename(const wstringi &i_name, wstringi *o_path,
-					 Symbols *o_symbols,
 					 RetryCallback i_retry = nullptr,
 					 int i_debugLevel = 1) const;
 

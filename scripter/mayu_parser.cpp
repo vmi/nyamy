@@ -97,7 +97,7 @@ void MayuParser::initPrefixes()
 		return;
 
 	static const wchar_t *prefixes[] = {
-		L"=", L"=>", L"&&", L"||", L":", L"$", L"&",
+		L"=", L"=>", L"&&", L"||", L":", L"$", L"&", L"@",
 		L"-=", L"+=", L"!!!", L"!!", L"!",
 		L"E0-", L"E1-",
 		L"S-", L"A-", L"M-", L"C-",
@@ -325,6 +325,40 @@ std::unique_ptr<AstFile> MayuParser::parseFile(
 		return std::make_unique<AstFile>();
 	}
 	return parseBuffer(data.c_str(), data.size(), filename);
+}
+
+
+std::unique_ptr<AstKeySequence> MayuParser::parseActions(
+	const wchar_t *buffer, size_t length,
+	const wstringi &filename)
+{
+	initPrefixes();
+
+	m_filename = filename;
+	m_hasErrors = false;
+	m_messages.clear();
+
+	auto localPrefixes = s_prefixes;
+	Lexer lexer(buffer, length);
+	lexer.setPrefixes(localPrefixes.get());
+	m_lexer = &lexer;
+
+	std::unique_ptr<AstKeySequence> seq;
+	if (nextLine()) {
+		try {
+			seq = parseKeySequence(false);
+		} catch (ErrorMessage &e) {
+			std::wstringstream ss;
+			ss << e;
+			error(ss.str());
+		}
+	}
+
+	m_lexer = nullptr;
+
+	if (!seq)
+		seq = std::make_unique<AstKeySequence>();
+	return seq;
 }
 
 
@@ -920,6 +954,21 @@ std::unique_ptr<AstKeySequence> MayuParser::parseKeySequence(bool inParen)
 			action->functionName = getToken()->getString();
 			action->arguments = parseArguments();
 			seq->actions.push_back(std::move(action));
+		} else if (*t == L"@") {
+			// @FuncName[(arg, ...)]  ->  &ExecUserFunc("FuncName"[, arg, ...])
+			getToken(); // consume '@'
+			auto action = std::make_unique<AstActionFuncCall>();
+			action->modifiers = std::move(mods);
+			action->functionName = wstringi(L"ExecUserFunc");
+			auto nameArg = std::make_unique<AstArgument>();
+			nameArg->kind = AstArgument::Kind::String;
+			nameArg->stringValue = getToken()->getString();
+			action->arguments.push_back(std::move(nameArg));
+			// Optional argument list: @FuncName(arg1, arg2, ...)
+			auto extraArgs = parseArguments();
+			for (auto &a : extraArgs)
+				action->arguments.push_back(std::move(a));
+			seq->actions.push_back(std::move(action));
 		} else {
 			auto action = std::make_unique<AstActionKey>();
 			action->modifiers = std::move(mods);
@@ -1030,4 +1079,46 @@ std::vector<std::unique_ptr<AstArgument>> MayuParser::parseArguments()
 		throw ErrorMessage() << L"`)' expected in function arguments.";
 
 	return args;
+}
+
+
+//=============================================================================
+// Public static helpers
+//=============================================================================
+
+// Parse a modifier-key string (e.g. "C-A", "*-LButton", "S-C-Return").
+// Uses parseActions() on the string; expects exactly one AstActionKey.
+/*static*/
+bool MayuParser::parseModifiedKey(const wstringi &str,
+	std::vector<AstModifierSpec> &mods, wstringi &keyName)
+{
+	MayuParser p;
+	auto seq = p.parseActions(str.c_str(), str.size(), L"<modkey>");
+	if (p.hasErrors() || !seq || seq->actions.size() != 1)
+		return false;
+	const auto *key = dynamic_cast<const AstActionKey *>(seq->actions[0].get());
+	if (!key)
+		return false;
+	mods    = key->modifiers;
+	keyName = key->keyName;
+	return true;
+}
+
+
+// Parse a single scan-code string (e.g. "0x1c", "E0-0x1c", "28").
+// Wraps the string in a synthetic "def sync = <str>" and extracts the result.
+/*static*/
+bool MayuParser::parseScanCode(const wstringi &str, AstScanCode &out)
+{
+	MayuParser p;
+	wstringi synth = wstringi(L"def sync = ") + str;
+	auto ast = p.parseBuffer(synth.c_str(), synth.size(), L"<scancode>");
+	if (p.hasErrors() || !ast || ast->statements.empty())
+		return false;
+	const auto *sync =
+		dynamic_cast<const AstDefSync *>(ast->statements[0].get());
+	if (!sync || sync->scanCodes.empty())
+		return false;
+	out = sync->scanCodes[0];
+	return true;
 }

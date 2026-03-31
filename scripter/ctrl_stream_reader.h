@@ -7,8 +7,24 @@
 
 
 #  include "../ctrl_stream.h"
+#  include "ys_types.h"
 #  include <istream>
-#  include <vector>
+
+
+/// Payload of the Start control command (pairs with CtrlId::Start)
+struct CtrlArgsStart {
+	wstringi configName;  // config profile name (may be empty)
+	wstringi configPath;  // config file path (may be empty)
+	Symbols  symbols;
+};
+
+
+/// Payload of the ExecUserFunc control command (pairs with CtrlId::ExecUserFunc)
+struct CtrlArgsExecUserFunc {
+	wstringi    name;
+	YsFuncArgs  args;     // move-only
+	TriggerInfo context;
+};
 
 
 //=============================================================================
@@ -24,15 +40,10 @@ public:
 	bool readNext(CtrlId &ctrlId);
 
 	/// Read the payload of a Start command (call after readNext returns Start)
-	Symbols readStart();
+	CtrlArgsStart readStart();
 
 	/// Read the payload of an ExecUserFunc command (call after readNext returns ExecUserFunc)
-	struct ExecUserFuncData {
-		wstringi              name;
-		std::vector<FuncArg>  args;
-		TriggerInfo           context;
-	};
-	ExecUserFuncData readExecUserFunc();
+	CtrlArgsExecUserFunc readExecUserFunc();
 
 private:
 	std::istream &m_in;

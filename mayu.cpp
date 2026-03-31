@@ -746,13 +746,53 @@ private:
 		return DefWindowProc(i_hwnd, i_message, i_wParam, i_lParam);
 	}
 
+	// Read the active config profile from the registry (or yamy.ini).
+	// Returns false if no valid entry exists.
+	static bool readRegistryConfig(wstringi *o_name, wstringi *o_path, Symbols *o_symbols)
+	{
+		Registry reg(MAYU_REGISTRY_ROOT);
+		int index = 0;
+		reg.read(L".mayuIndex", &index, 0);
+		wchar_t key[32];
+		_snwprintf(key, NUMBER_OF(key), L".mayu%d", index);
+		wstringi entry;
+		if (!reg.read(key, &entry))
+			return false;
+		wregex_stored re(L"^([^;]*);([^;]*);(.*)$");
+		std::wsmatch m;
+		if (!std::regex_match(static_cast<const std::wstring&>(entry), m, re))
+			return false;
+		if (o_name) *o_name = m.str(1);
+		if (o_path) *o_path = m.str(2);
+		if (o_symbols) {
+			wstringi symPart = m.str(3);
+			wregex_stored reSym(L"-D([^;]*)(.*)$");
+			std::wsmatch ms;
+			while (std::regex_search(static_cast<const std::wstring&>(symPart), ms, reSym)) {
+				o_symbols->insert(ms.str(1));
+				symPart = ms.str(2);
+			}
+		}
+		return true;
+	}
+
 	/// load setting
 	void load() {
-		// set symbol
+		// command-line symbols
 		Symbols initialSymbols;
 		for (int i = 1; i < __argc; ++ i) {
 			if (__wargv[i][0] == L'-' && __wargv[i][1] == L'D')
 				initialSymbols.insert(__wargv[i] + 2);
+		}
+
+		// registry config: name, path, registry symbols merged into initialSymbols
+		wstringi configName, configPath;
+		{
+			Symbols registrySyms;
+			if (readRegistryConfig(&configName, &configPath, &registrySyms)) {
+				for (const auto &s : registrySyms)
+					initialSymbols.insert(s);
+			}
 		}
 
 		if (!m_scripter) {
@@ -768,7 +808,7 @@ private:
 		}
 
 		// Start (or restart) scripter asynchronously; result notified via WM_APP_scripterSettingReady.
-		m_scripter->start(initialSymbols);
+		m_scripter->start(configName, configPath, initialSymbols);
 	}
 
 	// show message (a baloon from the task tray icon)

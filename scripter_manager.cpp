@@ -9,6 +9,8 @@
 #include "cmd_stream_reader.h"
 #include "pipe_streambuf.h"
 #include "stringtool.h"
+#include "registry.h"
+#include "mayu.h"
 
 #include <process.h>
 #include <vector>
@@ -92,7 +94,8 @@ void ScripterManager::closeHandles()
 }
 
 
-bool ScripterManager::start(const Symbols &syms)
+bool ScripterManager::start(const wstringi &configName, const wstringi &configPath,
+                             const Symbols &syms)
 {
 	// If a previous async start is still running, skip
 	if (m_startFuture.valid() &&
@@ -100,12 +103,55 @@ bool ScripterManager::start(const Symbols &syms)
 		return false;
 
 	m_startFuture = std::async(std::launch::async,
-	                           &ScripterManager::launchScripter, this, syms);
+		[this, configName, configPath, syms]() {
+			return launchScripter(configName, configPath, syms);
+		});
 	return true;
 }
 
 
-bool ScripterManager::launchScripter(const Symbols &syms)
+// Expand ${VAR} placeholders in s.
+// ${YAMY_HOME} -> yamyHome; others -> GetEnvironmentVariableW().
+// Unknown vars are left as-is and appended to *unknownVars if provided.
+// After each expansion, if the result ends with '\' and the next input char is also '\',
+// one backslash is consumed to prevent double separators.
+static std::wstring expandVars(const std::wstring &s, const std::wstring &yamyHome,
+                               std::vector<std::wstring> *unknownVars = nullptr)
+{
+	std::wstring result;
+	result.reserve(s.size());
+	for (size_t i = 0; i < s.size(); ) {
+		if (s[i] == L'$' && i + 1 < s.size() && s[i + 1] == L'{') {
+			size_t end = s.find(L'}', i + 2);
+			if (end == std::wstring::npos) { result += s[i++]; continue; }
+			std::wstring name = s.substr(i + 2, end - i - 2);
+			if (name == L"YAMY_HOME") {
+				result += yamyHome;
+			} else {
+				wchar_t buf[2048];
+				DWORD len = GetEnvironmentVariableW(name.c_str(), buf, 2048);
+				if (len > 0 && len < 2048) {
+					result.append(buf, len);
+				} else {
+					result += s.substr(i, end - i + 1);
+					if (unknownVars) unknownVars->push_back(name);
+				}
+			}
+			i = end + 1;
+			// Prevent double backslash when expansion ends with '\' and next char is also '\'.
+			if (!result.empty() && result.back() == L'\\' && i < s.size() && s[i] == L'\\')
+				++i;
+		} else {
+			result += s[i++];
+		}
+	}
+	return result;
+}
+
+
+bool ScripterManager::launchScripter(const wstringi &configName,
+                                      const wstringi &configPath,
+                                      const Symbols &syms)
 {
 	// Stop existing scripter if running
 	if (m_hScripterProcess != NULL) {
@@ -117,9 +163,9 @@ bool ScripterManager::launchScripter(const Symbols &syms)
 		m_quitSent = false;
 	}
 
-	// ctrl pipe:  yamy (write) -> scripter (read) via inherited handle in YSCR_CTRL env var
+	// ctrl pipe:  yamy (write) -> scripter (read) via inherited handle in YS_CTRL env var
 	HANDLE hCtrlRead  = INVALID_HANDLE_VALUE;
-	// data pipe:  scripter (write) -> yamy (read) via inherited handle in YSCR_CMD env var
+	// data pipe:  scripter (write) -> yamy (read) via inherited handle in YS_CMD env var
 	HANDLE hDataWrite = INVALID_HANDLE_VALUE;
 	// msg pipe:   scripter stdout+stderr (write) -> yamy (read), merged
 	HANDLE hMsgWrite  = INVALID_HANDLE_VALUE;
@@ -163,15 +209,33 @@ bool ScripterManager::launchScripter(const Symbols &syms)
 	GetModuleFileName(NULL, exePath, GANA_MAX_PATH);
 	_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH,
 	              NULL, 0, NULL, 0);
-	wstringi scripterPath = exeDrive;
-	scripterPath += exeDir;
-	scripterPath += L"yamy-scripter.exe";
+	wstringi yamyHome = exeDrive;
+	yamyHome += exeDir;
+	wstringi scripterPath = yamyHome + L"yamy-scripter.exe";
+
+	// Read optional extra arguments from ini/registry.
+	wstringi iniExtra;
+	{
+		Registry reg(MAYU_REGISTRY_ROOT);
+		reg.read(L"cmdLine", &iniExtra);
+	}
 
 	// build command line
-	wchar_t cmdLine[1024];
-	swprintf_s(cmdLine, L"\"%s\"", scripterPath.c_str());
+	std::wstring cmdLineStr = L"\"" + std::wstring(scripterPath.c_str()) + L"\"";
+	if (!iniExtra.empty()) {
+		std::vector<std::wstring> unknownVars;
+		std::wstring expanded = expandVars(iniExtra, yamyHome, &unknownVars);
+		for (const auto &uv : unknownVars) {
+			if (m_log) {
+				Acquire a(m_soLog, 0);
+				*m_log << L"warning: cmdLine: unknown variable: ${" << uv << L"}" << std::endl;
+			}
+		}
+		cmdLineStr += L" ";
+		cmdLineStr += expanded;
+	}
 
-	// build an environment block that includes YSCR_CTRL and YSCR_CMD
+	// build an environment block that includes YS_CTRL and YS_CMD
 	// so the child receives pipe handle values without polluting the parent environment
 	wchar_t ctrlVal[32], cmdVal[32];
 	swprintf_s(ctrlVal, L"%llu",
@@ -187,8 +251,8 @@ bool ScripterManager::launchScripter(const Symbols &syms)
 			for (const wchar_t *p = value; *p; ++p) envBlock.push_back(*p);
 			envBlock.push_back(L'\0');
 		};
-		addVar(L"YSCR_CTRL", ctrlVal);
-		addVar(L"YSCR_CMD",  cmdVal);
+		addVar(L"YS_CTRL", ctrlVal);
+		addVar(L"YS_CMD",  cmdVal);
 
 		// append current process environment
 		wchar_t *cur = GetEnvironmentStringsW();
@@ -197,9 +261,11 @@ bool ScripterManager::launchScripter(const Symbols &syms)
 				const wchar_t *entry = p;
 				while (*p) ++p;
 				++p;  // skip NUL
-				// skip any existing YSCR_CTRL/YSCR_CMD entries
-				bool skip = (wcsncmp(entry, L"YSCR_CTRL=", 10) == 0 ||
-				             wcsncmp(entry, L"YSCR_CMD=",   9) == 0);
+				// skip any existing YS_CTRL/YS_CMD entries
+				wchar_t ysCtrlEq[] = L"YS_CTRL=";
+				wchar_t ysCmdEq[] = L"YS_CMD=";
+				bool skip = (wcsncmp(entry, ysCtrlEq, sizeof(ysCtrlEq) - 1) == 0 ||
+				             wcsncmp(entry, ysCmdEq, sizeof(ysCmdEq) - 1) == 0);
 				if (!skip) {
 					for (const wchar_t *q = entry; q < p; ++q) envBlock.push_back(*q);
 				}
@@ -217,7 +283,7 @@ bool ScripterManager::launchScripter(const Symbols &syms)
 	si.hStdError  = hMsgWrite;  // stderr = same pipe (merged)
 
 	PROCESS_INFORMATION pi = {};
-	BOOL result = CreateProcess(NULL, cmdLine, NULL, NULL, TRUE,
+	BOOL result = CreateProcess(NULL, cmdLineStr.data(), NULL, NULL, TRUE,
 	                            CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
 	                            envBlock.data(), NULL, &si, &pi);
 	DWORD lastErr = GetLastError();
@@ -255,9 +321,9 @@ bool ScripterManager::launchScripter(const Symbols &syms)
 		*m_log << L"ScripterManager: started " << scripterPath << std::endl;
 	}
 
-	// Send CtrlId::Start with the requested symbols
+	// Send CtrlId::Start with config name, path, and symbols
 	if (m_ctrlWriter) {
-		try { m_ctrlWriter->writeStart(syms); } catch (...) {}
+		try { m_ctrlWriter->writeStart(configName, configPath, syms); } catch (...) {}
 	}
 	return true;
 }

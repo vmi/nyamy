@@ -1,7 +1,7 @@
 # mruby バインディング仕様案
 
-> **状態: 未実装 (設計案)**
-> C API ([c-api.md](c-api.md)) の実装完了後に着手する。
+> **状態: 実装済み**
+> `scripter/mruby_binding.cpp/h` および `scripter/mruby_main.cpp` として実装済み。
 
 ## 目的
 
@@ -43,8 +43,8 @@ keymap "Global" do
   key["C-S-L C-A-L"] = "&WindowLower"
 end
 
-deffunc "NotifyTime" do |trigger|
-  trigger.exec "&OSD(#{Time.now.strftime('%H:%M')})"
+deffunc "NotifyTime" do
+  exec_keyseq "&OSD(#{Time.now.strftime('%H:%M')})"
 end
 ```
 
@@ -514,41 +514,40 @@ C API 対応: `ys_assign_mod(prefixes, modifier_name, op, keys)`
 
 ### `deffunc` — 関数登録
 
-**.mayu 相当:** `&ExecUserFunc` (将来実装予定機能)
+**.mayu 相当:** `&ExecUserFunc`
+
+Engine 側の `.mayu` で `&ExecUserFunc(FuncName, arg1, arg2, ...)` が実行されると
+登録したブロックが呼ばれる。Engine から渡された引数は型変換表に従い Ruby 値として
+ブロックに展開される。
 
 ```ruby
-deffunc "NotifyTime" do |trigger|
+# 引数なし
+deffunc "NotifyTime" do
   require "time"
-  trigger.exec "&OSD(#{Time.now.strftime('%H:%M')})"
+  exec_keyseq "&OSD(#{Time.now.strftime('%H:%M')})"
 end
 
-# プリセット引数付き (load_setting 時に YsFuncArgs に詰めて送信)
-deffunc "ShowMsg", preset: "Hello" do |trigger, msg|
-  trigger.exec "&OSD(#{msg})"
-end
-
-# 複数プリセット引数 (配列で指定)
-deffunc "DoSomething", preset: [42, "arg2"] do |trigger, n, s|
-  trigger.exec "&OSD(#{n}: #{s})"
+# Engine から渡される引数を受け取る (例: &ExecUserFunc(ShowMsg, "hello"))
+deffunc "ShowMsg" do |msg|
+  exec_keyseq "&OSD(#{msg})"
 end
 
 keymap "Global" do
-  key["C-F1"] = "&ExecUserFunc(NotifyTime)"  # 標準的な .mayu 構文
-  key["C-F2"] = "&ExecUserFunc(ShowMsg)"
+  key["C-F1"] = "&ExecUserFunc(NotifyTime)"
+  key["C-F2"] = "&ExecUserFunc(ShowMsg, \"hello\")"
 end
 ```
 
 `deffunc` は内部で:
 
-1. `ys_reg_user_func(func_name, preset_args)` でエンジンに登録
-2. `func_name → block` テーブルに保存
+1. `ys_reg_user_func(func_name, handler)` でエンジンに登録
+2. `func_name → block` テーブル (mruby Hash) に保存
 
-`exec_user_func` コールバック受信時:
+`on_exec_user_func` コールバック受信時:
 
-1. `func_name` でテーブルを検索
+1. `func_name` でハッシュを検索
 2. `YsFuncArgs*` → Ruby 値の配列に変換 (型変換表参照)
-3. `YsTriggerInfo*` → `Yamy::TriggerInfo` にラップ
-4. `block.call(trigger, *preset_args)` を実行
+3. `mrb_yield_argv` でブロックを呼び出す
 
 ### キーシーケンス文字列内でのユーザー定義関数呼び出し
 
@@ -560,156 +559,76 @@ end
 key["C-F1"] = "&ExecUserFunc(NotifyTime)"
 ```
 
-#### 方法 B: `@FuncName` プレフィックス (Ruby バインディング層の糖衣構文)
+#### 方法 B: `@FuncName` プレフィックス (未実装)
 
-`.mayu` の `&` プレフィックスは組み込み関数、`$` はキーシーケンス参照と既に使用されている。
-`@` はいずれとも衝突しないため、ユーザー定義関数の呼び出しプレフィックスとして採用する。
+バインディング層が `ys_reg_keyseq` に渡す前に `@Name` を `&ExecUserFunc(Name)` へ置換する
+糖衣構文。現状は未実装のため、方法 A (`&ExecUserFunc(Name)`) を使うこと。
 
-```ruby
-key["C-F1"] = "@NotifyTime"           # → &ExecUserFunc(NotifyTime) に変換
-key["C-F2"] = "@ShowMsg"              # → &ExecUserFunc(ShowMsg)
-keyseq :my_seq, "@NotifyTime A B C"   # 複合アクション内でも可
-```
 
-バインディング層が `ys_reg_keyseq` に渡す前に `@Name` を `&ExecUserFunc(Name)` へ置換する。
-**C API 側への変更は不要。**
+### `exec_keyseq` — キーシーケンス実行 (deffunc ブロック内)
 
-**仕様:**
-- アクション文字列中の `@` はエスケープ手段を提供しない。
-- `.mayu` の既存文法にはキー名・組み込み関数名・モディファイア記号として `@` を使うものが存在しないため、衝突しない。
-- `@` をリテラルとして送りたい用途は想定しない。
-- Ruby の `@` (インスタンス変数) とは無関係。アクション文字列はすべて `String` リテラルとして渡されるため混同は起きない。
-
----
-
-### `Yamy::TriggerInfo` — トリガー情報オブジェクト
-
-`deffunc` ブロックの第1引数として渡される。
+DSL オブジェクトのメソッドとして提供される (`ys_exec_keyseq` の薄いラッパー)。
+`on_exec_user_func` コールバック実行中のみ有効で、受信時のトリガーコンテキストが自動的に引き継がれる。
 
 ```ruby
-class Yamy::TriggerInfo
-  # actions のキーシーケンスをエンジン側で実行する
-  # ys_exec_keyseq(actions, self.c_ptr) の薄いラッパー
-  #
-  # 制約: actions 文字列に &ExecUserFunc / @FuncName を含めることは禁止。
-  # (無限ループ防止のため C API レベルでガードし、false を返す)
-  # バインディング層で @Name → &ExecUserFunc(Name) 変換を行った後に渡す場合も同様。
-  def exec(actions)  # String → bool
-  end
+deffunc "DoAction" do
+  exec_keyseq "&OSD.Display(\"hello\")"
 end
 ```
 
-`exec` の制約について:
-- `&ExecUserFunc` を含む actions を渡すと `ys_exec_keyseq` が **false** を返す
-- この検査は C API 側 (`ys_exec_keyseq` 実装内) でガードする
-- バインディング層での `@Name` → `&ExecUserFunc(Name)` 変換は、
-  `ys_exec_keyseq` への渡し前に行われるが、ガードが C API 側にあるため問題ない
-- 意図: `deffunc` ブロック内からユーザー定義関数を再帰呼び出しする
-  無限ループを防止するための設計上の制限
+制約:
+- `on_load_setting` 内では `ys_exec_keyseq` が false を返す
+- `&ExecUserFunc` を含む actions は C API レベルでガードされ false を返す (無限ループ防止)
 
 ---
 
 ## 型変換
 
-### `YsFuncArgs` → Ruby 値 (exec_user_func 受信時)
+### `YsFuncArgs` → Ruby 値 (on_exec_user_func 受信時)
 
 `YsFuncArgs*` の各要素を Ruby 値に変換してブロックに渡す:
 
-| `YsType`        | Ruby 型              | 変換方法 |
-|-----------------|----------------------|----------|
-| `YT_STRING`     | `String`             | UTF-8 文字列 |
-| `YT_NUMBER`     | `Integer`            | `int32_t` |
-| `YT_REGEXP`     | `Regexp`             | `Regexp.new(pattern)` |
-| `YT_KEYSEQ_IDX` | `Yamy::KeySeq`       | インデックスをラップ |
-| `YT_MOD`        | `Yamy::Modifier`     | `modifiers` + `dontcares` の 2 値 |
-| `YT_TOKEN_SEQ`  | `Array` of `String`  | `YsStrs*` → 文字列配列 |
-
-### `deffunc preset:` → `YsFuncArgs` (load_setting 送信時)
-
-`preset:` に渡した Ruby 値を `ys_func_args_push` で `YsFuncArgs*` に変換:
-
-| Ruby 型   | `YsType`    | 変換方法 |
-|-----------|-------------|----------|
-| `String`  | `YT_STRING` | UTF-8 → `char*` |
-| `Integer` | `YT_NUMBER` | `int32_t` |
-| `Regexp`  | `YT_REGEXP` | `.source` → `char*` |
-| `Symbol`  | `YT_STRING` | `.to_s` → `char*` |
+| `YsType`             | Ruby 型              | 変換方法 |
+|----------------------|----------------------|----------|
+| `YsType_String`      | `String`             | UTF-8 文字列 |
+| `YsType_Number`      | `Integer`            | `int32_t` |
+| `YsType_Regexp`      | `Regexp`             | `"pattern".to_regexp` (mruby 拡張) |
+| `YsType_KeySeqIdx`   | `Yamy::KeySeq`       | インデックスをラップ |
+| `YsType_ModifierSpec`| `Yamy::Modifier`     | `modifiers` + `dontcares` の 2 値 |
+| `YsType_TokenSeq`    | `Array` of `String`  | `YsStrs*` → 文字列配列 |
 
 ---
 
-## C API への変更提案
+## 実装済み C API
 
-### 提案 1: `ys_include_mayu(path)` の追加 (推奨)
+mruby バインディング実装時に追加された C API:
 
-`load_mayu` は設定済みパスからの読み込みのみ対応するが、
-`include "104.mayu"` のように特定ファイルを明示インクルードしたい場面がある。
+- `ys_include_mayu(path)` — 指定パスの .mayu をコンパイルしてキューに積む
+- `ys_last_error()` — 最後のエラーメッセージを返す (UTF-8 NUL 終端、なければ NULL)
+- `ys_exec_keyseq(actions)` — キーシーケンスを実行 (`on_exec_user_func` 内でのみ有効)
 
-```c
-// 指定パスの .mayu ファイルをコンパイルしてキューに積む
-// path: UTF-8 ファイルパス (相対パスは設定ファイルと同ディレクトリから解決)
-// load_setting 内でのみ有効
-YS_API bool ys_include_mayu(const char* path);
-```
-
-### 提案 2: `ys_last_error()` の追加 (推奨)
-
-```c
-// 最後のエラーメッセージを返す (UTF-8 NUL 終端)
-// エラーなし / 未発生の場合は NULL を返す
-YS_API const char* ys_last_error(void);
-```
-
-```ruby
-# Ruby 側での使用例
-load "104.mayu" or raise "load failed: #{Yamy.last_error}"
-```
-
-### 提案 3: `YsCallbacks` フィールドへの `on_` プレフィックス付加 (推奨)
-
-コールバック用フィールドに `on_` を付けることで、
-「エンジンから呼び出されるイベントハンドラである」という意味が明確になる。
-フィールド名と呼び出し側関数名 (`ys_load_mayu` 等) の混同も防げる。
-
-```c
-// 変更前
-typedef struct YsCallbacks {
-    ys_ctrl_load_setting   load_setting;
-    ys_ctrl_exec_user_func exec_user_func;
-} YsCallbacks;
-
-// 変更後
-typedef struct YsCallbacks {
-    ys_on_load_setting   on_load_setting;    // 「設定ロードが要求されたとき」
-    ys_on_exec_user_func on_exec_user_func;  // 「ユーザー定義関数実行が要求されたとき」
-} YsCallbacks;
-```
-
-合わせて typedef 名も統一する:
+コールバック typedef:
 
 ```c
 typedef bool (*ys_on_load_setting)(void);
-typedef void (*ys_on_exec_user_func)(const char*, const YsFuncArgs*, const YsTriggerInfo*);
+typedef void (*ys_on_exec_user_func)(const char* /* func_name */,
+                                     const YsFuncArgs* /* args */);
 ```
 
-mruby EXE での使用例:
-
-```cpp
-YsCallbacks cb = {};
-cb.on_load_setting   = on_load_setting;    // 関数名と対応が自明
-cb.on_exec_user_func = on_exec_user_func;
-ys_start(&cb);
-```
-
-### 決定事項: `ys_exec_keyseq` での `&ExecUserFunc` ガード
-
-`trigger.exec` の制約を C API レベルで強制する (採用済み):
+`ys_start` は `on_load_setting` のみを受け取る単一コールバック形式 (コールバック構造体なし):
 
 ```c
-// ys_exec_keyseq 実装内での検査
-// actions 文字列に "&ExecUserFunc" が含まれる場合は即 false を返す
-YS_API bool ys_exec_keyseq(const char* actions, const YsTriggerInfo* trigger_info);
-// シグネチャ変更なし。実装側でガードを追加するのみ。
+YS_API int ys_start(ys_on_load_setting on_load_setting);
 ```
+
+`on_exec_user_func` は `ys_reg_user_func` で関数ごとに個別登録する:
+
+```c
+YS_API bool ys_reg_user_func(const char* func_name, ys_on_exec_user_func on_exec_user_func);
+```
+
+`ys_exec_keyseq` での `&ExecUserFunc` ガード (実装済み):
+- actions 文字列に `&ExecUserFunc` が含まれる場合は即 false を返す (無限ループ防止)
 
 ---
 
@@ -810,13 +729,13 @@ window "ConsoleWindowClass", class: /^ConsoleWindowClass$/, parent: "Global" do
 end
 
 # ユーザー定義関数
-deffunc "NotifyCurrentTime" do |trigger|
+deffunc "NotifyCurrentTime" do
   require "time"
-  trigger.exec "&OSD(#{Time.now.strftime('%H:%M:%S')})"
+  exec_keyseq "&OSD(#{Time.now.strftime('%H:%M:%S')})"
 end
 
 keymap "Global" do
-  key["C-S-F12"] = "@NotifyCurrentTime"  # @Name は &ExecUserFunc(Name) に変換される
+  key["C-S-F12"] = "&ExecUserFunc(NotifyCurrentTime)"
 end
 ```
 
@@ -826,64 +745,45 @@ end
 
 ### グローバル状態
 
-```c
+```cpp
 // mruby_binding.cpp 内
 
 static mrb_state*  g_mrb        = nullptr;
-static mrb_value   g_dsl_obj    = mrb_nil_value();  // Yamy::DSL インスタンス
-static std::unordered_map<std::string, mrb_value> g_user_funcs;
+static std::string g_scriptPath;
+static mrb_value   g_funcTable;  // mruby Hash: String => Proc (GC保護済み)
 ```
 
 ### コールバック
 
-```c
-static bool on_load_setting() {
-    // .rb ファイルを dsl_obj のコンテキストで instance_eval
-    FILE* f = fopen(g_script_path, "rb");
-    mrb_value code = mrb_load_file(g_mrb, f);  // DSL obj の instance_eval で実行
-    fclose(f);
-    return g_mrb->exc == nullptr;
-}
+```cpp
+// mruby_on_load_setting: scripter/mruby_binding.cpp
+bool mruby_on_load_setting();  // .rb ファイルを Yamy::DSL の instance_eval で実行
 
-static void on_exec_user_func(const char* name,
-                               const YsFuncArgs* preset_args,
-                               const YsTriggerInfo* trigger_info) {
-    auto it = g_user_funcs.find(name);
-    if (it == g_user_funcs.end()) return;
-
-    mrb_value trigger = wrap_trigger_info(g_mrb, trigger_info);
-    mrb_value argv[1] = { trigger };
-
-    // preset_args を Ruby 値に展開して block.call(trigger, *preset_args)
-    mrb_value args_ary = func_args_to_mrb(g_mrb, preset_args);
-    mrb_funcall_argv(g_mrb, it->second, mrb_intern_lit(g_mrb, "call"),
-                     1 + RARRAY_LEN(args_ary), /* ... */);
-}
+// mruby_on_exec_user_func: scripter/mruby_binding.cpp
+// g_funcTable からブロックを検索し mrb_yield_argv で呼び出す
+void mruby_on_exec_user_func(const char* func_name, const YsFuncArgs* args);
 ```
 
 ### `mruby_main.cpp` の構成
 
 ```cpp
 #include "yamy_scripter.h"
-#include "mruby.h"
 #include "mruby_binding.h"
+#include <mruby.h>
 
-int wmain(int argc, wchar_t* argv[]) {
-    mrb_state* mrb = mrb_open();
-    yamy_mruby_init(mrb);   // Yamy::DSL クラス等を登録
-
-    // --script=path.rb (または argv[1]) を設定
-    const char* script = find_script_path(argc, argv);
+int main(int argc, char* argv[]) {  // UTF-8 activeCodePage マニフェスト使用
+    const char* script = findScriptPath(argc, argv);  // --script=path.rb または argv[1]
     if (!script) {
-        fwprintf(stderr, L"error: script file required\n");
+        fprintf(stderr, "error: script file required\n"
+                        "usage: yamy-scripter.exe [--script=]path.rb\n");
         return 1;
     }
-    yamy_mruby_set_script(script);
 
-    YsCallbacks cb = {};
-    cb.on_load_setting   = on_load_setting;
-    cb.on_exec_user_func = on_exec_user_func;
-    int ret = ys_start(&cb);
+    mrb_state* mrb = mrb_open();
+    yamy_mruby_init(mrb);          // Yamy::DSL / KeySeq / KeyMap 等を登録
+    yamy_mruby_set_script(mrb, script);
+
+    int ret = ys_start(mruby_on_load_setting);
 
     mrb_close(mrb);
     return ret;
@@ -904,13 +804,9 @@ int wmain(int argc, wchar_t* argv[]) {
 - **`$VAR` のスコープ**: keyseq はもともとプロセス終了まで保持されるグローバルなリソース。
   Ruby グローバル変数 `$VAR` で保持することと整合しており、スコープ問題は生じない。
 
-- **`@FuncName` のエスケープ**: エスケープ手段は提供しない (仕様に明記済み、上記参照)。
-
 - **`deffunc` とキーマップ定義の順序**: 順序制約なし。
   `ys_reg_user_func` の呼び出しタイミングはキューイングの順序に影響しない。
-  実装方針は以下のいずれか (C API 実装時に決定):
-  - commit 前に全 `&ExecUserFunc` 参照が登録済みか検証する
-  - キューイング時点では検証せず、Engine 側で未定義関数を受け取った場合にエラーとする
+  未登録関数への `&ExecUserFunc` 呼び出しは Engine 側でエラー扱いになる。
 
 ---
 

@@ -20,8 +20,10 @@ class CtrlStreamWriter
 public:
 	explicit CtrlStreamWriter(std::ostream &out);
 
-	/// Send a start request with the given symbol set
-	void writeStart(const Symbols &syms);
+	/// Send a start request with config name, path, and symbol set
+	void writeStart(const wstringi &configName,
+	                const wstringi &configPath,
+	                const Symbols  &syms);
 
 	/// Send a quit request
 	void writeQuit();

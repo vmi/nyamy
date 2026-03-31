@@ -1,0 +1,3 @@
+[submodule "scripter/mruby"]
+	path = scripter/mruby
+	url = https://github.com/mruby/mruby.git
