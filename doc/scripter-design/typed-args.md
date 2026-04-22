@@ -157,7 +157,7 @@ YsType_String     = 0
 YsType_Number     = 1
 YsType_Regexp     = 2
 YsType_KeySeqIdx  = 3
-YsType_ModSpec    = 4
+YsType_ModifierSpec    = 4
 YsType_TokenSeq   = 5
 
 # --- 読み取り ---
@@ -175,7 +175,7 @@ def read_args(fas) -> list:
             result.append({"type": "number", "value": ctypes.c_int32(v.value).value})
         elif t == YsType_KeySeqIdx:
             result.append({"type": "keyseq_idx", "value": v.value & 0xFFFFFFFF})
-        elif t == YsType_ModSpec:
+        elif t == YsType_ModifierSpec:
             result.append({"type": "mod",
                             "modifiers": v.value & 0xFFFFFFFFFFFFFFFF,
                             "dontcares": l.value & 0xFFFFFFFFFFFFFFFF})
@@ -192,22 +192,33 @@ def read_args(fas) -> list:
 
 # --- コールバック ---
 
-LoadSettingFn  = ctypes.CFUNCTYPE(ctypes.c_bool)
+# exeCtx は呼び出し元コンテキストポインタ (今回は使わないので無視)
+LoadSettingFn  = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_void_p)
 ExecUserFuncFn = ctypes.CFUNCTYPE(None,
-    ctypes.c_char_p,   # func_name
-    ctypes.c_void_p)   # args (YsFuncArgs*)
+    ctypes.c_void_p,  # exeCtx
+    ctypes.c_char_p,  # func_name
+    ctypes.c_void_p)  # args (YsFuncArgs*)
 
-def on_load_setting():
+def on_load_setting(ctx):
     return bool(lib.ys_load_mayu())
 
-def on_exec_user_func(name, fas):
+def on_exec_user_func(ctx, name, fas):
     args = read_args(fas)
     print(f"called: {name.decode()}, args={args}")
     lib.ys_exec_keyseq(b"&SomeAction")
 
+# YsCallbacks 構造体 (on_load_setting + on_quit)
+class YsCallbacks(ctypes.Structure):
+    _fields_ = [
+        ("on_load_setting", LoadSettingFn),
+        ("on_quit",         ctypes.c_void_p),  # NULL
+    ]
+
+callbacks = YsCallbacks(LoadSettingFn(on_load_setting), None)
+
 lib.ys_start.restype  = ctypes.c_int
-lib.ys_start.argtypes = [LoadSettingFn]
-lib.ys_start(LoadSettingFn(on_load_setting))
+lib.ys_start.argtypes = [ctypes.POINTER(YsCallbacks), ctypes.c_void_p]
+lib.ys_start(ctypes.byref(callbacks), None)
 ```
 
 ### Ruby (ffi gem)
@@ -223,7 +234,7 @@ module YamyScripter
   YsType_Number     = 1
   YsType_Regexp     = 2
   YsType_KeySeqIdx  = 3
-  YsType_ModSpec    = 4
+  YsType_ModifierSpec    = 4
   YsType_TokenSeq   = 5
 
   attach_function :ys_func_args_new,    [],                             :pointer
@@ -239,7 +250,7 @@ module YamyScripter
   attach_function :ys_strs_push,        [:pointer, :string, :size_t],   :bool
   attach_function :ys_exec_keyseq,      [:string],                      :bool
   attach_function :ys_load_mayu,        [],                             :bool
-  attach_function :ys_start,            [:pointer],                     :int
+  attach_function :ys_start,            [:pointer, :pointer],           :int
 
   # --- 読み取り ---
 
@@ -258,7 +269,7 @@ module YamyScripter
         { type: :number, value: [v].pack("q<").unpack1("l<") }
       when YsType_KeySeqIdx
         { type: :keyseq_idx, value: v & 0xFFFFFFFF }
-      when YsType_ModSpec
+      when YsType_ModifierSpec
         { type: :mod, modifiers: v & 0xFFFFFFFF_FFFFFFFF,
                       dontcares: l & 0xFFFFFFFF_FFFFFFFF }
       when YsType_TokenSeq
@@ -278,8 +289,17 @@ module YamyScripter
   end
 end
 
-on_load = FFI::Function.new(:bool, []) { YamyScripter.ys_load_mayu }
-YamyScripter.ys_start(on_load)
+# YsCallbacks 構造体 (on_load_setting + on_quit)
+class YsCallbacks < FFI::Struct
+  layout :on_load_setting, :pointer,
+         :on_quit,         :pointer
+end
+
+on_load = FFI::Function.new(:bool, [:pointer]) { YamyScripter.ys_load_mayu }
+callbacks = YsCallbacks.new
+callbacks[:on_load_setting] = on_load
+callbacks[:on_quit]         = FFI::Pointer::NULL
+YamyScripter.ys_start(callbacks, FFI::Pointer::NULL)
 ```
 
 ---
@@ -290,7 +310,7 @@ YamyScripter.ys_start(on_load)
 `ys_exec_keyseq` を使う。アクション文字列は mayu 構文で記述する。
 
 ```c
-void on_exec_user_func(const char* name, const YsFuncArgs* args)
+void on_exec_user_func(void* exeCtx, const char* name, const YsFuncArgs* args)
 {
     // "&関数名(引数)" の形で mayu 構文アクション文字列として指定
     ys_exec_keyseq("&OSD.Display(\"hello\")");

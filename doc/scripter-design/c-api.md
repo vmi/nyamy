@@ -1,6 +1,6 @@
-# DLL 公開 C API 仕様案
+# DLL 公開 C API 仕様
 
-FFI/mrubyで使用する他言語インターフェースの仕様案。
+FFI/mrubyで使用する他言語インターフェースの仕様。
 
 - FFIとしてなるべく追加コード量が少なくなるようなAPIを規定する。
 - 文字列は NUL終端のUTF-8(BOM無し)とする。(ライブラリ内部で wchar_t に変換する)
@@ -52,17 +52,28 @@ YS_API bool ys_func_args_push(YsFuncArgs* fas, YsType type, int64_t value, int64
 YS_API bool ys_strs_push(YsStrs* ss, const char* value, size_t length);
 
 // 設定ロードが要求されたときに呼び出されるコールバック
-typedef bool (*ys_on_load_setting)(void);
+// exeCtx: ys_start() に渡した呼び出し元コンテキストポインタ
+typedef bool (*ys_on_load_setting)(void* exeCtx);
 
 // Engine側で &ExecUserFunc() が実行されたときに呼び出されるコールバック
+// exeCtx: ys_start() に渡した呼び出し元コンテキストポインタ
 // args: Engine が ExecUserFunc コマンドとともに送った引数列
-typedef void (*ys_on_exec_user_func)(const char* /* user_func_name */,
+typedef void (*ys_on_exec_user_func)(void*             /* exeCtx */,
+                                     const char*       /* user_func_name */,
                                      const YsFuncArgs* /* args */);
+
+// コールバックテーブル。on_quit は省略可 (NULL 可)
+typedef struct YsCallbacks {
+    bool (*on_load_setting)(void* exeCtx);
+    void (*on_quit)(void* exeCtx);          // Quit / Reload 直前に呼ばれる (省略可)
+} YsCallbacks;
 
 // scripterのメインループを開始。以下の場合、処理を終了する
 // - Engineから終了コマンドを受信した場合 (返り値: 0)
 // - on_load_setting()がfalseを返した場合 (返り値: 1)
-YS_API int ys_start(const ys_on_load_setting on_load_setting);
+// callbacks: コールバックテーブル (on_load_setting は必須)
+// exeCtx:   各コールバックに透過的に渡される呼び出し元コンテキストポインタ
+YS_API int ys_start(const YsCallbacks* callbacks, void* exeCtx);
 
 // バージョン確認 (FFI 利用時の互換性検証用)
 YS_API uint32_t ys_version(void);
@@ -172,16 +183,6 @@ YS_API bool ys_include_mayu(const char* path);
 // on_load_setting / on_exec_user_func 内で有効
 YS_API YsStrs* ys_get_home_directories(void);
 
-// Windows レジストリから現在の設定プロファイル情報を取得する
-// out_name:    プロファイル名 (NULL 可) — 次回本関数呼び出しまで有効
-// out_path:    ファイルパス   (NULL 可) — 次回本関数呼び出しまで有効
-// out_symbols: シンボル名の YsStrs (NULL 可) — セッションライフタイム
-// 返り値: レジストリに有効な設定が存在すれば true
-// on_load_setting / on_exec_user_func 内で有効
-YS_API bool ys_get_registry_config(const char** out_name,
-                                    const char** out_path,
-                                    YsStrs**     out_symbols);
-
 // 設定ファイル名を絶対パスに解決する (コンパイルなし)
 // name: ファイル名 (NULL または "" でデフォルト .mayu を探索)
 //       空の場合: レジストリ → ホームディレクトリの .mayu の順で探索
@@ -199,15 +200,17 @@ YS_API const char* ys_last_error(void);
 
 ### 初期化処理とイベントループ
 
-1. scripterプロセスが起動し、ys_start()を呼ぶと、内部初期化処理を行なった後に on_load_setting が呼ばれる。
-2. on_load_settingがtrueを返すと、キューイングした設定情報およびCmdCommitを送信。以後コマンド要求待ち。
-    - falseを返すとキューを破棄してCmdAbortを送信。
+1. scripterプロセスが起動し、`ys_start(callbacks, exeCtx)` を呼ぶと、
+   環境変数 `YS_CTRL` / `YS_CMD` からパイプハンドルを取得して初期化処理を行なった後、
+   `callbacks->on_load_setting(exeCtx)` が呼ばれる。
+2. `on_load_setting` が `true` を返すと、キューイングした設定情報および CmdCommit を送信。以後コマンド要求待ち。
+    - `false` を返すとキューを破棄して CmdAbort を送信。
 3. Engineがユーザー定義関数呼び出し (`&ExecUserFunc` / `@func_name`) を実行すると、ctrlチャネル経由でExecUserFuncコマンドと引数・トリガーコンテキストが届く。
-    scripterは関数名でys_reg_user_funcに登録したハンドラをルックアップし、受信した引数を `args` として呼び出す。
-    - ユーザー定義関数内で、Engineのキーシーケンスを実行したい場合は、ys_exec_keyseq()を呼び出す。
+    scripterは関数名で `ys_reg_user_func` に登録したハンドラをルックアップし、`(exeCtx, func_name, args)` として呼び出す。
+    - ユーザー定義関数内で、Engineのキーシーケンスを実行したい場合は、`ys_exec_keyseq()` を呼び出す。
       トリガーコンテキストは内部で自動的に引き継がれる。
-4. Engineが再読み込みもしくは終了を選択すると、ys_start()が終了する。
-    - 再読み込み時はscripterプロセス終了後、再起動される。
+4. Engineが終了を選択すると、`callbacks->on_quit(exeCtx)` が呼ばれた後 `ys_start()` が終了する。
+    - 再読み込み時はscripterプロセス終了後、再起動される (プロセス再起動方式は未実装)。
 
 ### CmdCommit 後のメモリ管理
 

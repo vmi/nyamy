@@ -9,10 +9,10 @@ yamy-scripter はかつて、.mayu ファイルをコンパイルして CmdStrea
 
 凡例: ✅ 実装済み / 🔲 未実装 (設計済み)
 
-1. **C API + mruby 内蔵 EXE** ✅: 公開 C API (`ys_*`) を `yamy_scripter.cpp` に実装し、
-   mruby ランタイムを内蔵した EXE (`yamy-scripter.exe`) として提供する。
-   Python/Ruby など他言語からも FFI 経由で同じ C API を利用できる。
-2. **stdout/stderr 隔離** ✅: CtrlStream/CmdStream を非 stdio のパイプ (環境変数 `YSCR_CTRL`/`YSCR_CMD`) で渡し、
+1. **C API DLL + mruby 内蔵 EXE** ✅: 公開 C API (`ys_*`) を DLL (`yamy-scripter.dll`) として提供し、
+   mruby ランタイムを内蔵した EXE (`yamy-scripter.exe`) がその DLL をリンクして使用する。
+   Python/Ruby など他言語からも FFI 経由で同じ DLL の C API を直接利用できる。
+2. **stdout/stderr 隔離** ✅: CtrlStream/CmdStream を非 stdio の継承パイプ (環境変数 `YS_CTRL`/`YS_CMD` でハンドル番号を渡す) で通信し、
    scripter の stdin=NUL / stdout+stderr=ログパイプとする。
    scripter 実装が `printf` / `std::cout` を使っても CmdStream を汚染しない。
 3. **コマンドキューイング** ✅: Def 系コマンドは Commit まで内部でキューイングし、
@@ -26,12 +26,18 @@ yamy-scripter はかつて、.mayu ファイルをコンパイルして CmdStrea
 
 ## 現在の構成 (実装済み)
 
-scripter は mruby を内蔵した EXE として実装済み。
-C API (`ys_*`) は `yamy_scripter.cpp` に実装されており、
-mruby バインディング (`mruby_binding.cpp`) がそれを mruby DSL として公開する。
+成果物は 2 つに分かれている。
+
+- **`yamy-scripter.dll`** — 公開 C API (`ys_*`) と .mayu コンパイラ本体。
+  `yamy_scripter.cpp` に C API を実装し、CtrlStream ループ・設定キュー管理・
+  lexer/parser/compiler を内包する。FFI クライアント (Python/Ruby) はこの DLL を直接ロードする。
+- **`yamy-scripter.exe`** — mruby ランタイムを内蔵した薄いラッパー。
+  `mruby_main.cpp` / `mruby_binding.cpp` のみをコンパイルし、`yamy-scripter.dll` をリンクして
+  C API を import する。mruby バインディングが C API を mruby DSL として公開する。
 
 ```
 scripter/
+  # --- yamy-scripter.dll に入る (C API + .mayu コンパイラ) ---
   yamy_scripter.h           ← 公開 C API 宣言 (ys_start / ys_reg_keyseq 等)
   yamy_scripter.cpp         ← C API 実装 (CtrlStream ループ、設定キュー管理)
   ys_types.h                ← scripter 内部型 (YsFuncArg / YsFuncArgs / YsStrs)
@@ -41,20 +47,22 @@ scripter/
   cmd_stream_writer.cpp/h
   config_files.cpp/h
   ctrl_stream_reader.cpp/h  ← CtrlStream デシリアライズ
+  # --- yamy-scripter.exe に入る (mruby ラッパー、DLL をリンク) ---
   mruby_binding.cpp/h       ← mruby DSL (Yamy::DSL 等)
-  mruby_main.cpp            ← EXE エントリポイント (ys_start(mruby_on_load_setting))
+  mruby_main.cpp            ← EXE エントリポイント (YsCallbacks + MRubyContext を設定し ys_start(&callbacks, &ctx) を呼ぶ)
 
 pipe_streambuf.h              ← PipeWriteStreambuf/PipeReadStreambuf/PipeReadWStreambuf
 
 proj/
-  yamy-scripter.vcxproj     ← yamy-scripter.exe (mruby 内蔵 EXE)
+  yamy-scripter-dll.vcxproj ← yamy-scripter.dll (C API + .mayu コンパイラ, DynamicLibrary)
+  yamy-scripter.vcxproj     ← yamy-scripter.exe (mruby 内蔵 EXE, DLL を ProjectReference)
 ```
 
 プロセスフロー (現状):
 ```
 yamy → CreateProcess("yamy-scripter.exe path.rb",
                       stdin=NUL, stdout=stderr=msgPipe,
-                      env: YSCR_CTRL=N, YSCR_CMD=M)
+                      env: YS_CTRL=N, YS_CMD=M)
 
 yamy → ctrl パイプ: Start(syms) → scripter → .rb 実行 → cmd パイプ: CmdStream → yamy
 yamy → ctrl パイプ: ExecUserFunc → scripter → mruby proc 呼び出し → ExecKeySeq → yamy
@@ -79,12 +87,13 @@ yamy ← msg パイプ: ログテキスト (scripter の stdout+stderr をマー
 | ファイル | 種別 | 説明 |
 |---------|------|------|
 | `scripter/yamy_scripter.h` | 新規 | 公開 C API 宣言 (`ys_start` / `ys_reg_keyseq` 等) |
-| `scripter/yamy_scripter.cpp` | 新規 | C API 実装 (`YSCR_CTRL`/`YSCR_CMD` 取得、CtrlStream ループ、設定キュー管理) |
+| `scripter/yamy_scripter.cpp` | 新規 | C API 実装 (`YS_CTRL`/`YS_CMD` 取得、CtrlStream ループ、設定キュー管理) |
 | `scripter/ys_types.h` | 新規 | 内部型 (`YsFuncArg` / `YsFuncArgs` / `YsStrs`) |
 | `scripter/mruby_binding.cpp/h` | 新規 | mruby DSL (`Yamy::DSL` 等) |
-| `scripter/mruby_main.cpp` | 新規 | EXE エントリポイント (`ys_start(mruby_on_load_setting)`) |
+| `scripter/mruby_main.cpp` | 新規 | EXE エントリポイント (`YsCallbacks` + `MRubyContext` を設定して `ys_start(&callbacks, &ctx)` を呼ぶ) |
 | `pipe_streambuf.h` | 新規 | PipeWriteStreambuf / PipeReadStreambuf / PipeReadWStreambuf |
-| `proj/yamy-scripter.vcxproj` | 変更 | EXE: mruby 内蔵ビルド |
+| `proj/yamy-scripter-dll.vcxproj` | 新規 | DLL: C API + .mayu コンパイラ (DynamicLibrary) |
+| `proj/yamy-scripter.vcxproj` | 変更 | EXE: mruby 内蔵ビルド (DLL を ProjectReference) |
 
 ## 変更対象ファイル一覧
 
@@ -93,14 +102,15 @@ yamy ← msg パイプ: ログテキスト (scripter の stdout+stderr をマー
 | ファイル | 変更種別 | 主な内容 |
 |---------|---------|---------|
 | `scripter/yamy_scripter.h` | 新規 | 公開 C API 宣言 (`ys_start` / `ys_reg_keyseq` 等) |
-| `scripter/yamy_scripter.cpp` | 新規 | `YSCR_CTRL`/`YSCR_CMD` 取得、CtrlStream ループ、設定キュー管理 |
+| `scripter/yamy_scripter.cpp` | 新規 | `YS_CTRL`/`YS_CMD` 取得、CtrlStream ループ、設定キュー管理 |
 | `scripter/ys_types.h` | 新規 | 内部型 (`YsFuncArg` / `YsFuncArgs` / `YsStrs`) |
 | `scripter/mruby_binding.cpp/h` | 新規 | mruby DSL (`Yamy::DSL` 等) |
-| `scripter/mruby_main.cpp` | 新規 | EXE エントリポイント (`ys_start(mruby_on_load_setting)`) |
+| `scripter/mruby_main.cpp` | 新規 | EXE エントリポイント (`YsCallbacks` + `MRubyContext` を設定して `ys_start(&callbacks, &ctx)` を呼ぶ) |
 | `pipe_streambuf.h` | 新規 | PipeWriteStreambuf / PipeReadStreambuf / PipeReadWStreambuf |
-| `scripter_manager.cpp` | 変更 | 非 stdio パイプ方式、msgPipe (stdout+stderr マージ)、`YSCR_CTRL`/`YSCR_CMD` 環境変数渡し |
+| `scripter_manager.cpp` | 変更 | 非 stdio パイプ方式、msgPipe (stdout+stderr マージ)、`YS_CTRL`/`YS_CMD` 環境変数渡し |
 | `scripter_manager.h` | 変更 | `m_hStderrRead` → `m_hMsgRead`、`stderrThread` → `msgThread` |
-| `proj/yamy-scripter.vcxproj` | 変更 | mruby 内蔵 EXE ビルド |
+| `proj/yamy-scripter-dll.vcxproj` | 新規 | C API + .mayu コンパイラ DLL ビルド |
+| `proj/yamy-scripter.vcxproj` | 変更 | mruby 内蔵 EXE ビルド (DLL を ProjectReference) |
 
 ### 未実装 (設計済み)
 

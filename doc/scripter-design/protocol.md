@@ -6,8 +6,8 @@ yamy ↔ yamy-scripter 間の通信は **4 本のハンドル** で行う。
 
 | チャネル | 方向 | 渡し方 | 内容 |
 |--------|------|--------|------|
-| ctrl パイプ | yamy → scripter | 環境変数 `YSCR_CTRL` (継承ハンドル番号) | CtrlStream (バイナリ) |
-| cmd パイプ | scripter → yamy | 環境変数 `YSCR_CMD` (継承ハンドル番号) | CmdStream (バイナリ) |
+| ctrl パイプ | yamy → scripter | 環境変数 `YS_CTRL` (継承ハンドル番号) | CtrlStream (バイナリ) |
+| cmd パイプ | scripter → yamy | 環境変数 `YS_CMD` (継承ハンドル番号) | CmdStream (バイナリ) |
 | msg パイプ | scripter → yamy | STARTUPINFO (stdout+stderr をマージ) | ログ出力 (テキスト) |
 | NUL | — | STARTUPINFO stdin | 即 EOF |
 
@@ -43,7 +43,7 @@ SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
 wchar_t ctrlVal[32], cmdVal[32];
 swprintf_s(ctrlVal, L"%llu", (unsigned long long)(uintptr_t)hCtrlRead);
 swprintf_s(cmdVal,  L"%llu", (unsigned long long)(uintptr_t)hDataWrite);
-// YSCR_CTRL=ctrlVal, YSCR_CMD=cmdVal を先頭に持つ環境ブロックを構築 (既存 env をマージ)
+// YS_CTRL=ctrlVal, YS_CMD=cmdVal を先頭に持つ環境ブロックを構築 (既存 env をマージ)
 
 // コマンドライン (ハンドル引数なし)
 swprintf_s(cmdLine, L"\"%s\"", scripterPath.c_str());
@@ -56,14 +56,14 @@ si.hStdError  = hMsgWrite;  // 同じパイプにマージ
 CreateProcess(NULL, cmdLine, NULL, NULL, TRUE, CREATE_UNICODE_ENVIRONMENT, envBlock, NULL, &si, &pi);
 ```
 
-scripter 側 (`scripter_engine()`) の処理:
+scripter 側 (`ys_start()` 内) の処理:
 
 ```cpp
-// 環境変数 YSCR_CTRL / YSCR_CMD からハンドルを復元
+// 環境変数 YS_CTRL / YS_CMD からハンドルを復元
 wchar_t buf[32];
-GetEnvironmentVariableW(L"YSCR_CTRL", buf, 32);
+GetEnvironmentVariableW(L"YS_CTRL", buf, 32);
 HANDLE hCtrlRead  = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
-GetEnvironmentVariableW(L"YSCR_CMD", buf, 32);
+GetEnvironmentVariableW(L"YS_CMD", buf, 32);
 HANDLE hDataWrite = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
 
 // stderr を UTF-16 に設定 (wcerr 経由のログを yamy が wchar_t 単位で読む)
@@ -161,10 +161,12 @@ enum class CtrlId : uint8_t {
 
 ### 現在の実装
 
-| コマンド | ID | 状態 |
-|---------|-----|------|
-| RegKeySeq〜Commit | 0x01〜0xFF | 使用中 (変更なし) |
-| ExecKeySeq | 0x02 | 使用中 (adhoc キーシーケンス実行要求) |
+CmdStream のコマンドは用途で 2 系統に分かれる (ID 定義は下記 enum を参照)。
+
+| 系統 | コマンド | 用途 |
+|------|---------|------|
+| 設定構築 | `RegKeySeq` / `Def*` / `BeginKeymap` / `Assign*` / `Commit` | on_load_setting で構築した設定を Engine へ送出 |
+| ランタイム | `ExecKeySeq` (0x02) | `ys_exec_keyseq` による adhoc キーシーケンス実行要求 |
 
 **現状のフロー**: scripter は compile 中に CmdStream コマンドを即座にパイプへ書き出す
 (キューイングなし)。エラー発生時は Commit を書かずに終了する。
@@ -201,8 +203,8 @@ sequenceDiagram
     participant yamy
     participant scripter as yamy-scripter
 
-    yamy->>scripter: CreateProcess("yamy-scripter.exe",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YSCR_CTRL=N, YSCR_CMD=M)
-    Note right of scripter: 1. env から YSCR_CTRL/YSCR_CMD を取得
+    yamy->>scripter: CreateProcess("yamy-scripter.exe",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YS_CTRL=N, YS_CMD=M)
+    Note right of scripter: 1. env から YS_CTRL/YS_CMD を取得
     Note right of scripter: 2. stderr を UTF-16 に設定
     yamy->>scripter: CtrlStream: Start(syms)
     Note right of scripter: 3. .mayu コンパイル
@@ -223,8 +225,8 @@ sequenceDiagram
     participant yamy
     participant scripter as yamy-scripter
 
-    yamy->>scripter: CreateProcess("yamy-scripter.exe -DSYM1 -DSYM2",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YSCR_CTRL=N, YSCR_CMD=M)
-    Note right of scripter: 1. env から YSCR_CTRL/YSCR_CMD を取得<br/>　 argv から -D シンボルを解析
+    yamy->>scripter: CreateProcess("yamy-scripter.exe -DSYM1 -DSYM2",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YS_CTRL=N, YS_CMD=M)
+    Note right of scripter: 1. env から YS_CTRL/YS_CMD を取得<br/>　 argv から -D シンボルを解析
     Note right of scripter: 2. .mayu コンパイル or スクリプト実行
     Note right of scripter: 3. Commit → CmdStream 送出
     scripter->>yamy: CmdStream (batch)

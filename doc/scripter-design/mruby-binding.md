@@ -1,11 +1,11 @@
-# mruby バインディング仕様案
+# mruby バインディング仕様
 
 > **状態: 実装済み**
 > `scripter/mruby_binding.cpp/h` および `scripter/mruby_main.cpp` として実装済み。
 
 ## 目的
 
-`yamy-scripter-mruby.exe` 内蔵の mruby ランタイム向けに、
+`yamy-scripter.exe` 内蔵の mruby ランタイム向けに、
 `.mayu` 構文と同等の設定を **Ruby らしく** 記述できる DSL を提供する。
 
 - `YsFuncArgs*` / `YsStrs*` などの C 構造体管理を Ruby 側に完全隠蔽する
@@ -15,12 +15,12 @@
 
 ---
 
-## ファイル構成 (将来追加)
+## ファイル構成
 
 ```
 scripter/
-  mruby_binding.h/cpp   ← mruby C 拡張 (Yamy::DSL モジュール登録)
-  mruby_main.cpp        ← yamy-scripter-mruby.exe エントリポイント
+  mruby_binding.h/cpp   ← mruby C 拡張 (Yamy::DSL 等を登録; mruby_on_load_setting 実装)
+  mruby_main.cpp        ← yamy-scripter.exe エントリポイント
 ```
 
 ---
@@ -610,15 +610,22 @@ mruby バインディング実装時に追加された C API:
 コールバック typedef:
 
 ```c
-typedef bool (*ys_on_load_setting)(void);
-typedef void (*ys_on_exec_user_func)(const char* /* func_name */,
+// exeCtx: ys_start() に渡した呼び出し元コンテキストポインタ (MRubyContext* など)
+typedef bool (*ys_on_load_setting)(void* exeCtx);
+typedef void (*ys_on_exec_user_func)(void*             /* exeCtx */,
+                                     const char*       /* func_name */,
                                      const YsFuncArgs* /* args */);
+
+typedef struct YsCallbacks {
+    bool (*on_load_setting)(void* exeCtx);
+    void (*on_quit)(void* exeCtx);   // Quit 直前に呼ばれる (NULL 可)
+} YsCallbacks;
 ```
 
-`ys_start` は `on_load_setting` のみを受け取る単一コールバック形式 (コールバック構造体なし):
+`ys_start` は `YsCallbacks` テーブルと `exeCtx` を受け取る:
 
 ```c
-YS_API int ys_start(ys_on_load_setting on_load_setting);
+YS_API int ys_start(const YsCallbacks* callbacks, void* exeCtx);
 ```
 
 `on_exec_user_func` は `ys_reg_user_func` で関数ごとに個別登録する:
@@ -743,25 +750,41 @@ end
 
 ## 内部実装メモ (mruby C 拡張)
 
+### コンテキスト構造体
+
+```cpp
+// mruby_binding.h に定義
+struct MRubyContext {
+    int                argc;
+    const char* const* argv;
+    mrb_state*         mrb;  // initially nullptr; set by mruby_on_load_setting
+};
+```
+
 ### グローバル状態
 
 ```cpp
 // mruby_binding.cpp 内
 
-static mrb_state*  g_mrb        = nullptr;
-static std::string g_scriptPath;
-static mrb_value   g_funcTable;  // mruby Hash: String => Proc (GC保護済み)
+static mrb_value g_funcTable;  // mruby Hash: String => Proc (GC保護済み)
 ```
+
+`mrb_state*` は `MRubyContext` が保持する。スクリプトパスは `mruby_on_load_setting` 内で
+`ctx->argv[1]` または `ys_get_home_directories()` を使って解決する。
 
 ### コールバック
 
 ```cpp
-// mruby_on_load_setting: scripter/mruby_binding.cpp
-bool mruby_on_load_setting();  // .rb ファイルを Yamy::DSL の instance_eval で実行
+// mruby_binding.h / mruby_binding.cpp
 
-// mruby_on_exec_user_func: scripter/mruby_binding.cpp
-// g_funcTable からブロックを検索し mrb_yield_argv で呼び出す
-void mruby_on_exec_user_func(const char* func_name, const YsFuncArgs* args);
+// YsCallbacks.on_load_setting に渡す。mrb_open してDSLクラス登録→スクリプト実行
+bool mruby_on_load_setting(void* exeCtx);  // exeCtx = MRubyContext*
+
+// YsCallbacks.on_quit に渡す。mrb_close して mrb を nullptr に
+void mruby_on_quit(void* exeCtx);          // exeCtx = MRubyContext*
+
+// ys_reg_user_func で関数ごとに登録する。g_funcTable からブロックを検索し呼び出す
+void mruby_on_exec_user_func(void* exeCtx, const char* func_name, const YsFuncArgs* args);
 ```
 
 ### `mruby_main.cpp` の構成
@@ -769,24 +792,17 @@ void mruby_on_exec_user_func(const char* func_name, const YsFuncArgs* args);
 ```cpp
 #include "yamy_scripter.h"
 #include "mruby_binding.h"
-#include <mruby.h>
+#include <windows.h>
 
-int main(int argc, char* argv[]) {  // UTF-8 activeCodePage マニフェスト使用
-    const char* script = findScriptPath(argc, argv);  // --script=path.rb または argv[1]
-    if (!script) {
-        fprintf(stderr, "error: script file required\n"
-                        "usage: yamy-scripter.exe [--script=]path.rb\n");
-        return 1;
-    }
+int main(int argc, char *argv[])  // UTF-8 activeCodePage マニフェスト使用
+{
+    MRubyContext ctx = { argc, (const char* const*)argv, nullptr };
 
-    mrb_state* mrb = mrb_open();
-    yamy_mruby_init(mrb);          // Yamy::DSL / KeySeq / KeyMap 等を登録
-    yamy_mruby_set_script(mrb, script);
+    YsCallbacks callbacks = {};
+    callbacks.on_load_setting = mruby_on_load_setting;
+    callbacks.on_quit         = mruby_on_quit;
 
-    int ret = ys_start(mruby_on_load_setting);
-
-    mrb_close(mrb);
-    return ret;
+    return ys_start(&callbacks, &ctx);
 }
 ```
 

@@ -6,11 +6,11 @@
 
 ```
 旧: stdin=CtrlStream, stdout=CmdStream, stderr=ログ
-新: stdin=NUL, stdout+stderr=msgパイプ(マージ), --ctrl=N でCtrlStream, --cmd=M でCmdStream
+新: stdin=NUL, stdout+stderr=msgパイプ(マージ), 環境変数 YS_CTRL でCtrlStream, YS_CMD でCmdStream
 ```
 
 scripter の stdin は NUL デバイス (即 EOF)。CtrlStream / CmdStream は
-継承ハンドルをコマンドライン引数 `--ctrl=N` / `--cmd=M` で渡す。
+継承ハンドルの番号を環境変数 `YS_CTRL` / `YS_CMD` で渡す。
 これにより scripter 実装が `printf` / `std::cout` 等を使っても CmdStream を汚染しない。
 
 ### `pipe_streambuf.h` — 新規追加
@@ -67,19 +67,25 @@ scripter が `ys_exec_keyseq()` を呼ぶと CmdStream の ExecKeySeq (0x02) が
 
 ### `start(syms)` — コマンドライン構築とシンボル送信
 
+`YS_CTRL` / `YS_CMD` を先頭に持つ環境ブロックを構築し、子プロセスに継承させる。
+コマンドライン自体にはハンドル番号を含まない。
+
 ```cpp
+wchar_t ctrlVal[32], cmdVal[32];
+swprintf_s(ctrlVal, L"%llu", (unsigned long long)(uintptr_t)hCtrlRead);
+swprintf_s(cmdVal,  L"%llu", (unsigned long long)(uintptr_t)hDataWrite);
+// YS_CTRL + YS_CMD を先頭に持つ環境ブロックを作成 (既存 env をマージ)
+
 wchar_t cmdLine[1024];
-swprintf_s(cmdLine,
-           L"\"%s\" --ctrl=%llu --cmd=%llu",
-           scripterPath.c_str(),
-           (unsigned long long)(uintptr_t)hCtrlRead,
-           (unsigned long long)(uintptr_t)hDataWrite);
+swprintf_s(cmdLine, L"\"%s\"", scripterPath.c_str());
+// yamy.ini の cmdLine 設定があれば追加
 
 si.hStdInput  = hNul;      // NUL (即 EOF)
 si.hStdOutput = hMsgWrite; // ログパイプ
 si.hStdError  = hMsgWrite; // 同じパイプにマージ
 
-CreateProcess(NULL, cmdLine, NULL, NULL, TRUE /*bInheritHandles*/, ...);
+CreateProcess(NULL, cmdLine, NULL, NULL, TRUE /*bInheritHandles*/,
+              CREATE_UNICODE_ENVIRONMENT, envBlock, ...);
 ```
 
 ---
