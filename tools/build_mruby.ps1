@@ -162,11 +162,25 @@ Remove-Item Env:\MRUBY_CONFIGS -ErrorAction SilentlyContinue
 
 # Copy artifacts for each requested config.
 # Each named build outputs to build/<Config>/lib/libmruby.lib.
-$incSrc  = Join-Path $mrubyDir 'include'
+#
+# Headers are taken from the build output (build/<Config>/include), not the
+# source tree (scripter/mruby/include): the build generates additional headers
+# there (mruby/presym/id.h, mruby/presym/table.h, and per-gem headers under
+# mruby/gems/) that do not exist in the source tree.  The generated headers are
+# identical across configs, so the first requested config is used as the source.
+$incSrc  = Join-Path $buildDir "$($Config[0])\include"
 $incDest = Join-Path $distDir 'include'
 
+if (-not (Test-Path $incSrc)) {
+	Write-Error "Generated include directory not found: $incSrc"
+}
+
+# Replace the destination outright so stale headers from a previous source-tree
+# copy do not linger.
+if (Test-Path $incDest) { Remove-Item $incDest -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $incDest | Out-Null
 Copy-Item (Join-Path $incSrc '*') $incDest -Recurse -Force
+Write-Host "Copied headers from build/$($Config[0])/include -> scripter/mruby-dist/include"
 
 foreach ($cfg in $Config) {
 	$libSrc  = Join-Path $buildDir "$cfg\lib\libmruby.lib"
