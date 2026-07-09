@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Tests">
+      <UniqueIdentifier>{11111111-1111-1111-1111-111111111111}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scripter">
+      <UniqueIdentifier>{22222222-2222-2222-2222-222222222222}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{33333333-3333-3333-3333-333333333333}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\tests\scripter\test_main.cpp"><Filter>Tests</Filter></ClCompile>
+    <ClCompile Include="..\tests\scripter\test_harness.cpp"><Filter>Tests</Filter></ClCompile>
+    <ClCompile Include="..\tests\scripter\setting_dump.cpp"><Filter>Tests</Filter></ClCompile>
+    <ClCompile Include="..\scripter\mruby_binding.cpp"><Filter>Scripter</Filter></ClCompile>
+    <ClCompile Include="..\cmd_processor.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\cmd_stream_reader.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\scripter_types.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\compiler_specific_func.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\ctrl_stream_writer.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\dlgeditsetting.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\dlginvestigate.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\dlglog.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\dlgsetting.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\dlgversion.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\engine.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\fixscancodemap.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\focus.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\function.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\keyboard.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\keymap.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\layoutmanager.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\registry.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\setting_builder.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\stringtool.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\target.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\vkeytable.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\windowstool.cpp"><Filter>Engine</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\tests\scripter\test_harness.h"><Filter>Tests</Filter></ClInclude>
+    <ClInclude Include="..\tests\scripter\setting_dump.h"><Filter>Tests</Filter></ClInclude>
+  </ItemGroup>
+</Project>

@@ -231,6 +231,40 @@ C API 対応: `ys_def_option(option_name, value)`
 
 ---
 
+## 条件シンボル (`define` / `symbol?`)
+
+`.mayu` の `define SYM` と `if ( SYM )` に対応する DSL。
+シンボル集合は Start コマンドで渡されたもの (USE104 等) に、`define` で追加したものを加えた集合。
+
+**.mayu 相当:**
+```
+define KBD104
+if ( KBD109 ) and ( ! KBD104on109 )
+  ...
+endif
+```
+
+```ruby
+# シンボルを定義する (.mayu の `define SYM`)
+define "KBD104"
+
+# シンボルの有無を問い合わせる (.mayu の `if ( SYM )`)
+if symbol?("KBD109") && !symbol?("KBD104on109")
+  # ...
+end
+
+load "104.mayu.rb" if symbol?("USE104")
+```
+
+C API 対応: `ys_define_symbol(name)` / `ys_has_symbol(name)`
+
+- `define` は呼び出し時点でシンボル集合に追加するため、後続の `symbol?` から見える
+  (`.mayu` のファイル順序と同じ意味論)。
+- `flushQueue` が flush 時点のシンボル集合をすべて `DefSymbol` として出力するため、
+  `define` したシンボルも最終的な `Setting.m_symbols` に含まれる。
+
+---
+
 ## キーマップ定義
 
 ### `keymap` / `keymap2` / `window`

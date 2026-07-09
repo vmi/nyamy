@@ -187,6 +187,15 @@ YS_API bool ys_assign_mod(const YsStrs* prefixes, const char* modifier_name,
 /// with func_name, the args sent by the Engine, and the trigger context.
 YS_API bool ys_reg_user_func(const char* func_name, ys_on_exec_user_func on_exec_user_func);
 
+/// Equivalent to: define <symbol>
+/// Adds the symbol to the current symbol set so that subsequent ys_has_symbol()
+/// queries see it and flushQueue() emits a DefSymbol for it.  Idempotent.
+YS_API bool ys_define_symbol(const char* name);
+
+/// Return true if the named symbol is defined in the current symbol set.
+/// (The set comes from the Start command plus any ys_define_symbol() calls.)
+YS_API bool ys_has_symbol(const char* name);
+
 /// Clear all queued setting commands (call before rebuilding from scratch).
 YS_API bool ys_reset_setting(void);
 

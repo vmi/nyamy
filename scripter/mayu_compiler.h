@@ -34,6 +34,13 @@ private:
 	bool m_hasErrors;
 	uint32_t m_nextKeySeqIdx;		///< auto-incrementing keySeq index
 
+	/// When non-null, inline key-sequence literals (parenthesised sub-sequences
+	/// used as function arguments) are collected here instead of being written
+	/// to m_writer.  compileKeySequence() then returns the sub-sequence's index
+	/// within this collector (post-order).  Used by ys_reg_keyseq() so the caller
+	/// can register each sub-sequence as a separate keyseq and fix up the indices.
+	std::vector<std::vector<CmdAction>> *m_subSeqCollector = nullptr;
+
 	/// Modifier default state (inherited through includes)
 	ModifierSpec m_defaultAssignModifier;
 	ModifierSpec m_defaultKeySeqModifier;
@@ -90,6 +97,12 @@ public:
 	/// KeySeqLiteral arguments within function calls are written to the
 	/// compiler's associated stream as side effects (same as compile()).
 	std::vector<CmdAction> compileActions(const AstKeySequence &seq);
+
+	/// Enable/disable sub-sequence collection mode (see m_subSeqCollector).
+	/// Pass nullptr to restore normal stream-writing behaviour.
+	void setSubSeqCollector(std::vector<std::vector<CmdAction>> *collector) {
+		m_subSeqCollector = collector;
+	}
 
 	/// Check if there were any errors
 	bool hasErrors() const { return m_hasErrors; }

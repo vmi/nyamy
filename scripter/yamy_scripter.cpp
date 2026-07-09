@@ -576,18 +576,23 @@ YS_API uint32_t ys_version(void)
 // Setting registration API
 //=============================================================================
 
-// Check if any compiled actions contain inline KeySeqLiteral arguments.
-// Such args are produced by compileKeySequence() and embed a stream-relative
-// index that is invalid when the keyseq is written separately.
-static bool hasInlineKeySeqLiteral(const std::vector<CmdAction>& actions)
+// Remap FuncArgKeySeqIdx values in compiled actions using a local-index ->
+// global-vidx map.  Used to fix up inline key-sequence literals after each
+// sub-sequence has been registered as its own keyseq entry.
+static void remapKeySeqIdx(std::vector<CmdAction>& actions,
+	const std::vector<int>& localToGlobal)
 {
-	for (const auto& a : actions) {
-		for (const auto& arg : a.arguments)
-			if (std::holds_alternative<FuncArgKeySeqIdx>(arg)) return true;
-		if (!a.subActions.empty() && hasInlineKeySeqLiteral(a.subActions))
-			return true;
+	for (auto& a : actions) {
+		for (auto& arg : a.arguments) {
+			if (std::holds_alternative<FuncArgKeySeqIdx>(arg)) {
+				uint32_t v = std::get<FuncArgKeySeqIdx>(arg);
+				if (v < localToGlobal.size() && localToGlobal[v] >= 0)
+					arg = FuncArgKeySeqIdx{ static_cast<uint32_t>(localToGlobal[v]) };
+			}
+		}
+		if (!a.subActions.empty())
+			remapKeySeqIdx(a.subActions, localToGlobal);
 	}
-	return false;
 }
 
 
@@ -609,22 +614,34 @@ YS_API int ys_reg_keyseq(const char* name, const char* actions)
 	}
 
 	// Compile via a null-stream compiler.  Inline KeySeqLiteral arguments
-	// (parenthesised sub-sequences as function args) are unsupported here:
-	// register sub-sequences separately and reference them by $name.
+	// (parenthesised sub-sequences used as function args) are collected so each
+	// can be registered as its own keyseq entry below, then referenced by index.
 	std::ostringstream nullSink;
 	CmdStreamWriter nullWriter(nullSink);
 	ConfigFiles cf;
 	MayuCompiler compiler(nullWriter, g_symbols, cf, nullptr, nullptr);
+	std::vector<std::vector<CmdAction>> subSeqs;
+	compiler.setSubSeqCollector(&subSeqs);
 	std::vector<CmdAction> compiled = compiler.compileActions(*seq);
+	compiler.setSubSeqCollector(nullptr);
 	if (compiler.hasErrors()) {
 		setError("ys_reg_keyseq: failed to compile actions");
 		return -1;
 	}
-	if (hasInlineKeySeqLiteral(compiled)) {
-		setError("ys_reg_keyseq: inline key sequence literals are not supported; "
-		         "use ys_reg_keyseq for sub-sequences and reference them by $name");
-		return -1;
+
+	// Register each collected sub-sequence as an anonymous keyseq.  Sub-sequences
+	// are in post-order, so sub-sequence i only references earlier ones; remap its
+	// indices (already-global) before storing, then record its own global index.
+	// Sub-sequences are allocated before the main keyseq so that flushQueue writes
+	// them first and the consumer can resolve the references by index.
+	std::vector<int> localToGlobal(subSeqs.size(), -1);
+	for (size_t i = 0; i < subSeqs.size(); ++i) {
+		remapKeySeqIdx(subSeqs[i], localToGlobal);
+		int sub = allocVidx(nullptr);
+		g_keyseqEntries[sub].compiled = std::move(subSeqs[i]);
+		localToGlobal[i] = sub;
 	}
+	remapKeySeqIdx(compiled, localToGlobal);
 
 	// Update existing entry when name is already registered.
 	if (name && *name) {
@@ -858,6 +875,23 @@ YS_API bool ys_reg_user_func(const char* func_name, ys_on_exec_user_func on_exec
 
 	g_userFuncs[func_name] = on_exec_user_func;
 	return true;
+}
+
+YS_API bool ys_define_symbol(const char* name)
+{
+	if (!checkInLoadSetting("ys_define_symbol")) return false;
+	if (!name || !*name) return setError("ys_define_symbol: name is empty");
+	// Mirror the .mayu compiler's `define`: insert into the symbol set so that
+	// later ys_has_symbol() sees it and flushQueue() emits a DefSymbol for it.
+	g_symbols.insert(wstringi(from_UTF8(name)));
+	return true;
+}
+
+YS_API bool ys_has_symbol(const char* name)
+{
+	if (!checkInLoadSetting("ys_has_symbol")) return false;
+	if (!name || !*name) return false;
+	return g_symbols.count(wstringi(from_UTF8(name))) > 0;
 }
 
 YS_API bool ys_reset_setting(void)

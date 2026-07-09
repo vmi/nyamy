@@ -744,6 +744,28 @@ static mrb_value dsl_deffunc(mrb_state *mrb, mrb_value self)
 	return mrb_true_value();
 }
 
+// DSL#define(name)  ->  define <name>   (adds symbol to the current set)
+static mrb_value dsl_define(mrb_state *mrb, mrb_value self)
+{
+	(void)self;
+	mrb_value name_v;
+	mrb_get_args(mrb, "o", &name_v);
+	std::string name = toStdStr(mrb, name_v);
+	if (!ys_define_symbol(name.c_str()))
+		raiseApiError(mrb, "ys_define_symbol failed");
+	return mrb_true_value();
+}
+
+// DSL#symbol?(name)  ->  true if <name> is defined   (mirrors .mayu `if (name)`)
+static mrb_value dsl_symbol_p(mrb_state *mrb, mrb_value self)
+{
+	(void)self;
+	mrb_value name_v;
+	mrb_get_args(mrb, "o", &name_v);
+	std::string name = toStdStr(mrb, name_v);
+	return mrb_bool_value(ys_has_symbol(name.c_str()));
+}
+
 // DSL#exec_keyseq(actions)  (runtime API; valid from on_exec_user_func)
 static mrb_value dsl_exec_keyseq(mrb_state *mrb, mrb_value self)
 {
@@ -826,6 +848,8 @@ static void yamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, dsl_cls, "key",       dsl_key,      MRB_ARGS_NONE());
 	mrb_define_method(mrb, dsl_cls, "event",     dsl_event,    MRB_ARGS_NONE());
 	mrb_define_method(mrb, dsl_cls, "mod",       dsl_mod,      MRB_ARGS_NONE());
+	mrb_define_method(mrb, dsl_cls, "define",      dsl_define,      MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, dsl_cls, "symbol?",     dsl_symbol_p,    MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, dsl_cls, "deffunc",     dsl_deffunc,     MRB_ARGS_ANY());
 	mrb_define_method(mrb, dsl_cls, "exec_keyseq", dsl_exec_keyseq, MRB_ARGS_REQ(1));
 
@@ -923,9 +947,16 @@ bool mruby_on_load_setting(void* exeCtx)
 	struct RClass *yamy = mrb_module_get(mrb, "Yamy");
 	mrb_define_const(mrb, yamy, "FUNC_TABLE", g_funcTable);
 
-	// 7. Evaluate the script via mruby-require's Kernel#load.
-	mrb_funcall(mrb, mrb_top_self(mrb), "load", 1,
-		mrb_str_new_cstr(mrb, script));
+	// 7. Evaluate the script on a fresh Yamy::DSL instance so that the DSL
+	//    methods (keymap, key, event, mod, symbol?, define, load, ...) are in
+	//    scope for the top-level script.  DSL#load instance_eval's a .rb file
+	//    on the same object (and compiles a .mayu file via ys_include_mayu).
+	{
+		struct RClass *dsl_cls = mrb_class_get_under(mrb,
+			mrb_module_get(mrb, "Yamy"), "DSL");
+		mrb_value dsl = mrb_obj_new(mrb, dsl_cls, 0, nullptr);
+		mrb_funcall(mrb, dsl, "load", 1, mrb_str_new_cstr(mrb, script));
+	}
 
 	if (mrb->exc) {
 		mrb_value msg = mrb_funcall(mrb, mrb_obj_value(mrb->exc),

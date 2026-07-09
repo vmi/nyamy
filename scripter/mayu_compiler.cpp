@@ -251,6 +251,13 @@ uint32_t MayuCompiler::compileKeySequence(const AstKeySequence &seq)
 	for (const auto &action : seq.actions)
 		bks.actions.push_back(compileAction(*action));
 
+	if (m_subSeqCollector) {
+		// Collection mode: gather the sub-sequence's actions and return its
+		// position in the collector (children were appended first -> post-order).
+		m_subSeqCollector->push_back(std::move(bks.actions));
+		return static_cast<uint32_t>(m_subSeqCollector->size() - 1);
+	}
+
 	uint32_t idx = m_nextKeySeqIdx++;
 	m_writer.writeRegKeySeq(bks);
 	return idx;
