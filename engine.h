@@ -324,6 +324,9 @@ private:
 	/// pop all pressed key on win32
 	void keyboardResetOnWin32();
 
+	/// release modifiers and reset counters when no key is pressed
+	void resetModifiersIfIdle();
+
 	/// get current modifiers
 	Modifier getCurrentModifiers(Key *i_key, bool i_isPressed);
 

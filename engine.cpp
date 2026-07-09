@@ -758,6 +758,27 @@ void Engine::keyboardResetOnWin32()
 }
 
 
+// release modifiers and reset counters when no key is pressed.
+// Modifier presses are generated inline per action, but their release
+// is centralized here; every path that generates key events must reach
+// this after processing (see keyboardHandler).
+void Engine::resetModifiersIfIdle()
+{
+	if (m_currentKeyPressCount <= 0) {
+		{
+			Acquire a(&m_log, 1);
+			m_log << L"* No key is pressed" << std::endl;
+		}
+		generateModifierEvents(Modifier());
+		if (0 < m_currentKeyPressCountOnWin32)
+			keyboardResetOnWin32();
+		m_currentKeyPressCount = 0;
+		m_currentKeyPressCountOnWin32 = 0;
+		m_oneShotKey.m_key = NULL;
+	}
+}
+
+
 unsigned int WINAPI Engine::keyboardDetour(Engine *i_this, WPARAM i_wParam, LPARAM i_lParam)
 {
 	return i_this->keyboardDetour(reinterpret_cast<KBDLLHOOKSTRUCT*>(i_lParam));
@@ -1018,11 +1039,23 @@ void Engine::keyboardHandler()
 			if (s && m_isEnabled) {
 				auto &item = std::get<AdHocKeySeq>(event);
 				if (item && item->keySeq) {
+					if (item->origin != s) {
+						// materialized against a Setting that has been
+						// replaced by a reload; its Key* would dangle
+						Acquire a(&m_log, 1);
+						m_log << L"* ad-hoc key sequence discarded "
+						L"(setting reloaded)" << std::endl;
+						continue;
+					}
 					if (!m_currentFocusOfThread) continue;
 					Current i_c = reconstructCurrentFromContext(item->context, s);
 					i_c.m_adhocKeySeq = item->keySeq.get();
 					i_c.m_mkey.m_modifier.on(Modifier::Type_Down);
 					beginGeneratingKeyboardEvents(i_c, false);
+					// modifiers pressed while generating the sequence are
+					// released only by this reset; without it they would
+					// remain pressed on Win32 (stuck modifier)
+					resetModifiersIfIdle();
 				}
 			}
 			continue;
@@ -1171,18 +1204,7 @@ void Engine::keyboardHandler()
 		}
 
 		// if counter is zero, reset modifiers and keys on win32
-		if (m_currentKeyPressCount <= 0) {
-			{
-				Acquire a(&m_log, 1);
-				m_log << L"* No key is pressed" << std::endl;
-			}
-			generateModifierEvents(Modifier());
-			if (0 < m_currentKeyPressCountOnWin32)
-				keyboardResetOnWin32();
-			m_currentKeyPressCount = 0;
-			m_currentKeyPressCountOnWin32 = 0;
-			m_oneShotKey.m_key = NULL;
-		}
+		resetModifiersIfIdle();
 
 		key.initialize();
 		updateLastPressedKey(isPhysicallyPressed ? c.m_mkey.m_key : NULL);
@@ -1355,6 +1377,9 @@ bool Engine::setSetting(std::shared_ptr<Setting> newSetting) {
 			if (m_lastPressedKey[i])
 				m_lastPressedKey[i] =
 					raw->m_keyboard.searchKey(*m_lastPressedKey[i]);
+		if (m_oneShotKey.m_key)
+			m_oneShotKey.m_key =
+				raw->m_keyboard.searchKey(*m_oneShotKey.m_key);
 	}
 
 	m_setting.store(std::move(newSetting), std::memory_order_release);

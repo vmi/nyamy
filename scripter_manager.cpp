@@ -339,6 +339,11 @@ void ScripterManager::execUserFunc(const wstringi &name,
                                    const std::vector<FuncArg> &args,
                                    const TriggerInfo &ctx)
 {
+	// KNOWN RISK: called on the engine's keyboard handler thread while
+	// it holds Engine::m_mutex.  This write blocks if the ctrl pipe
+	// buffer is full (scripter busy in a long-running user function),
+	// which stalls all key processing.  If this becomes a problem,
+	// introduce a dedicated writer thread with an internal queue here.
 	if (m_ctrlWriter) {
 		try { m_ctrlWriter->writeExecUserFunc(name, args, ctx); } catch (...) {}
 	}

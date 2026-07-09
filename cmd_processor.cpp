@@ -107,6 +107,7 @@ void CmdProcessor::operator()(CmdArgsExecKeySeq &data)
 {
 	auto item = m_materializer.materialize(data.actions, data.context);
 	if (!item || !item->keySeq) return;
+	item->origin = m_setting;
 	if (m_execKeySeqCallback) m_execKeySeqCallback(std::move(item));
 }
 
