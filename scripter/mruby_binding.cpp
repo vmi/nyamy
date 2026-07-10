@@ -54,6 +54,31 @@ static void raiseApiError(mrb_state *mrb, const char *fallback)
 	mrb_raise(mrb, E_RUNTIME_ERROR, msg ? msg : fallback);
 }
 
+// Print the pending mruby exception (message and backtrace) to stderr with
+// the given prefix, then clear it.  No-op when no exception is pending.
+static void printPendingException(mrb_state *mrb, const char *prefix)
+{
+	if (!mrb->exc) return;
+	mrb_value exc = mrb_obj_value(mrb->exc);
+	mrb->exc = nullptr;
+
+	mrb_value msg = mrb_funcall(mrb, exc, "inspect", 0);
+	fprintf(stderr, "%s: %s\n", prefix,
+		mrb_string_p(msg) ? mrb_string_cstr(mrb, msg) : "(unprintable exception)");
+
+	mrb_value bt = mrb_funcall(mrb, exc, "backtrace", 0);
+	if (mrb_array_p(bt)) {
+		mrb_int n = RARRAY_LEN(bt);
+		for (mrb_int i = 0; i < n; ++i) {
+			mrb_value line = mrb_ary_ref(mrb, bt, i);
+			if (mrb_string_p(line))
+				fprintf(stderr, "    from %s\n",
+					mrb_string_cstr(mrb, line));
+		}
+	}
+	mrb->exc = nullptr;	// in case inspect/backtrace raised
+}
+
 // Resolve a Ruby value (String / Symbol / Yamy::KeySeq) to a keyseq index.
 static int resolveRhs(mrb_state *mrb, mrb_value rhs)
 {
@@ -435,7 +460,11 @@ static mrb_value dsl_load(mrb_state *mrb, mrb_value self)
 		fread(&buf[0], 1, sz, f);
 		fclose(f);
 		mrb_value code = mrb_str_new(mrb, buf.c_str(), buf.size());
-		mrb_funcall(mrb, self, "instance_eval", 1, code);
+		// Pass the file name and start line so that exception backtraces
+		// point into the loaded script instead of "(eval)".
+		mrb_funcall(mrb, self, "instance_eval", 3, code,
+			mrb_str_new_cstr(mrb, path.c_str()),
+			mrb_int_value(mrb, 1));
 	} else {
 		if (!ys_include_mayu(path.c_str()))
 			raiseApiError(mrb, "ys_include_mayu failed");
@@ -493,7 +522,11 @@ static mrb_value dsl_defkey(mrb_state *mrb, mrb_value self)
 	mrb_value *argv;
 	mrb_int argc;
 	mrb_value kw_hash = mrb_nil_value();
-	mrb_get_args(mrb, "*o", &argv, &argc, &kw_hash);
+	// "*" swallows the keyword hash as the trailing positional argument
+	// (mrb_get_args without ":" packs keywords that way), so peel it off.
+	mrb_get_args(mrb, "*", &argv, &argc);
+	if (argc > 0 && mrb_hash_p(argv[argc - 1]))
+		kw_hash = argv[--argc];
 
 	mrb_value scan_v = mrb_nil_value();
 	if (!mrb_nil_p(kw_hash) && mrb_hash_p(kw_hash)) {
@@ -959,11 +992,7 @@ bool mruby_on_load_setting(void* exeCtx)
 	}
 
 	if (mrb->exc) {
-		mrb_value msg = mrb_funcall(mrb, mrb_obj_value(mrb->exc),
-			"inspect", 0);
-		fprintf(stderr, "[mruby] on_load_setting error: %s\n",
-			mrb_string_cstr(mrb, msg));
-		mrb->exc = nullptr;
+		printPendingException(mrb, "[mruby] on_load_setting error");
 		return false;
 	}
 	return true;
@@ -1013,10 +1042,8 @@ void mruby_on_exec_user_func(void *exeCtx, const char *func_name,
 	delete[] call_args;
 
 	if (mrb->exc) {
-		mrb_value msg = mrb_funcall(mrb, mrb_obj_value(mrb->exc),
-			"inspect", 0);
-		fprintf(stderr, "[mruby] exec_user_func error (%s): %s\n",
-			func_name, mrb_string_cstr(mrb, msg));
-		mrb->exc = nullptr;
+		std::string prefix = std::string("[mruby] exec_user_func error (")
+			+ func_name + ")";
+		printPendingException(mrb, prefix.c_str());
 	}
 }
