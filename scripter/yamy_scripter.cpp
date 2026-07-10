@@ -730,13 +730,13 @@ YS_API bool ys_def_key(const YsStrs* names, const YsStrs* scancodes)
 	CmdArgsDefKey d;
 	int nn = ys_strs_length(names);
 	for (int i = 0; i < nn; ++i) {
-		const char* p; size_t len;
+		const char* p = nullptr; size_t len = 0;
 		ys_strs_get(names, i, &p, &len);
 		d.names.push_back(wstringi(from_UTF8(std::string(p, len))));
 	}
 	int ns = ys_strs_length(scancodes);
 	for (int i = 0; i < ns; ++i) {
-		const char* p; size_t len;
+		const char* p = nullptr; size_t len = 0;
 		ys_strs_get(scancodes, i, &p, &len);
 		CmdScanCode sc;
 		if (!parseScanCode("ys_def_key", p, len, sc)) return false;
@@ -756,7 +756,7 @@ YS_API bool ys_def_mod(const char* modifier_name, const YsStrs* key_names)
 	d.modifierName = from_UTF8(modifier_name);
 	int n = ys_strs_length(key_names);
 	for (int i = 0; i < n; ++i) {
-		const char* p; size_t len;
+		const char* p = nullptr; size_t len = 0;
 		ys_strs_get(key_names, i, &p, &len);
 		d.keyNames.push_back(wstringi(from_UTF8(std::string(p, len))));
 	}
@@ -772,7 +772,7 @@ YS_API bool ys_def_sync(const YsStrs* scan_codes)
 	CmdArgsDefSync d;
 	int n = ys_strs_length(scan_codes);
 	for (int i = 0; i < n; ++i) {
-		const char* p; size_t len;
+		const char* p = nullptr; size_t len = 0;
 		ys_strs_get(scan_codes, i, &p, &len);
 		CmdScanCode sc;
 		if (!parseScanCode("ys_def_sync", p, len, sc)) return false;
@@ -804,7 +804,7 @@ YS_API bool ys_def_subst(const YsStrs* lhs_mod_keys, int rhs_keyseq_idx)
 	d.rhsKeySeqIdx = static_cast<uint32_t>(rhs_keyseq_idx);
 	int n = ys_strs_length(lhs_mod_keys);
 	for (int i = 0; i < n; ++i) {
-		const char* p; size_t len;
+		const char* p = nullptr; size_t len = 0;
 		ys_strs_get(lhs_mod_keys, i, &p, &len);
 		CmdModifiedKey mk;
 		if (!parseModifiedKey("ys_def_subst", p, len, mk)) return false;
@@ -864,7 +864,7 @@ YS_API bool ys_assign_key(const YsStrs* lhs_mod_keys, int rhs_keyseq_idx)
 	d.rhsKeySeqIdx = static_cast<uint32_t>(rhs_keyseq_idx);
 	int n = ys_strs_length(lhs_mod_keys);
 	for (int i = 0; i < n; ++i) {
-		const char* p; size_t len;
+		const char* p = nullptr; size_t len = 0;
 		ys_strs_get(lhs_mod_keys, i, &p, &len);
 		CmdModifiedKey mk;
 		if (!parseModifiedKey("ys_assign_key", p, len, mk)) return false;
@@ -901,7 +901,7 @@ YS_API bool ys_assign_mod(const YsStrs* prefixes, const char* modifier_name,
 	if (prefixes) {
 		int n = ys_strs_length(prefixes);
 		for (int i = 0; i < n; ++i) {
-			const char* p; size_t len;
+			const char* p = nullptr; size_t len = 0;
 			ys_strs_get(prefixes, i, &p, &len);
 			auto [mode, mname] = splitAssignEntry(p, len);
 			CmdArgsAssignMod::PrefixMod pm;
@@ -912,7 +912,7 @@ YS_API bool ys_assign_mod(const YsStrs* prefixes, const char* modifier_name,
 	}
 	int nk = ys_strs_length(keys);
 	for (int i = 0; i < nk; ++i) {
-		const char* p; size_t len;
+		const char* p = nullptr; size_t len = 0;
 		ys_strs_get(keys, i, &p, &len);
 		auto [mode, kname] = splitAssignEntry(p, len);
 		CmdArgsAssignMod::KeyEntry ke;
