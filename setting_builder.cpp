@@ -9,8 +9,16 @@
 #include "function.h"   // createFunctionData
 
 
-KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs)
+KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs,
+                                          std::vector<std::wstring> *o_warnings)
 {
+	auto warn = [&](const wchar_t *what, const wstringi &name) {
+		if (o_warnings)
+			o_warnings->push_back(std::wstring(what) + L": " + name.c_str()
+			                      + L" (dropped from keyseq "
+			                      + cmdKs.name.c_str() + L")");
+	};
+
 	KeySeq ks(cmdKs.name);
 	if (cmdKs.mode != 0)
 		ks.setMode(static_cast<Modifier::Type>(cmdKs.mode));
@@ -24,6 +32,8 @@ KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs)
 			if (key) {
 				mkey.m_key = key;
 				ks.add(ActionKey(mkey));
+			} else {
+				warn(L"undefined key", action.name);
 			}
 			break;
 		}
@@ -32,6 +42,8 @@ KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs)
 			if (ref) {
 				ks.setMode(ref->getMode());
 				ks.add(ActionKeySeq(ref));
+			} else {
+				warn(L"undefined keyseq", action.name);
 			}
 			break;
 		}
@@ -41,6 +53,8 @@ KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs)
 			if (fd) {
 				fd->loadFromCmd(action.arguments, this);
 				ks.add(ActionFunction(fd, mod));
+			} else {
+				warn(L"unknown function", action.name);
 			}
 			break;
 		}
@@ -54,6 +68,8 @@ KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs)
 					if (key) {
 						mkey.m_key = key;
 						subKs.add(ActionKey(mkey));
+					} else {
+						warn(L"undefined key", sub.name);
 					}
 				} else if (sub.type == CmdAction::FuncCall) {
 					Modifier mod = modifierFromCmd(sub.modifier);
@@ -61,6 +77,8 @@ KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs)
 					if (fd) {
 						fd->loadFromCmd(sub.arguments, this);
 						subKs.add(ActionFunction(fd, mod));
+					} else {
+						warn(L"unknown function", sub.name);
 					}
 				}
 			}

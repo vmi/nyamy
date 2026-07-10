@@ -33,6 +33,31 @@ void setHandleEnv(const wchar_t *i_name, HANDLE i_handle)
 	SetEnvironmentVariableW(i_name, buf);
 }
 
+// No-op lock: the consumer thread is the only writer of the log stream.
+struct NullSyncObject : public SyncObject {
+	void acquire() override {}
+	void release() override {}
+};
+
+// Wide streambuf that writes its content to stderr as UTF-8 on flush,
+// matching the scripter's log line format.
+class Utf8StderrBuf : public std::wstringbuf {
+protected:
+	int sync() override {
+		std::wstring s = str();
+		if (!s.empty()) {
+			int n = WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(),
+			                            nullptr, 0, nullptr, nullptr);
+			std::string u8(n, '\0');
+			WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(),
+			                    &u8[0], n, nullptr, nullptr);
+			fwrite(u8.data(), 1, u8.size(), stderr);
+			str(L"");
+		}
+		return 0;
+	}
+};
+
 } // namespace
 
 
@@ -65,7 +90,10 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	std::istream dataIn(&dataBuf);
 	CmdStreamReader reader(dataIn);
 
-	CmdProcessor proc(nullptr, nullptr);
+	NullSyncObject soLog;
+	Utf8StderrBuf logBuf;
+	std::wostream logStream(&logBuf);
+	CmdProcessor proc(&soLog, &logStream);
 	std::promise<std::shared_ptr<Setting>> committed;
 	std::future<std::shared_ptr<Setting>> committedFut = committed.get_future();
 	bool delivered = false;

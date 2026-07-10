@@ -47,6 +47,7 @@ public:
 
 private:
 	void error(const std::wstring &msg);
+	void warning(const std::wstring &msg);
 	static bool lookupModifierType(const wstringi &name, Modifier::Type *o_mt);
 	static Keymap::AssignMode parseAssignMode(const wstringi &s);
 

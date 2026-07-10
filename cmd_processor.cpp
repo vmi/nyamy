@@ -61,6 +61,15 @@ void CmdProcessor::error(const std::wstring &msg)
 }
 
 
+void CmdProcessor::warning(const std::wstring &msg)
+{
+	if (m_log) {
+		Acquire a(m_soLog);
+		*m_log << L"loader warning: " << msg << std::endl;
+	}
+}
+
+
 bool CmdProcessor::lookupModifierType(const wstringi &name, Modifier::Type *o_mt)
 {
 	for (size_t i = 0; i < NUMBER_OF(g_modNameMap); ++i) {
@@ -99,7 +108,10 @@ void CmdProcessor::process(CmdStreamReader &cr)
 
 void CmdProcessor::operator()(CmdArgsRegKeySeq &bks)
 {
-	m_builder->pushKeySeqRef(m_builder->materializeKeySeq(bks));
+	std::vector<std::wstring> warnings;
+	m_builder->pushKeySeqRef(m_builder->materializeKeySeq(bks, &warnings));
+	for (const auto &w : warnings)
+		warning(w);
 }
 
 

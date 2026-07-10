@@ -103,8 +103,11 @@ public:
 		return mkey;
 	}
 
-	/// Materialize a CmdArgsRegKeySeq into a KeySeq* owned by this builder
-	KeySeq *materializeKeySeq(const CmdArgsRegKeySeq &cmdKs);
+	/// Materialize a CmdArgsRegKeySeq into a KeySeq* owned by this builder.
+	/// Actions whose key / keyseq / function name cannot be resolved are
+	/// dropped; a message per dropped action is appended to o_warnings.
+	KeySeq *materializeKeySeq(const CmdArgsRegKeySeq &cmdKs,
+	                          std::vector<std::wstring> *o_warnings = nullptr);
 
 private:
 	Setting &m_setting;                  ///< reference to the Setting being built
