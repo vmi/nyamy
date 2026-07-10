@@ -13,6 +13,7 @@
 #  include "ctrl_stream_writer.h"
 #  include "adhoc_keyseq.h"
 #  include "ctrl_stream.h"     // FuncArg, TriggerInfo
+#  include "pipe_streambuf.h"
 #  include "symbols.h"
 #  include "setting.h"
 #  include "multithread.h"
@@ -69,7 +70,7 @@ private:
 	HANDLE m_hMsgThread;
 
 	// ostream and its streambuf to write to ctrl pipe
-	std::unique_ptr<std::streambuf>  m_ctrlStreambuf;
+	std::unique_ptr<PipeWriteStreambuf> m_ctrlStreambuf;
 	std::unique_ptr<std::ostream>    m_ctrlStream;
 	std::unique_ptr<CtrlStreamWriter> m_ctrlWriter;
 

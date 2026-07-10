@@ -321,10 +321,17 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		*m_log << L"ScripterManager: started " << scripterPath << std::endl;
 	}
 
-	// Send CtrlId::Start with config name, path, and symbols
+	// Send CtrlId::Start with config name, path, and symbols.
+	// This runs while the pipe is still blocking, so the (possibly large)
+	// Start message is delivered reliably before we switch to drop-on-full.
 	if (m_ctrlWriter) {
 		try { m_ctrlWriter->writeStart(configName, configPath, syms); } catch (...) {}
 	}
+
+	// From now on, ctrl writes (ExecUserFunc from the engine thread) must not
+	// block if the scripter is busy: drop and log instead of stalling input.
+	if (m_ctrlStreambuf)
+		m_ctrlStreambuf->setNonBlocking();
 	return true;
 }
 
@@ -339,13 +346,20 @@ void ScripterManager::execUserFunc(const wstringi &name,
                                    const std::vector<FuncArg> &args,
                                    const TriggerInfo &ctx)
 {
-	// KNOWN RISK: called on the engine's keyboard handler thread while
-	// it holds Engine::m_mutex.  This write blocks if the ctrl pipe
-	// buffer is full (scripter busy in a long-running user function),
-	// which stalls all key processing.  If this becomes a problem,
-	// introduce a dedicated writer thread with an internal queue here.
+	// Called on the engine's keyboard handler thread.  The ctrl pipe is in
+	// non-blocking mode (see launchScripter), so if the scripter is busy and
+	// the pipe buffer is full this write is dropped rather than stalling all
+	// key processing.  Report the drop instead.
 	if (m_ctrlWriter) {
 		try { m_ctrlWriter->writeExecUserFunc(name, args, ctx); } catch (...) {}
+	}
+	if (m_ctrlStreambuf && m_ctrlStreambuf->wasBlocked()) {
+		m_ctrlStreambuf->clearBlocked();
+		if (m_log) {
+			Acquire a(m_soLog, 0);
+			*m_log << L"ScripterManager: ctrl pipe full; discarded "
+			          L"ExecUserFunc(" << name << L")" << std::endl;
+		}
 	}
 }
 
