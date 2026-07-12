@@ -9,8 +9,8 @@
 #include "function.h"   // createFunctionData
 
 
-KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs,
-                                          std::vector<std::wstring> *o_warnings)
+void SettingBuilder::fillKeySeq(KeySeq *o_target, const CmdArgsRegKeySeq &cmdKs,
+                                std::vector<std::wstring> *o_warnings)
 {
 	auto warn = [&](const wchar_t *what, const wstringi &name) {
 		if (o_warnings)
@@ -88,7 +88,9 @@ KeySeq *SettingBuilder::materializeKeySeq(const CmdArgsRegKeySeq &cmdKs,
 		}
 		}
 	}
-	return addKeySeq(ks);
+	// Assign into the shell registered when the RegKeySeq command arrived,
+	// so pointers already handed out to keymaps / assignments stay valid.
+	*o_target = ks;
 }
 
 

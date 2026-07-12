@@ -108,10 +108,12 @@ void CmdProcessor::process(CmdStreamReader &cr)
 
 void CmdProcessor::operator()(CmdArgsRegKeySeq &bks)
 {
-	std::vector<std::wstring> warnings;
-	m_builder->pushKeySeqRef(m_builder->materializeKeySeq(bks, &warnings));
-	for (const auto &w : warnings)
-		warning(w);
+	// Register an empty shell so later commands can bind to a stable pointer
+	// by index or name.  The contents are filled at Commit, when every key,
+	// keymap and keyseq referenced by the actions is guaranteed to exist.
+	KeySeq *shell = m_builder->addKeySeq(KeySeq(bks.name));
+	m_builder->pushKeySeqRef(shell);
+	m_pendingKeySeqs.emplace_back(shell, std::move(bks));
 }
 
 
@@ -175,7 +177,15 @@ void CmdProcessor::operator()(CmdArgsDefAlias &data)
 
 void CmdProcessor::operator()(CmdArgsDefSubst &data)
 {
+	// Deferred until Commit: the rhs keyseq is an empty shell until then.
+	m_pendingSubsts.push_back(std::move(data));
+}
+
+
+void CmdProcessor::applyDefSubst(const CmdArgsDefSubst &data)
+{
 	KeySeq *keySeq = m_builder->getKeySeqRef(data.rhsKeySeqIdx);
+	if (!keySeq) throw ErrorMessage() << L"invalid keyseq for substitute";
 	ModifiedKey rhs = keySeq->getFirstModifiedKey();
 	if (!rhs.m_key) throw ErrorMessage() << L"no key for substitute";
 	for (const auto &bmk : data.lhsKeys) {
@@ -280,6 +290,22 @@ void CmdProcessor::operator()(CmdArgsAssignMod &data)
 
 void CmdProcessor::operator()(CmdArgsCommit)
 {
+	// Every key, keymap and keyseq shell now exists: materialize the deferred
+	// keyseq contents, then the substitutes that read them.
+	for (const auto &p : m_pendingKeySeqs) {
+		std::vector<std::wstring> warnings;
+		m_builder->fillKeySeq(p.first, p.second, &warnings);
+		for (const auto &w : warnings)
+			warning(w);
+	}
+	m_pendingKeySeqs.clear();
+
+	for (const auto &d : m_pendingSubsts) {
+		try { applyDefSubst(d); }
+		catch (ErrorMessage &e) { error(e.getMessage()); }
+	}
+	m_pendingSubsts.clear();
+
 	m_builder.reset();
 	if (m_commitCallback) m_commitCallback(m_setting);
 }

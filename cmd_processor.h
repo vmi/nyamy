@@ -11,6 +11,8 @@
 #  include "multithread.h"
 #  include <functional>
 #  include <memory>
+#  include <utility>
+#  include <vector>
 
 
 class CmdProcessor
@@ -48,11 +50,18 @@ public:
 private:
 	void error(const std::wstring &msg);
 	void warning(const std::wstring &msg);
+	void applyDefSubst(const CmdArgsDefSubst &data);
 	static bool lookupModifierType(const wstringi &name, Modifier::Type *o_mt);
 	static Keymap::AssignMode parseAssignMode(const wstringi &s);
 
 	SyncObject *m_soLog;
 	std::wostream *m_log;
+
+	// Commands whose resolution is deferred until Commit: keyseq actions may
+	// reference keys / keymaps / keyseqs defined later in the stream, and
+	// substitutes read the contents of a materialized keyseq.
+	std::vector<std::pair<KeySeq *, CmdArgsRegKeySeq>> m_pendingKeySeqs;
+	std::vector<CmdArgsDefSubst>                       m_pendingSubsts;
 
 	// NOTE: m_setting must be declared before m_materializer (initialization order guarantee)
 	std::shared_ptr<Setting>        m_setting;      ///< shared Setting being built

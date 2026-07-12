@@ -253,23 +253,14 @@ static bool parseScanCode(const char* funcName,
 	return true;
 }
 
-// True when the action list contains a function call or keyseq reference
-// (directly or inside a sub-sequence).  Such actions bind to keymaps or
-// other keyseqs when the consumer materializes them, so they must be
-// re-emitted after all keymaps have been defined.
-static bool hasLateBinding(const std::vector<CmdAction>& actions)
-{
-	for (const auto& a : actions) {
-		if (a.type == CmdAction::FuncCall || a.type == CmdAction::KeySeqRef)
-			return true;
-		if (a.type == CmdAction::SubSeq && hasLateBinding(a.subActions))
-			return true;
-	}
-	return false;
-}
-
 // Flush all queued commands to the data stream and write CmdCommit.
 // Returns false on error (stream not flushed).
+//
+// The consumer defers reference resolution until CmdCommit (keyseq contents
+// and substitutes are materialized only after the whole stream has been
+// received), so key definitions, keyseqs and keymaps may appear in any
+// order.  The only ordering constraint is that RegKeySeq must precede the
+// commands that reference a keyseq by index, hence step 2 before step 3.
 static bool flushQueue()
 {
 	if (!g_dataWriter) return false;
@@ -285,30 +276,7 @@ static bool flushQueue()
 		g_dataWriter->writeDefSymbol(d);
 	}
 
-	// Step 2: Key definition commands (def key / mod / sync / alias) from the
-	// queue, in order.  These must precede RegKeySeq because the consumer
-	// resolves key names when it materializes a key sequence, and drops
-	// actions whose key is not defined yet.
-	auto isKeyDef = [](const CmdArgs& c) {
-		return std::holds_alternative<CmdArgsDefKey>(c)
-		    || std::holds_alternative<CmdArgsDefMod>(c)
-		    || std::holds_alternative<CmdArgsDefSync>(c)
-		    || std::holds_alternative<CmdArgsDefAlias>(c);
-	};
-	for (const auto& entry : g_cmdQueue) {
-		if (entry.kind != QueueEntry::Kind::Direct || !isKeyDef(entry.cmd))
-			continue;
-		if (auto* k = std::get_if<CmdArgsDefKey>(&entry.cmd))
-			g_dataWriter->writeDefKey(*k);
-		else if (auto* m = std::get_if<CmdArgsDefMod>(&entry.cmd))
-			g_dataWriter->writeDefMod(*m);
-		else if (auto* s = std::get_if<CmdArgsDefSync>(&entry.cmd))
-			g_dataWriter->writeDefSync(*s);
-		else if (auto* al = std::get_if<CmdArgsDefAlias>(&entry.cmd))
-			g_dataWriter->writeDefAlias(*al);
-	}
-
-	// Step 3: Pre-registered keyseqs (indices 0 .. n-1).
+	// Step 2: Pre-registered keyseqs (indices 0 .. n-1).
 	for (const auto& e : g_keyseqEntries) {
 		CmdArgsRegKeySeq ks;
 		ks.name    = wstringi(e.name);
@@ -317,23 +285,20 @@ static bool flushQueue()
 		g_dataWriter->writeRegKeySeq(ks);
 	}
 
-	// Step 4: Remaining commands in queue order (key definitions were already
-	// written in step 2).
+	// Step 3: Remaining commands in queue order.
 	// Include entries are compiled with initialKeySeqIdx = current keyseq count.
 	uint32_t nextKeySeqIdx = static_cast<uint32_t>(g_keyseqEntries.size());
 
 	for (const auto& entry : g_cmdQueue) {
 		if (entry.kind == QueueEntry::Kind::Direct) {
-			if (isKeyDef(entry.cmd))
-				continue;
 			std::visit(overloaded{
 				[](const CmdArgsRegKeySeq&)   {},  // not placed in cmdQueue
 				[](const CmdArgsExecKeySeq&)  {},  // not placed in cmdQueue
 				[](const CmdArgsCommit&)      {},  // not placed in cmdQueue
-				[](const CmdArgsDefKey&)      {},  // written in step 2
-				[](const CmdArgsDefMod&)      {},  // written in step 2
-				[](const CmdArgsDefSync&)     {},  // written in step 2
-				[](const CmdArgsDefAlias&)    {},  // written in step 2
+				[](const CmdArgsDefKey& a)    { g_dataWriter->writeDefKey(a); },
+				[](const CmdArgsDefMod& a)    { g_dataWriter->writeDefMod(a); },
+				[](const CmdArgsDefSync& a)   { g_dataWriter->writeDefSync(a); },
+				[](const CmdArgsDefAlias& a)  { g_dataWriter->writeDefAlias(a); },
 				[](const CmdArgsDefSubst& a)  { g_dataWriter->writeDefSubst(a); },
 				[](const CmdArgsDefOption& a) { g_dataWriter->writeDefOption(a); },
 				[](const CmdArgsDefSymbol& a) { g_dataWriter->writeDefSymbol(a); },
@@ -362,22 +327,6 @@ static bool flushQueue()
 				nextKeySeqIdx = compiler.nextKeySeqIdx();
 			}
 		}
-	}
-
-	// Step 5: Re-emit pre-registered keyseqs that reference keymaps or other
-	// keyseqs.  Their first emission in step 3 preceded every BeginKeymap, so
-	// the consumer materialized those references as unresolved.  Re-emitting
-	// after step 4 lets the consumer resolve them; it replaces the contents
-	// of a named keyseq in place, keeping pointers held by earlier
-	// assignments valid.
-	for (const auto& e : g_keyseqEntries) {
-		if (!hasLateBinding(e.compiled))
-			continue;
-		CmdArgsRegKeySeq ks;
-		ks.name    = wstringi(e.name);
-		ks.mode    = 0;
-		ks.actions = e.compiled;
-		g_dataWriter->writeRegKeySeq(ks);
 	}
 
 	g_dataWriter->writeCommit();
