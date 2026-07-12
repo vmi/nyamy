@@ -36,6 +36,7 @@ std::optional<CmdArgs> CmdStreamReader::readCmd()
 	case CmdId::AssignKey:     return readAssignKey();
 	case CmdId::AssignEvent:   return readAssignEvent();
 	case CmdId::AssignMod:     return readAssignMod();
+	case CmdId::Reset:         return CmdArgsReset{};
 	case CmdId::Commit:        return CmdArgsCommit{};
 	default:                   return std::nullopt;
 	}
@@ -407,6 +408,7 @@ static const wchar_t *cmdIdToString(CmdId id)
 	case CmdId::AssignKey:    return L"AssignKey";
 	case CmdId::AssignEvent:  return L"AssignEvent";
 	case CmdId::AssignMod:    return L"AssignMod";
+	case CmdId::Reset:        return L"Reset";
 	case CmdId::Commit:       return L"Commit";
 	default:                  return L"???";
 	}
@@ -547,6 +549,7 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			out << L"]";
 			break;
 		}
+		case CmdId::Reset:
 		case CmdId::Commit:
 			break;
 		}

@@ -62,7 +62,8 @@ protected:
 
 
 std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
-                                      const Symbols &i_symbols)
+                                      const Symbols &i_symbols,
+                                      int i_loadCount)
 {
 	// ctrl pipe: test (write) -> scripter (read, via YS_CTRL)
 	// data pipe: scripter (write, via YS_CMD) -> test (read)
@@ -96,17 +97,20 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	CmdProcessor proc(&soLog, &logStream);
 	std::promise<std::shared_ptr<Setting>> committed;
 	std::future<std::shared_ptr<Setting>> committedFut = committed.get_future();
-	bool delivered = false;
+	int commitCount = 0;
 	proc.onCommit([&](std::shared_ptr<Setting> s) {
-		if (!delivered) { delivered = true; committed.set_value(s); }
+		// Deliver the Setting of the i_loadCount-th Commit.
+		if (++commitCount == i_loadCount) committed.set_value(s);
 	});
 	std::thread consumerThread([&]() { proc.process(reader); });
 
-	// Send the Start command (carries the symbol set).
+	// Send the Start command (carries the symbol set); once more per extra
+	// load to exercise the reload path.
 	PipeWriteStreambuf ctrlBuf(ctrlW);
 	std::ostream ctrlOut(&ctrlBuf);
 	CtrlStreamWriter ctrlWriter(ctrlOut);
-	ctrlWriter.writeStart(wstringi(L"test"), wstringi(L""), i_symbols);
+	for (int i = 0; i < i_loadCount; ++i)
+		ctrlWriter.writeStart(wstringi(L"test"), wstringi(L""), i_symbols);
 	ctrlOut.flush();
 
 	// Wait for the Commit (or time out on a Ruby error / hang).

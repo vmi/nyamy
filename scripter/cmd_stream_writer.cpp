@@ -264,6 +264,12 @@ void CmdStreamWriter::writeAssignMod(const CmdArgsAssignMod &data)
 
 
 
+void CmdStreamWriter::writeReset()
+{
+	writeU8(static_cast<uint8_t>(CmdId::Reset));
+}
+
+
 void CmdStreamWriter::writeCommit()
 {
 	writeU8(static_cast<uint8_t>(CmdId::Commit));

@@ -28,6 +28,7 @@ public:
 	void writeAssignKey(const CmdArgsAssignKey &data);
 	void writeAssignEvent(const CmdArgsAssignEvent &data);
 	void writeAssignMod(const CmdArgsAssignMod &data);
+	void writeReset();
 	void writeCommit();
 	// The following can be executed only after running writeCommit.
 	void writeExecKeySeq(const std::vector<CmdAction> &actions,

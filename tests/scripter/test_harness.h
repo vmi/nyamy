@@ -18,7 +18,10 @@ class Setting;
 /// Build a Setting by running the mruby script at i_scriptPathUtf8 with the
 /// given symbol set.  Returns nullptr if the script failed to produce a Commit
 /// (e.g. a Ruby error) within the timeout.
+/// i_loadCount > 1 sends that many Start commands over the same pipe and
+/// returns the Setting of the last Commit, exercising the reload path.
 std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
-                                      const Symbols &i_symbols);
+                                      const Symbols &i_symbols,
+                                      int i_loadCount = 1);
 
 #endif // !_TEST_HARNESS_H

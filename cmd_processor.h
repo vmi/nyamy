@@ -32,6 +32,7 @@ public:
 	void process(CmdStreamReader &cr);
 
 	// Visitor operators (public: required by std::visit)
+	void operator()(CmdArgsReset);
 	void operator()(CmdArgsRegKeySeq &);
 	void operator()(CmdArgsExecKeySeq &);
 	void operator()(CmdArgsDefKey &);
@@ -50,6 +51,7 @@ public:
 private:
 	void error(const std::wstring &msg);
 	void warning(const std::wstring &msg);
+	void beginSetting();
 	void applyDefSubst(const CmdArgsDefSubst &data);
 	static bool lookupModifierType(const wstringi &name, Modifier::Type *o_mt);
 	static Keymap::AssignMode parseAssignMode(const wstringi &s);
@@ -63,10 +65,9 @@ private:
 	std::vector<std::pair<KeySeq *, CmdArgsRegKeySeq>> m_pendingKeySeqs;
 	std::vector<CmdArgsDefSubst>                       m_pendingSubsts;
 
-	// NOTE: m_setting must be declared before m_materializer (initialization order guarantee)
-	std::shared_ptr<Setting>        m_setting;      ///< shared Setting being built
-	AdHocMaterializer               m_materializer; ///< uses m_setting (init order: after m_setting)
-	std::unique_ptr<SettingBuilder> m_builder;       ///< valid only during process()
+	std::shared_ptr<Setting>        m_setting;   ///< Setting being built (Reset .. Commit)
+	std::shared_ptr<Setting>        m_committed; ///< last committed Setting (used by ExecKeySeq)
+	std::unique_ptr<SettingBuilder> m_builder;   ///< valid between Reset and Commit
 
 	CommitCallback     m_commitCallback;
 	ExecKeySeqCallback m_execKeySeqCallback;

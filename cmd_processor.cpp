@@ -42,9 +42,6 @@ const ModNameEntry g_modNameMap[] = {
 
 CmdProcessor::CmdProcessor(SyncObject *soLog, std::wostream *log)
 	: m_soLog(soLog), m_log(log)
-	, m_setting(std::make_shared<Setting>())
-	, m_builder(std::make_unique<SettingBuilder>(*m_setting))
-	, m_materializer(*m_setting)
 {}
 
 
@@ -93,16 +90,43 @@ Keymap::AssignMode CmdProcessor::parseAssignMode(const wstringi &s)
 
 void CmdProcessor::process(CmdStreamReader &cr)
 {
+	while (auto cmd = cr.readCmd()) {
+		// Reset opens a setting definition block and ExecKeySeq operates on
+		// the last committed Setting; every other command requires an open
+		// block (m_builder alive).
+		if (!m_builder
+			&& !std::holds_alternative<CmdArgsReset>(*cmd)
+			&& !std::holds_alternative<CmdArgsExecKeySeq>(*cmd)) {
+			error(L"command received outside a Reset..Commit block");
+			continue;
+		}
+		try { std::visit(*this, *cmd); }
+		catch (ErrorMessage &e) { error(e.getMessage()); }
+	}
+}
+
+
+// Start building a fresh Setting, discarding any partially built one.
+// The last committed Setting (m_committed) is untouched: the engine may
+// still be using it.
+void CmdProcessor::beginSetting()
+{
+	m_pendingKeySeqs.clear();
+	m_pendingSubsts.clear();
+	m_setting = std::make_shared<Setting>();
+	m_builder = std::make_unique<SettingBuilder>(*m_setting);
+
 	ActionFunction af(createFunctionData(L"OtherWindowClass"));
 	KeySeq *globalDefault = m_builder->addKeySeq(KeySeq(L"").add(af));
 	m_builder->setCurrentKeymap(m_builder->addKeymap(
 		Keymap(Keymap::Type_windowOr, L"Global", L"", L"",
 		       globalDefault, nullptr)));
+}
 
-	while (auto cmd = cr.readCmd()) {
-		try { std::visit(*this, *cmd); }
-		catch (ErrorMessage &e) { error(e.getMessage()); }
-	}
+
+void CmdProcessor::operator()(CmdArgsReset)
+{
+	beginSetting();
 }
 
 
@@ -119,9 +143,11 @@ void CmdProcessor::operator()(CmdArgsRegKeySeq &bks)
 
 void CmdProcessor::operator()(CmdArgsExecKeySeq &data)
 {
-	auto item = m_materializer.materialize(data.actions, data.context);
+	if (!m_committed) return;	// nothing committed yet
+	AdHocMaterializer materializer(*m_committed);
+	auto item = materializer.materialize(data.actions, data.context);
 	if (!item || !item->keySeq) return;
-	item->origin = m_setting;
+	item->origin = m_committed;
 	if (m_execKeySeqCallback) m_execKeySeqCallback(std::move(item));
 }
 
@@ -307,5 +333,6 @@ void CmdProcessor::operator()(CmdArgsCommit)
 	m_pendingSubsts.clear();
 
 	m_builder.reset();
-	if (m_commitCallback) m_commitCallback(m_setting);
+	m_committed = std::move(m_setting);
+	if (m_commitCallback) m_commitCallback(m_committed);
 }

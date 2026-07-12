@@ -37,6 +37,7 @@ enum class CmdId : uint8_t {
 	AssignKey      = 0x21,
 	AssignEvent    = 0x23,
 	AssignMod      = 0x24,
+	Reset          = 0xFE,
 	Commit         = 0xFF,
 };
 
@@ -178,6 +179,11 @@ struct CmdArgsAssignMod {
 /// Tag-only struct for the payload-free Commit command
 struct CmdArgsCommit {};
 
+/// Tag-only struct for the payload-free Reset command.
+/// Marks the start of a setting definition block: the consumer discards any
+/// partially built setting and starts a fresh one.
+struct CmdArgsReset {};
+
 /// Ad-hoc key sequence execution (scripter -> engine)
 struct CmdArgsExecKeySeq {
 	std::vector<CmdAction>  actions;
@@ -199,6 +205,7 @@ using CmdArgs = std::variant<
 	CmdArgsAssignKey,
 	CmdArgsAssignEvent,
 	CmdArgsAssignMod,
+	CmdArgsReset,
 	CmdArgsCommit
 >;
 

@@ -269,6 +269,11 @@ static bool flushQueue()
 	std::wostream logStream(&logBuf);
 	ConfigFiles cf;
 
+	// Step 0: Reset opens the setting definition block.  The consumer starts
+	// a fresh Setting here, which also discards the partial block left behind
+	// when a previous flush failed halfway (no Commit written).
+	g_dataWriter->writeReset();
+
 	// Step 1: DefSymbol commands for the current symbol set.
 	for (const auto& sym : g_symbols) {
 		CmdArgsDefSymbol d;
@@ -294,6 +299,7 @@ static bool flushQueue()
 			std::visit(overloaded{
 				[](const CmdArgsRegKeySeq&)   {},  // not placed in cmdQueue
 				[](const CmdArgsExecKeySeq&)  {},  // not placed in cmdQueue
+				[](const CmdArgsReset&)       {},  // not placed in cmdQueue
 				[](const CmdArgsCommit&)      {},  // not placed in cmdQueue
 				[](const CmdArgsDefKey& a)    { g_dataWriter->writeDefKey(a); },
 				[](const CmdArgsDefMod& a)    { g_dataWriter->writeDefMod(a); },

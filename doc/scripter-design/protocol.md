@@ -165,11 +165,17 @@ CmdStream のコマンドは用途で 2 系統に分かれる (ID 定義は下�
 
 | 系統 | コマンド | 用途 |
 |------|---------|------|
-| 設定構築 | `RegKeySeq` / `Def*` / `BeginKeymap` / `Assign*` / `Commit` | on_load_setting で構築した設定を Engine へ送出 |
+| 設定構築 | `Reset` / `RegKeySeq` / `Def*` / `BeginKeymap` / `Assign*` / `Commit` | on_load_setting で構築した設定を Engine へ送出 |
 | ランタイム | `ExecKeySeq` (0x02) | `ys_exec_keyseq` による adhoc キーシーケンス実行要求 |
 
-**現状のフロー**: scripter は compile 中に CmdStream コマンドを即座にパイプへ書き出す
-(キューイングなし)。エラー発生時は Commit を書かずに終了する。
+**設定定義ブロック**: 設定構築コマンドは `Reset` (0xFE) で開始し `Commit` (0xFF) で
+完了する。consumer (CmdProcessor) は `Reset` で新しい Setting の構築を開始し
+(構築途中の Setting があれば破棄)、`Commit` で参照解決を行って完成させる。
+keyseq の内容と substitute の解決は `Commit` 受信時まで遅延されるため、
+ブロック内のキー定義・keyseq・keymap の順序は不問 (keyseq を index で参照する
+コマンドより先に対応する `RegKeySeq` を送る必要があるのみ)。
+エラー発生時は `Commit` を書かずに終了し、次のブロックの `Reset` が
+書き残しを破棄する。`ExecKeySeq` は最後に `Commit` された Setting に対して動作する。
 
 ### コマンド ID
 
@@ -188,6 +194,7 @@ enum class CmdId : uint8_t {
     AssignKey   = 0x21,
     AssignEvent = 0x23,
     AssignMod   = 0x24,
+    Reset       = 0xFE,
     Commit      = 0xFF,
 };
 ```
@@ -196,7 +203,7 @@ enum class CmdId : uint8_t {
 
 ## プロセスライフサイクル
 
-### 現在の起動シーケンス
+### 起動シーケンス (実装済み)
 
 ```mermaid
 sequenceDiagram
@@ -205,40 +212,23 @@ sequenceDiagram
 
     yamy->>scripter: CreateProcess("yamy-scripter.exe",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YS_CTRL=N, YS_CMD=M)
     Note right of scripter: 1. env から YS_CTRL/YS_CMD を取得
-    Note right of scripter: 2. stderr を UTF-16 に設定
-    yamy->>scripter: CtrlStream: Start(syms)
-    Note right of scripter: 3. .mayu コンパイル
+    yamy->>scripter: CtrlStream: Start(configName, configPath, syms)
+    Note right of scripter: 2. on_load_setting (.mayu コンパイル or スクリプト実行)
+    scripter->>yamy: Reset (0xFE)
     scripter->>yamy: CmdStream (all cmds)
     scripter->>yamy: Commit (0xFF)
-    yamy->>scripter: CtrlStream: Start(syms)
-    Note right of scripter: 4. 再コンパイル (設定変更時)
-    scripter->>yamy: CmdStream (all cmds)
-    scripter->>yamy: Commit (0xFF)
-    yamy->>scripter: CtrlStream: Quit (0xFF)
-    Note right of scripter: 5. 終了
-```
-
-### 将来の起動シーケンス (プロセス再起動方式、未実装)
-
-```mermaid
-sequenceDiagram
-    participant yamy
-    participant scripter as yamy-scripter
-
-    yamy->>scripter: CreateProcess("yamy-scripter.exe -DSYM1 -DSYM2",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YS_CTRL=N, YS_CMD=M)
-    Note right of scripter: 1. env から YS_CTRL/YS_CMD を取得<br/>　 argv から -D シンボルを解析
-    Note right of scripter: 2. .mayu コンパイル or スクリプト実行
-    Note right of scripter: 3. Commit → CmdStream 送出
-    scripter->>yamy: CmdStream (batch)
-    scripter->>yamy: Commit (0xFF)
-    Note right of scripter: 4. CtrlStream 待ちループへ移行
+    Note right of scripter: 3. CtrlStream 待ちループ
     yamy->>scripter: ExecUserFunc (0x02)
     scripter->>yamy: ExecKeySeq (0x02)
-    yamy->>scripter: Quit (0xFF)
-    Note right of scripter: 5. 終了
+    yamy->>scripter: CtrlStream: Quit (0xFF)
+    Note right of scripter: 4. 終了
 ```
 
-### 将来の設定再読み込み (未実装、プロセス再起動方式)
+### 設定再読み込み (実装済み、プロセス再起動方式)
+
+再読み込みは `mayu.cpp load()` → `ScripterManager::start()` → `launchScripter()` で
+行う。`launchScripter()` は既存プロセスを終了させ、**パイプ3本とデータ受信スレッド
+(CmdProcessor を含む) もすべて作り直す**。パイプの再利用はない。
 
 ```mermaid
 sequenceDiagram
@@ -246,8 +236,15 @@ sequenceDiagram
     participant old as scripter (旧)
     participant new as scripter (新)
 
-    yamy->>old: CtrlStream: Quit 送信 OR ctrl パイプをクローズ
+    yamy->>old: CtrlStream: Quit 送信 + ctrl パイプをクローズ
     old-->>yamy: 終了
-    yamy->>yamy: WaitForSingleObject(process, 5000ms) / CloseHandle
-    yamy->>new: CreateProcess(新シンボル付きで再起動)
+    yamy->>yamy: WaitForMultipleObjects(process/threads) / closeHandles
+    yamy->>new: CreateProcess (新パイプ + 新 CmdProcessor)
+    yamy->>new: CtrlStream: Start(syms)
+    new->>yamy: Reset (0xFE) + CmdStream + Commit (0xFF)
 ```
+
+補足: `ys_start()` のループは同一プロセスへの複数回 Start も処理できる
+(consumer 側も Reset ごとに新しい Setting の構築を開始するため成立する)。
+本番の再読み込みはプロセス再起動方式であり、この経路はテストハーネス
+(`buildSetting(..., loadCount)`) が使用する。

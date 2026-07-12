@@ -136,9 +136,38 @@ int main()
 		}
 	}
 
+	// Reload: send Start twice over the same pipe and verify the Setting of
+	// the second Commit matches a single load.
+	{
+		Symbols syms;
+		for (const wchar_t *s : combos[0].symbols) syms.insert(wstringi(s));
+
+		printf("[%d] reload (%s x2) ... ", idx + 1, combos[0].name);
+		fflush(stdout);
+
+		std::shared_ptr<Setting> once  = buildSetting(rbScript, syms);
+		std::shared_ptr<Setting> twice = buildSetting(rbScript, syms, 2);
+
+		if (!once || !twice) {
+			printf("FAIL (load failed: %s%s)\n",
+			       once ? "" : "x1 ", twice ? "" : "x2");
+			++failures;
+		} else {
+			std::wstring da = dumpSetting(*once);
+			std::wstring db = dumpSetting(*twice);
+			if (da == db) {
+				printf("OK\n");
+			} else {
+				printf("FAIL (settings differ)\n");
+				reportFirstDiff(da, db);
+				++failures;
+			}
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 1;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
-	       (int)(sizeof(combos) / sizeof(combos[0])) - failures,
-	       (int)(sizeof(combos) / sizeof(combos[0])));
+	       total - failures, total);
 	return failures == 0 ? 0 : 1;
 }
