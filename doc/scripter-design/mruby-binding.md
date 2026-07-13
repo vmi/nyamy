@@ -35,11 +35,11 @@ scripter/
 load "104.mayu"          # キーボード定義を .mayu からロード
 load "emacsedit.rb"      # 別の .rb を同一コンテキストで実行
 
-keyseq :window_close, "A-F4"
-keyseq :toggle_ime,   "A-BackQuote"
+keyseq "$WindowClose", "A-F4"
+keyseq "$ToggleIME",   "A-BackQuote"
 
 keymap "Global" do
-  key["C-S-K C-A-K"] = :window_close
+  key["C-S-K C-A-K"] = "$WindowClose"
   key["C-S-L C-A-L"] = "&WindowLower"
 end
 
@@ -87,34 +87,39 @@ load_mayu   # ConfigFiles が解決する .mayu をコンパイル (ys_load_mayu
 **.mayu 相当:** `keyseq $name = actions`
 
 ```ruby
-# 形式 A: 名前付き (シンボルで参照可能)
-keyseq :window_close, "A-F4"
-keyseq :toggle_ime,   "A-BackQuote"
+# 形式 A: 名前付き。名前は `$` で始まる String 必須
+#          (参照側の "$WindowClose" と表記が一致する)
+keyseq "$WindowClose", "A-F4"
+keyseq "$ToggleIME",   "A-BackQuote"
 
 # 形式 B: 名前なし、KeySeq オブジェクトを変数に保持
 $WINDOW_CLOSE = keyseq "A-F4"   # グローバル変数に保持 (.mayu の $NAME に視覚的に対応)
 WM_CLOSE      = keyseq "A-F4"   # 定数への代入も可
 
 # 形式 C: 名前登録 + 変数保持の両立
-$WINDOW_CLOSE = keyseq :window_close, "A-F4"
+$WINDOW_CLOSE = keyseq "$WindowClose", "A-F4"
 ```
+
+先頭の `$` は「keyseq 名前空間を選ぶシジル」であり、登録される内部名には
+含まれない (`keyseq "$WindowClose"` の内部名は `WindowClose`)。
+`$` を欠く名前や String 以外 (Symbol 等) の名前はエラーになる。
 
 形式 B / C の使い分け:
 
-| | シンボル参照 | 変数参照 |
+| | 名前参照 | 変数参照 |
 |---|---|---|
 | 名前テーブルへの登録 | ✅ (`ys_get_keyseq_idx` で引ける) | ❌ (形式 B) / ✅ (形式 C) |
-| `key[...] = rhs` で使える | ✅ `:name` として | ✅ `$VAR` として |
-| `to:` kwarg での見た目 | `to: :window_close` (`:` が並ぶ) | `to: $WINDOW_CLOSE` (すっきり) |
-| `.mayu` ファイルからの参照 | ✅ `$window_close` として | ❌ |
+| `key[...] = rhs` で使える | ✅ `"$Name"` として | ✅ `$VAR` として |
+| `to:` kwarg での見た目 | `to: "$Name"` | `to: $WINDOW_CLOSE` |
+| `.mayu` ファイルからの参照 | ✅ `$Name` として | ❌ |
 
 形式 B で名前テーブル登録が不要な理由: `key["C-S-K"] = $WINDOW_CLOSE` は
-`KeySeq#idx` を直接参照するため `ys_get_keyseq_idx` を介さない。
+`KeySeq#idx` を直接参照するため名前解決を介さない。
 `.mayu` との相互運用が不要な純 Ruby 設定では形式 B で十分。
 
 C API 対応: `ys_reg_keyseq(name, actions)`
 
-- シンボル `:name` → 文字列 `"name"` に変換して登録
+- `"$Name"` → 先頭 `$` を除いた `"Name"` で登録
 - 重複登録は `ys_get_keyseq_idx` で既存インデックスを返す (べき等)
 - 戻り値は `Yamy::KeySeq` オブジェクト (内部に `keyseq_idx` を保持)
 
@@ -197,20 +202,17 @@ C API 対応: `ys_def_alias(alias_name, key_name)`
 
 ```ruby
 # キーワード to: で RHS を指定
-defsubst "*-LButton", to: $WINDOW_CLOSE          # KeySeq 変数 (コロンが並ばない)
-defsubst "*-LButton", to: :someseq               # シンボル (to: :name でコロンが並ぶ)
+defsubst "*-LButton", to: $WINDOW_CLOSE          # KeySeq 変数
+defsubst "*-LButton", to: "$SomeSeq"             # 名前参照 ($ シジル)
 defsubst "*-LButton", to: "S-A B C"              # インラインアクション文字列
 
 # LHS 複数指定
 defsubst ["*-LButton", "*-RButton"], to: $WINDOW_CLOSE
 ```
 
-`to: :someseq` はコロンが並んで見えるが、Ruby の構文上 `{to: :someseq}` として
-正しく解析される。視覚的に気になる場合は `$VAR` 形式を使う。
-
 C API 対応: `ys_def_subst(lhs_mod_keys, rhs_keyseq_idx)`
 
-RHS (`to:` の値) の解決は `key[...] =` と同じ規則 (Symbol / String / KeySeq)。
+RHS (`to:` の値) の解決は `key[...] =` と同じ規則 (String / Symbol / KeySeq)。
 
 ---
 
@@ -338,7 +340,7 @@ C API 対応: `ys_begin_keymap(keymap_type, name, window_class, window_title, op
 | `op: "&&"` (デフォルト) / `"||"` | `op` |
 | `parent: "Name"` | `parent_name` |
 | `default: "&Default"` | `default_keyseq_idx` (自動登録) |
-| `default: :seq_name` | `default_keyseq_idx` (シンボル解決) |
+| `default: "$SeqName"` | `default_keyseq_idx` (名前参照) |
 
 ---
 
@@ -352,7 +354,7 @@ C API 対応: `ys_begin_keymap(keymap_type, name, window_class, window_title, op
 
 ```ruby
 # LHS: 単一
-key["*IC-C-Yen"]  = :toggle_ime    # * = down+up
+key["*IC-C-Yen"]  = "$ToggleIME"   # * = down+up
 key["D-Z"]        = "&VK(RButton)" # D- = down only
 key["U-Z"]        = "&Ignore"      # U- = up only
 
@@ -397,8 +399,8 @@ C API 対応: `ys_assign_key(lhs_mod_keys, rhs_keyseq_idx)`
 
 | Ruby 値 | 例 | 変換 |
 |---------|-----|------|
-| `Symbol` | `:window_close` | `ys_get_keyseq_idx("window_close")` でインデックス取得 |
-| `String` | `"A-F4"` | `ys_reg_keyseq(nil, actions)` で匿名登録しインデックス取得 |
+| `String` | `"$WindowClose"` / `"A-F4"` | アクション文字列としてパースし `ys_reg_keyseq(nil, actions)` で匿名登録。`$Name` は名前付き keyseq への参照、裸のトークンはキー名 |
+| `Symbol` | `:"$WindowClose"` / `:Escape` | 同等の String と完全に同一視 (`:X` ≡ `"X"`) |
 | `KeySeq` | `$WINDOW_CLOSE` | `.idx` を直接使用 (名前テーブル不要) |
 
 #### `KeyMap` の概念実装
@@ -429,7 +431,7 @@ end
 ```ruby
 event["prefixed"]        = '&HelpMessage("Global", "ESC-")'
 event["before-key-down"] = "&HelpMessage"
-event["after-key-up"]    = :my_handler
+event["after-key-up"]    = "$MyHandler"
 ```
 
 C API 対応: `ys_assign_event(event_name, rhs_keyseq_idx)`
@@ -684,8 +686,8 @@ YS_API bool ys_reg_user_func(const char* func_name, ys_on_exec_user_func on_exec
 load "104.mayu"
 
 # キーシーケンス
-# 形式 A: シンボルで名前登録 (他の .rb / .mayu ファイルから参照する場合に有用)
-keyseq :toggle_ime,   "A-BackQuote"
+# 形式 A: 名前登録 (他の .rb / .mayu ファイルから参照する場合に有用)
+keyseq "$ToggleIME",  "A-BackQuote"
 
 # 形式 B: 変数保持 (コロンお見合い回避、to: $VAR で使いやすい)
 $WINDOW_CLOSE       = keyseq "A-F4"
@@ -694,7 +696,7 @@ $WM_VSCROLL_PAGEDOWN = keyseq "&PostMessage(ToItself, 277, 3, 0)"
 
 # Global キーマップ
 keymap "Global" do
-  key["*IC-C-Yen"]                  = :toggle_ime
+  key["*IC-C-Yen"]                  = "$ToggleIME"
   key["C-S-M",   "C-A-M"]          = "Applications"
   key["C-S-L",   "C-A-L"]          = "&WindowLower"
   key["C-S-R",   "C-A-R"]          = "&WindowRaise"
@@ -853,6 +855,17 @@ int main(int argc, char *argv[])  // UTF-8 activeCodePage マニフェスト使�
 
 - **`$VAR` のスコープ**: keyseq はもともとプロセス終了まで保持されるグローバルなリソース。
   Ruby グローバル変数 `$VAR` で保持することと整合しており、スコープ問題は生じない。
+
+- **keyseq 名の `$` 必須化**: `keyseq` の第一引数 (名前) は `"$Name"` 形式の String
+  のみ受理する。`$` は keyseq 名前空間を選ぶシジルで、参照側 (`"$Name"` /
+  `.mayu` の `$Name`) と定義側の表記が一致する。内部名は `$` を除いた裸の名前で
+  登録するため、パーサ・コンパイラ・旧 .mayu ローダーは影響を受けない。
+  Symbol による名前指定は廃止。
+
+- **RHS の Symbol は String と同一視**: `key[...] = :X` は `key[...] = "X"` と完全に
+  同じ意味 (アクション文字列としてパース)。かつての「Symbol は keyseq レジストリ
+  専用検索」という特殊動作は、`:Escape` (keyseq 参照) と `"Escape"` (キー押下) が
+  別物になり混乱を招くため廃止した。keyseq 参照は表記によらず `$` シジルで行う。
 
 - **`deffunc` とキーマップ定義の順序**: 順序制約なし。
   `ys_reg_user_func` の呼び出しタイミングはキューイングの順序に影響しない。

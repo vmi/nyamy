@@ -191,101 +191,101 @@ key["*E0ひらがな"]  = "*ひらがな"
 key["*E0無変換"]    = "*無変換"
 
 # key sequence definitions
-keyseq "ToggleIME",             "A-半角/全角"
-keyseq "CapsLock",              "S-英数"
+keyseq "$ToggleIME",             "A-半角/全角"
+keyseq "$CapsLock",              "S-英数"
 
-keyseq "SPACE",                 "~S-*Space"               #
-keyseq "EXCLAMATION_MARK",      "S-*_1"                   # !
-keyseq "QUOTATION_MARK",        "S-*_2"                   # "
-keyseq "NUMBER_SIGN",           "S-*_3"                   # #
-keyseq "DOLLAR_SIGN",           "S-*_4"                   # $
-keyseq "PERCENT_SIGN",          "S-*_5"                   # %
-keyseq "AMPERSAND",             "S-*_6"                   # &
-keyseq "APOSTROPHE",            "S-*_7"                   # '
-keyseq "LEFT_PARENTHESIS",      "S-*_8"                   # (
-keyseq "RIGHT_PARENTHESIS",     "S-*_9"                   # )
-keyseq "ASTERISK",              "S-*Colon"                # *
-keyseq "PLUS_SIGN",             "S-*Semicolon"            # +
-keyseq "COMMA",                 "~S-*Comma"               # ,
-keyseq "HYPHEN-MINUS",          "~S-*HyphenMinus"         # -
-keyseq "FULL_STOP",             "~S-*FullStop"            # .
-keyseq "SOLIDUS",               "~S-*Solidus"             # /
-keyseq "DIGIT_ZERO",            "~S-*_0"                  # 0
-keyseq "DIGIT_ONE",             "~S-*_1"                  # 1
-keyseq "DIGIT_TWO",             "~S-*_2"                  # 2
-keyseq "DIGIT_THREE",           "~S-*_3"                  # 3
-keyseq "DIGIT_FOUR",            "~S-*_4"                  # 4
-keyseq "DIGIT_FIVE",            "~S-*_5"                  # 5
-keyseq "DIGIT_SIX",             "~S-*_6"                  # 6
-keyseq "DIGIT_SEVEN",           "~S-*_7"                  # 7
-keyseq "DIGIT_EIGHT",           "~S-*_8"                  # 8
-keyseq "DIGIT_NINE",            "~S-*_9"                  # 9
-keyseq "COLON",                 "~S-*Colon"               # :
-keyseq "SEMICOLON",             "~S-*Semicolon"           # ;
-keyseq "LESS-THAN_SIGN",        "S-*Comma"                # <
-keyseq "EQUALS_SIGN",           "S-*HyphenMinus"          # =
-keyseq "GREATER-THAN_SIGN",     "S-*FullStop"             # >
-keyseq "QUESTION_MARK",         "S-*Solidus"              # ?
-keyseq "COMMERCIAL_AT",         "~S-*CommercialAt"        # @
-keyseq "LATIN_CAPITAL_LETTER_A", "S-*A"
-keyseq "LATIN_CAPITAL_LETTER_B", "S-*B"
-keyseq "LATIN_CAPITAL_LETTER_C", "S-*C"
-keyseq "LATIN_CAPITAL_LETTER_D", "S-*D"
-keyseq "LATIN_CAPITAL_LETTER_E", "S-*E"
-keyseq "LATIN_CAPITAL_LETTER_F", "S-*F"
-keyseq "LATIN_CAPITAL_LETTER_G", "S-*G"
-keyseq "LATIN_CAPITAL_LETTER_H", "S-*H"
-keyseq "LATIN_CAPITAL_LETTER_I", "S-*I"
-keyseq "LATIN_CAPITAL_LETTER_J", "S-*J"
-keyseq "LATIN_CAPITAL_LETTER_K", "S-*K"
-keyseq "LATIN_CAPITAL_LETTER_L", "S-*L"
-keyseq "LATIN_CAPITAL_LETTER_M", "S-*M"
-keyseq "LATIN_CAPITAL_LETTER_N", "S-*N"
-keyseq "LATIN_CAPITAL_LETTER_O", "S-*O"
-keyseq "LATIN_CAPITAL_LETTER_P", "S-*P"
-keyseq "LATIN_CAPITAL_LETTER_Q", "S-*Q"
-keyseq "LATIN_CAPITAL_LETTER_R", "S-*R"
-keyseq "LATIN_CAPITAL_LETTER_S", "S-*S"
-keyseq "LATIN_CAPITAL_LETTER_T", "S-*T"
-keyseq "LATIN_CAPITAL_LETTER_U", "S-*U"
-keyseq "LATIN_CAPITAL_LETTER_V", "S-*V"
-keyseq "LATIN_CAPITAL_LETTER_W", "S-*W"
-keyseq "LATIN_CAPITAL_LETTER_X", "S-*X"
-keyseq "LATIN_CAPITAL_LETTER_Y", "S-*Y"
-keyseq "LATIN_CAPITAL_LETTER_Z", "S-*Z"
-keyseq "LEFT_SQUARE_BRACKET",   "~S-*LeftSquareBracket"   # [
-keyseq "REVERSE_SOLIDUS",       "~S-*ReverseSolidus"      # \
-keyseq "RIGHT_SQUARE_BRACKET",  "~S-*RightSquareBracket"  # ]
-keyseq "CIRCUMFLEX_ACCENT",     "~S-*CircumflexAccent"    # ^
-keyseq "LOW_LINE",              "S-*ReverseSolidus"       # _
-keyseq "GRAVE_ACCENT",          "S-*CommercialAt"         # `
-keyseq "LATIN_SMALL_LETTER_A",  "~S-*A"
-keyseq "LATIN_SMALL_LETTER_B",  "~S-*B"
-keyseq "LATIN_SMALL_LETTER_C",  "~S-*C"
-keyseq "LATIN_SMALL_LETTER_D",  "~S-*D"
-keyseq "LATIN_SMALL_LETTER_E",  "~S-*E"
-keyseq "LATIN_SMALL_LETTER_F",  "~S-*F"
-keyseq "LATIN_SMALL_LETTER_G",  "~S-*G"
-keyseq "LATIN_SMALL_LETTER_H",  "~S-*H"
-keyseq "LATIN_SMALL_LETTER_I",  "~S-*I"
-keyseq "LATIN_SMALL_LETTER_J",  "~S-*J"
-keyseq "LATIN_SMALL_LETTER_K",  "~S-*K"
-keyseq "LATIN_SMALL_LETTER_L",  "~S-*L"
-keyseq "LATIN_SMALL_LETTER_M",  "~S-*M"
-keyseq "LATIN_SMALL_LETTER_N",  "~S-*N"
-keyseq "LATIN_SMALL_LETTER_O",  "~S-*O"
-keyseq "LATIN_SMALL_LETTER_P",  "~S-*P"
-keyseq "LATIN_SMALL_LETTER_Q",  "~S-*Q"
-keyseq "LATIN_SMALL_LETTER_R",  "~S-*R"
-keyseq "LATIN_SMALL_LETTER_S",  "~S-*S"
-keyseq "LATIN_SMALL_LETTER_T",  "~S-*T"
-keyseq "LATIN_SMALL_LETTER_U",  "~S-*U"
-keyseq "LATIN_SMALL_LETTER_V",  "~S-*V"
-keyseq "LATIN_SMALL_LETTER_W",  "~S-*W"
-keyseq "LATIN_SMALL_LETTER_X",  "~S-*X"
-keyseq "LATIN_SMALL_LETTER_Y",  "~S-*Y"
-keyseq "LATIN_SMALL_LETTER_Z",  "~S-*Z"
-keyseq "LEFT_CURLY_BRACKET",    "S-*LeftSquareBracket"    # {
-keyseq "VERTICAL_LINE",         "S-*YenSign"              # |
-keyseq "RIGHT_CURLY_BRACKET",   "S-*RightSquareBracket"   # }
-keyseq "TILDE",                 "S-*CircumflexAccent"     # ~
+keyseq "$SPACE",                 "~S-*Space"               #
+keyseq "$EXCLAMATION_MARK",      "S-*_1"                   # !
+keyseq "$QUOTATION_MARK",        "S-*_2"                   # "
+keyseq "$NUMBER_SIGN",           "S-*_3"                   # #
+keyseq "$DOLLAR_SIGN",           "S-*_4"                   # $
+keyseq "$PERCENT_SIGN",          "S-*_5"                   # %
+keyseq "$AMPERSAND",             "S-*_6"                   # &
+keyseq "$APOSTROPHE",            "S-*_7"                   # '
+keyseq "$LEFT_PARENTHESIS",      "S-*_8"                   # (
+keyseq "$RIGHT_PARENTHESIS",     "S-*_9"                   # )
+keyseq "$ASTERISK",              "S-*Colon"                # *
+keyseq "$PLUS_SIGN",             "S-*Semicolon"            # +
+keyseq "$COMMA",                 "~S-*Comma"               # ,
+keyseq "$HYPHEN-MINUS",          "~S-*HyphenMinus"         # -
+keyseq "$FULL_STOP",             "~S-*FullStop"            # .
+keyseq "$SOLIDUS",               "~S-*Solidus"             # /
+keyseq "$DIGIT_ZERO",            "~S-*_0"                  # 0
+keyseq "$DIGIT_ONE",             "~S-*_1"                  # 1
+keyseq "$DIGIT_TWO",             "~S-*_2"                  # 2
+keyseq "$DIGIT_THREE",           "~S-*_3"                  # 3
+keyseq "$DIGIT_FOUR",            "~S-*_4"                  # 4
+keyseq "$DIGIT_FIVE",            "~S-*_5"                  # 5
+keyseq "$DIGIT_SIX",             "~S-*_6"                  # 6
+keyseq "$DIGIT_SEVEN",           "~S-*_7"                  # 7
+keyseq "$DIGIT_EIGHT",           "~S-*_8"                  # 8
+keyseq "$DIGIT_NINE",            "~S-*_9"                  # 9
+keyseq "$COLON",                 "~S-*Colon"               # :
+keyseq "$SEMICOLON",             "~S-*Semicolon"           # ;
+keyseq "$LESS-THAN_SIGN",        "S-*Comma"                # <
+keyseq "$EQUALS_SIGN",           "S-*HyphenMinus"          # =
+keyseq "$GREATER-THAN_SIGN",     "S-*FullStop"             # >
+keyseq "$QUESTION_MARK",         "S-*Solidus"              # ?
+keyseq "$COMMERCIAL_AT",         "~S-*CommercialAt"        # @
+keyseq "$LATIN_CAPITAL_LETTER_A", "S-*A"
+keyseq "$LATIN_CAPITAL_LETTER_B", "S-*B"
+keyseq "$LATIN_CAPITAL_LETTER_C", "S-*C"
+keyseq "$LATIN_CAPITAL_LETTER_D", "S-*D"
+keyseq "$LATIN_CAPITAL_LETTER_E", "S-*E"
+keyseq "$LATIN_CAPITAL_LETTER_F", "S-*F"
+keyseq "$LATIN_CAPITAL_LETTER_G", "S-*G"
+keyseq "$LATIN_CAPITAL_LETTER_H", "S-*H"
+keyseq "$LATIN_CAPITAL_LETTER_I", "S-*I"
+keyseq "$LATIN_CAPITAL_LETTER_J", "S-*J"
+keyseq "$LATIN_CAPITAL_LETTER_K", "S-*K"
+keyseq "$LATIN_CAPITAL_LETTER_L", "S-*L"
+keyseq "$LATIN_CAPITAL_LETTER_M", "S-*M"
+keyseq "$LATIN_CAPITAL_LETTER_N", "S-*N"
+keyseq "$LATIN_CAPITAL_LETTER_O", "S-*O"
+keyseq "$LATIN_CAPITAL_LETTER_P", "S-*P"
+keyseq "$LATIN_CAPITAL_LETTER_Q", "S-*Q"
+keyseq "$LATIN_CAPITAL_LETTER_R", "S-*R"
+keyseq "$LATIN_CAPITAL_LETTER_S", "S-*S"
+keyseq "$LATIN_CAPITAL_LETTER_T", "S-*T"
+keyseq "$LATIN_CAPITAL_LETTER_U", "S-*U"
+keyseq "$LATIN_CAPITAL_LETTER_V", "S-*V"
+keyseq "$LATIN_CAPITAL_LETTER_W", "S-*W"
+keyseq "$LATIN_CAPITAL_LETTER_X", "S-*X"
+keyseq "$LATIN_CAPITAL_LETTER_Y", "S-*Y"
+keyseq "$LATIN_CAPITAL_LETTER_Z", "S-*Z"
+keyseq "$LEFT_SQUARE_BRACKET",   "~S-*LeftSquareBracket"   # [
+keyseq "$REVERSE_SOLIDUS",       "~S-*ReverseSolidus"      # \
+keyseq "$RIGHT_SQUARE_BRACKET",  "~S-*RightSquareBracket"  # ]
+keyseq "$CIRCUMFLEX_ACCENT",     "~S-*CircumflexAccent"    # ^
+keyseq "$LOW_LINE",              "S-*ReverseSolidus"       # _
+keyseq "$GRAVE_ACCENT",          "S-*CommercialAt"         # `
+keyseq "$LATIN_SMALL_LETTER_A",  "~S-*A"
+keyseq "$LATIN_SMALL_LETTER_B",  "~S-*B"
+keyseq "$LATIN_SMALL_LETTER_C",  "~S-*C"
+keyseq "$LATIN_SMALL_LETTER_D",  "~S-*D"
+keyseq "$LATIN_SMALL_LETTER_E",  "~S-*E"
+keyseq "$LATIN_SMALL_LETTER_F",  "~S-*F"
+keyseq "$LATIN_SMALL_LETTER_G",  "~S-*G"
+keyseq "$LATIN_SMALL_LETTER_H",  "~S-*H"
+keyseq "$LATIN_SMALL_LETTER_I",  "~S-*I"
+keyseq "$LATIN_SMALL_LETTER_J",  "~S-*J"
+keyseq "$LATIN_SMALL_LETTER_K",  "~S-*K"
+keyseq "$LATIN_SMALL_LETTER_L",  "~S-*L"
+keyseq "$LATIN_SMALL_LETTER_M",  "~S-*M"
+keyseq "$LATIN_SMALL_LETTER_N",  "~S-*N"
+keyseq "$LATIN_SMALL_LETTER_O",  "~S-*O"
+keyseq "$LATIN_SMALL_LETTER_P",  "~S-*P"
+keyseq "$LATIN_SMALL_LETTER_Q",  "~S-*Q"
+keyseq "$LATIN_SMALL_LETTER_R",  "~S-*R"
+keyseq "$LATIN_SMALL_LETTER_S",  "~S-*S"
+keyseq "$LATIN_SMALL_LETTER_T",  "~S-*T"
+keyseq "$LATIN_SMALL_LETTER_U",  "~S-*U"
+keyseq "$LATIN_SMALL_LETTER_V",  "~S-*V"
+keyseq "$LATIN_SMALL_LETTER_W",  "~S-*W"
+keyseq "$LATIN_SMALL_LETTER_X",  "~S-*X"
+keyseq "$LATIN_SMALL_LETTER_Y",  "~S-*Y"
+keyseq "$LATIN_SMALL_LETTER_Z",  "~S-*Z"
+keyseq "$LEFT_CURLY_BRACKET",    "S-*LeftSquareBracket"    # {
+keyseq "$VERTICAL_LINE",         "S-*YenSign"              # |
+keyseq "$RIGHT_CURLY_BRACKET",   "S-*RightSquareBracket"   # }
+keyseq "$TILDE",                 "S-*CircumflexAccent"     # ~

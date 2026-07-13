@@ -11,7 +11,7 @@ if symbol_defined?("KBD104")
 end
 
 # key sequences
-keyseq "WindowClose", "A-F4"
+keyseq "$WindowClose", "A-F4"
 
 # Global keymap
 keymap "Global" do
@@ -149,8 +149,8 @@ window "ComboBox",      class: ':ComboBox(:Edit)?$', parent: "EmacsEdit" do
 end
 
 # general Windows settings
-keyseq "WM_VSCROLL/SB_PAGEUP",   "&PostMessage(ToItself, 277, 2, 0)"
-keyseq "WM_VSCROLL/SB_PAGEDOWN", "&PostMessage(ToItself, 277, 3, 0)"
+keyseq "$WM_VSCROLL/SB_PAGEUP",   "&PostMessage(ToItself, 277, 2, 0)"
+keyseq "$WM_VSCROLL/SB_PAGEDOWN", "&PostMessage(ToItself, 277, 3, 0)"
 
 keymap2 "GeneralC-X", parent: "EmacsC-X" do
   key["C-S"] = "C-S"
@@ -202,12 +202,12 @@ window "MayuLog", class: 'mayu\.exe:#32770:Button', title: 'ログ - 窓使い�
 end
 
 # Console
-keyseq "ConsoleWindowClass/copy",       "&PostMessage(ToItself, 274, 65520, 0)"
-keyseq "ConsoleWindowClass/paste",      "&PostMessage(ToItself, 274, 65521, 0)"
-keyseq "ConsoleWindowClass/region",     "&PostMessage(ToItself, 274, 65522, 0)"
-keyseq "ConsoleWindowClass/scroll",     "&PostMessage(ToItself, 274, 65523, 0)"
-keyseq "ConsoleWindowClass/search",     "&PostMessage(ToItself, 274, 65524, 0)"
-keyseq "ConsoleWindowClass/select-all", "&PostMessage(ToItself, 274, 65525, 0)"
+keyseq "$ConsoleWindowClass/copy",       "&PostMessage(ToItself, 274, 65520, 0)"
+keyseq "$ConsoleWindowClass/paste",      "&PostMessage(ToItself, 274, 65521, 0)"
+keyseq "$ConsoleWindowClass/region",     "&PostMessage(ToItself, 274, 65522, 0)"
+keyseq "$ConsoleWindowClass/scroll",     "&PostMessage(ToItself, 274, 65523, 0)"
+keyseq "$ConsoleWindowClass/search",     "&PostMessage(ToItself, 274, 65524, 0)"
+keyseq "$ConsoleWindowClass/select-all", "&PostMessage(ToItself, 274, 65525, 0)"
 
 window "ConsoleWindowClass", class: '^ConsoleWindowClass$', parent: "Global" do
   key["C-S-K", "C-A-K"] = "A-Space C"
@@ -219,7 +219,7 @@ window "ConsoleWindowClass", class: '^ConsoleWindowClass$', parent: "Global" do
 end
 
 # Explorer, Internet Explorer
-keyseq "Explorer/show-folder-bar", "&PostMessage(ToMainWindow, 273, 41525, 0)"
+keyseq "$Explorer/show-folder-bar", "&PostMessage(ToMainWindow, 273, 41525, 0)"
 
 window "ExplorerList", class: 'EXPLORER.*:SHELLDLL_DefView:.*SysListView32$', parent: "SysListView32" do
   key["S-R"]   = "F2"
@@ -265,9 +265,9 @@ window "MULE", class: ':MULE$', parent: "Emacsen"
 window "Emacs", class: ':Emacs$', parent: "Emacsen"
 
 # Notepad
-keyseq "Notepad/new",     "&PostMessage(ToParentWindow, 273, 9, 0)"
-keyseq "Notepad/open",    "&PostMessage(ToParentWindow, 273, 10, 0)"
-keyseq "Notepad/save-as", "&PostMessage(ToParentWindow, 273, 1, 0)"
+keyseq "$Notepad/new",     "&PostMessage(ToParentWindow, 273, 9, 0)"
+keyseq "$Notepad/open",    "&PostMessage(ToParentWindow, 273, 10, 0)"
+keyseq "$Notepad/save-as", "&PostMessage(ToParentWindow, 273, 1, 0)"
 
 keymap2 "NotepadC-X", parent: "GeneralC-X" do
   event["prefixed"] = '&HelpMessage("メモ帳 C-x-", "C-x C-s\t上書き保存\r\n" "C-x C-f\t開く\t\r\n" "C-x k\t\t新規作成\r\n" "C-x C-c\t終了")'
@@ -285,7 +285,7 @@ window "Notepad", class: ':Notepad:Edit$', parent: "EmacsEdit" do
 end
 
 # ASTEC-X
-keyseq "ASTEC-X/copy-to-x", "&PostMessage(ToItself, 274, 16, 0)"
+keyseq "$ASTEC-X/copy-to-x", "&PostMessage(ToItself, 274, 16, 0)"
 
 window "ASTEC-X", class: ':ASTEC-X$', parent: "Global" do
   key["C-Yen"]        = "&Default"
@@ -367,7 +367,7 @@ window "TeraTerm", class: 'TTermPRO\.exe:VTWin32$', parent: "Global" do
 end
 
 # Waffle
-keyseq "WaffleMark/cancel", "Left Right"
+keyseq "$WaffleMark/cancel", "Left Right"
 
 window "Waffle", class: 'WITALK2\.EXE:.*:RichEdit(20A)?$', parent: "Global"
 keymap2 "WaffleMark", parent: "Waffle", default: "$WaffleMark/cancel &KeymapParent"

@@ -80,20 +80,21 @@ static void printPendingException(mrb_state *mrb, const char *prefix)
 }
 
 // Resolve a Ruby value (String / Symbol / Yamy::KeySeq) to a keyseq index.
+// A Symbol is treated exactly like the equivalent String: both are parsed
+// as action text, where "$Name" refers to a named keyseq and a bare token
+// is a key name.
 static int resolveRhs(mrb_state *mrb, mrb_value rhs)
 {
-	if (mrb_symbol_p(rhs)) {
-		mrb_sym sym = mrb_symbol(rhs);
-		mrb_int len;
-		const char *name = mrb_sym_name_len(mrb, sym, &len);
-		int idx = ys_get_keyseq_idx(name);
-		if (idx < 0)
-			mrb_raisef(mrb, E_RUNTIME_ERROR, "keyseq :%s not found", name);
-		return idx;
-	}
-
-	if (mrb_string_p(rhs)) {
-		std::string actions = toStdStr(mrb, rhs);
+	if (mrb_string_p(rhs) || mrb_symbol_p(rhs)) {
+		std::string actions;
+		if (mrb_symbol_p(rhs)) {
+			mrb_int len;
+			const char *name =
+				mrb_sym_name_len(mrb, mrb_symbol(rhs), &len);
+			actions.assign(name, static_cast<size_t>(len));
+		} else {
+			actions = toStdStr(mrb, rhs);
+		}
 		int idx = ys_reg_keyseq(nullptr, actions.c_str());
 		if (idx < 0)
 			raiseApiError(mrb, "ys_reg_keyseq failed");
@@ -492,14 +493,20 @@ static mrb_value dsl_keyseq(mrb_state *mrb, mrb_value self)
 	if (mrb_nil_p(arg2)) {
 		actions_s = toStdStr(mrb, arg1);
 		actions   = actions_s.c_str();
-	} else if (mrb_symbol_p(arg1)) {
-		mrb_sym sym = mrb_symbol(arg1);
-		mrb_int len;
-		name      = mrb_sym_name_len(mrb, sym, &len);
-		actions_s = toStdStr(mrb, arg2);
-		actions   = actions_s.c_str();
 	} else {
-		name_s    = toStdStr(mrb, arg1);
+		// The name must be a String starting with `$' so that the
+		// definition matches its "$Name" references in action strings.
+		// The `$' is a namespace sigil, not part of the registered name.
+		if (!mrb_string_p(arg1))
+			mrb_raise(mrb, E_TYPE_ERROR, "keyseq name must be a String");
+		name_s = toStdStr(mrb, arg1);
+		if (name_s.empty() || name_s[0] != '$')
+			mrb_raise(mrb, E_ARGUMENT_ERROR,
+				"keyseq name must start with `$' "
+				"(e.g. keyseq \"$WindowClose\", ...)");
+		name_s.erase(0, 1);
+		if (name_s.empty())
+			mrb_raise(mrb, E_ARGUMENT_ERROR, "keyseq name is empty");
 		name      = name_s.c_str();
 		actions_s = toStdStr(mrb, arg2);
 		actions   = actions_s.c_str();

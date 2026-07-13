@@ -38,13 +38,13 @@ keymap "EmacsMove", parent: "Global" do
 end
 
 # Emacs-like editing command key sequences
-keyseq "EmacsEdit/kill-word",          "S-C-Right C-X"
-keyseq "EmacsEdit/backward-kill-word", "S-C-Left C-X"
-keyseq "EmacsEdit/transpose-chars",    "S-Right C-X Left C-V Right"
-keyseq "EmacsEdit/upcase-word",        "S-C-Right C-C *&Sync &ClipboardUpcaseWord C-V"
-keyseq "EmacsEdit/downcase-word",      "S-C-Right C-C *&Sync &ClipboardDowncaseWord C-V"
-keyseq "EmacsEdit/kill-line",          "&EmacsEditKillLineFunc S-End C-X &Sync &EmacsEditKillLinePred((Delete), (Return Left))"
-keyseq "EmacsMark/cancel",             "Left Right"
+keyseq "$EmacsEdit/kill-word",          "S-C-Right C-X"
+keyseq "$EmacsEdit/backward-kill-word", "S-C-Left C-X"
+keyseq "$EmacsEdit/transpose-chars",    "S-Right C-X Left C-V Right"
+keyseq "$EmacsEdit/upcase-word",        "S-C-Right C-C *&Sync &ClipboardUpcaseWord C-V"
+keyseq "$EmacsEdit/downcase-word",      "S-C-Right C-C *&Sync &ClipboardDowncaseWord C-V"
+keyseq "$EmacsEdit/kill-line",          "&EmacsEditKillLineFunc S-End C-X &Sync &EmacsEditKillLinePred((Delete), (Return Left))"
+keyseq "$EmacsMark/cancel",             "Left Right"
 
 keymap "EmacsEdit", parent: "EmacsMove"
 keymap2 "EmacsMark", parent: "EmacsEdit", default: "$EmacsMark/cancel &KeymapWindow"
