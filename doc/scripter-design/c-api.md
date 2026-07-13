@@ -194,10 +194,38 @@ YS_API YsStrs* ys_get_home_directories(void);
 YS_API bool ys_resolve_config_path(const char*  name,
                                     const char** out_path);
 
+// キー名またはスキャンコード文字列をスキャンコード WORD 値に解決する
+// WORD は (prefix<<8)|code。prefix は 0x00(通常)/0xE0/0xE1 で、
+// レジストリ Scancode Map と同じエンコード。
+// str: 先行する ys_def_key で定義済みのキー名 (大文字小文字非区別、エイリアス可)、
+//      またはスキャンコードリテラル ("0x1c", "E0-0x1c", "E1-0x0f", 十進 "28")。
+//      キー名を優先し、未定義の場合はリテラルとして解釈する。
+// 返り値: WORD 値 (0..0xE1FF)。解決不能なら -1
+// on_load_setting 内でのみ有効 (キー名解決は ys_def_key 実行後に有効)
+YS_API int ys_sc_resolve(const char* str);
+
+// キャッシュ済みレジストリ Scancode Map のエントリ数を返す
+// マップは初回アクセス時に遅延読み込みされ、新しい設定ロードでクリアされる。
+// Scancode Map 未設定 / 値が不正な場合は 0 を返す
+YS_API int ys_scancode_map_length(void);
+
+// Scancode Map の 1 エントリを WORD 値で読み出す (エンコードは ys_sc_resolve 参照)
+// from_word: 変換元スキャンコード, to_word: 変換先スキャンコード (0 はキー無効化)
+// 両 out ポインタは NULL 可。idx が範囲外なら false を返す
+YS_API bool ys_scancode_map_entry(int idx, unsigned* from_word, unsigned* to_word);
+
 // 最後のエラーメッセージを返す (UTF-8 NUL 終端)
 // エラーなし / 未発生の場合は NULL を返す
 YS_API const char* ys_last_error(void);
 ```
+
+> **C++ 専用ヘルパー (`extern "C"` 外)**
+> `parseScancodeMapBlob(const unsigned char* data, size_t len, std::vector<std::pair<uint16_t,uint16_t>>& out)`
+> — レジストリ "Scancode Map" の生バイナリ blob を (変換元, 変換先) WORD ペア列に
+> パースする。単体テストから直接呼べるよう `YS_API` で export している。
+> blob レイアウト: header1(4) + header2(4) + count(4) + count 個の DWORD エントリ
+> (末尾は null 終端なのでマッピング数は count-1)。各 DWORD は HIWORD=変換元・
+> LOWORD=変換先。不正な blob では false を返し out を空にする。
 
 ### 初期化処理とイベントループ
 

@@ -16,11 +16,14 @@
 #include "setting_dump.h"
 #include "setting.h"
 #include "symbols.h"
+#include "yamy_scripter.h"   // parseScancodeMapBlob (exported test helper)
 
 #include <windows.h>
 #include <cstdio>
+#include <cstdint>
 #include <fstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 
@@ -253,7 +256,103 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 3;
+	// parseScancodeMapBlob: exercise the registry-blob parser directly with
+	// hand-built blobs (independent of the machine's actual Scancode Map).
+	{
+		printf("[%d] parseScancodeMapBlob ... ", idx + 4);
+		fflush(stdout);
+
+		auto makeBlob = [](std::vector<uint32_t> entries) {
+			// header1, header2, count(=entries incl. null terminator)
+			std::vector<uint32_t> dwords = { 0, 0,
+				(uint32_t)(entries.size() + 1) };
+			for (uint32_t e : entries) dwords.push_back(e);
+			dwords.push_back(0); // null terminator entry
+			std::vector<unsigned char> bytes;
+			for (uint32_t d : dwords) {
+				bytes.push_back((unsigned char)(d & 0xFF));
+				bytes.push_back((unsigned char)((d >> 8) & 0xFF));
+				bytes.push_back((unsigned char)((d >> 16) & 0xFF));
+				bytes.push_back((unsigned char)((d >> 24) & 0xFF));
+			}
+			return bytes;
+		};
+
+		bool ok = true;
+		std::vector<std::pair<uint16_t, uint16_t>> out;
+
+		// CapsLock(0x3A) -> LeftCtrl(0x1D): entry HIWORD=from, LOWORD=to.
+		auto b1 = makeBlob({ 0x003A001Du });
+		ok = ok && parseScancodeMapBlob(b1.data(), b1.size(), out)
+		        && out.size() == 1
+		        && out[0].first == 0x3A && out[0].second == 0x1D;
+
+		// Extended source RightCtrl(E0-0x1D) and a disabled key (to == 0).
+		auto b2 = makeBlob({ 0xE01D001Du, 0x003A0000u });
+		ok = ok && parseScancodeMapBlob(b2.data(), b2.size(), out)
+		        && out.size() == 2
+		        && out[0].first == 0xE01D && out[0].second == 0x1D
+		        && out[1].first == 0x3A   && out[1].second == 0x0000;
+
+		// Malformed: too short, and a count that overruns the buffer.
+		unsigned char tooShort[8] = { 0 };
+		ok = ok && !parseScancodeMapBlob(tooShort, sizeof(tooShort), out)
+		        && out.empty();
+		unsigned char badCount[12] = { 0,0,0,0, 0,0,0,0, 0xFF,0xFF,0,0 };
+		ok = ok && !parseScancodeMapBlob(badCount, sizeof(badCount), out);
+
+		if (ok) {
+			printf("OK\n");
+		} else {
+			printf("FAIL\n");
+			++failures;
+		}
+	}
+
+	// sc() / ScancodeMap DSL surface: a script that asserts the contract and
+	// raises on any mismatch.  buildSetting returns null if the script raised.
+	{
+		printf("[%d] sc() / ScancodeMap DSL ... ", idx + 5);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__sc_test__.rb",
+			L"defkey \"ScTestA\", \"ScAliasA\", scan: \"0x1e\"\n"
+			L"defkey \"ScTestExt\", scan: \"E0-0x1d\"\n"
+			L"raise \"sc int\"        unless sc(0x1c) == 0x1c\n"
+			L"raise \"sc int ext\"    unless sc(0xE10F) == 0xE10F\n"
+			L"raise \"sc hex str\"    unless sc(\"0x1c\") == 0x1c\n"
+			L"raise \"sc E1 str\"     unless sc(\"E1-0x0f\") == 0xE10F\n"
+			L"raise \"sc dec str\"    unless sc(\"28\") == 0x1c\n"
+			L"raise \"sc name\"       unless sc(\"ScTestA\") == 0x1e\n"
+			L"raise \"sc alias\"      unless sc(\"ScAliasA\") == 0x1e\n"
+			L"raise \"sc icase\"      unless sc(\"sctesta\") == 0x1e\n"
+			L"raise \"sc ext name\"   unless sc(\"ScTestExt\") == 0xe01d\n"
+			L"def expect_arg_error\n"
+			L"  yield\n"
+			L"  false\n"
+			L"rescue ArgumentError\n"
+			L"  true\n"
+			L"end\n"
+			L"raise \"range err\"     unless expect_arg_error { sc(0x10000) }\n"
+			L"raise \"unknown name\"  unless expect_arg_error { sc(\"NoSuchKeyXYZ\") }\n"
+			L"raise \"to is array\"   unless ScancodeMap.to(0x1d).is_a?(Array)\n"
+			L"m = ScancodeMap[0x3a]\n"
+			L"unless m.nil?\n"
+			L"  raise \"map/to consistency\" unless ScancodeMap.to(m).include?(0x3a)\n"
+			L"end\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__sc_test__.rb", syms);
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (script raised or no commit)\n");
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 5;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

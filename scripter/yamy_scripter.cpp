@@ -49,8 +49,11 @@
 #include <io.h>
 #include <sstream>
 #include <unordered_map>
+#include <map>
+#include <utility>
 #include <vector>
 #include <string>
+#include <windows.h>
 
 
 //=============================================================================
@@ -140,6 +143,35 @@ static wstringi  g_configPath;
 // User-function registry: funcName -> handler
 static std::unordered_map<std::string, ys_on_exec_user_func> g_userFuncs;
 
+// Key-name -> scan-code WORD table, populated alongside ys_def_key.
+// The WORD is (prefix<<8)|code, prefix 0x00/0xE0/0xE1 (see cmdScanToWord).
+// Used by ys_sc_resolve to turn a defined key name into its first scan code.
+// Case-insensitive lookup via wstringi's comparator; cleared on reset.
+static std::map<wstringi, uint16_t> g_keyNameToScan;
+
+// Cached registry Scancode Map, as (from, to) WORD pairs.
+// Read lazily on first query (g_scancodeMapLoaded guards the one-shot read),
+// discarded by resetQueue so a fresh setting load re-reads the registry.
+static std::vector<std::pair<uint16_t, uint16_t>> g_scancodeMap;
+static bool g_scancodeMapLoaded = false;
+
+// Scan-code extension flag bits.  These mirror ScanCode::E0 / ScanCode::E1 in
+// keyboard.h (via KEYBOARD_INPUT_DATA in driver.h), which is exactly what
+// CmdScanCode.flags carries after MayuCompiler::compileScanCode.  Duplicated
+// here as small constants to avoid pulling the engine headers into the DLL.
+static const uint16_t kScanFlagE0 = 2;
+static const uint16_t kScanFlagE1 = 4;
+
+// Pack a CmdScanCode into the (prefix<<8)|code WORD form used by the DSL and
+// the registry Scancode Map (high byte 0xE0/0xE1 for extended keys).
+static uint16_t cmdScanToWord(const CmdScanCode& sc)
+{
+	uint16_t prefix = 0;
+	if (sc.flags & kScanFlagE1)      prefix = 0xE100;
+	else if (sc.flags & kScanFlagE0) prefix = 0xE000;
+	return static_cast<uint16_t>(prefix | (sc.scan & 0xFF));
+}
+
 // Last error string (UTF-8)
 static std::string g_lastError;
 
@@ -203,6 +235,9 @@ static void resetQueue()
 	g_keyseqByName.clear();
 	g_cmdQueue.clear();
 	g_userFuncs.clear();
+	g_keyNameToScan.clear();
+	g_scancodeMap.clear();
+	g_scancodeMapLoaded = false;
 }
 
 // Release queue buffers after a successful CmdCommit.
@@ -697,6 +732,13 @@ YS_API bool ys_def_key(const YsStrs* names, const YsStrs* scancodes)
 		if (!parseScanCode("ys_def_key", p, len, sc)) return false;
 		d.scanCodes.push_back(sc);
 	}
+
+	// Record name -> first-scan-code so ys_sc_resolve can map key names.
+	// Later definitions win, matching Keyboard::addKey's last-wins lookup.
+	uint16_t word = cmdScanToWord(d.scanCodes[0]);
+	for (const auto& n : d.names)
+		g_keyNameToScan[n] = word;
+
 	g_cmdQueue.push_back(QueueEntry::makeDirect(std::move(d)));
 	return true;
 }
@@ -937,6 +979,96 @@ YS_API bool ys_include_mayu(const char* path)
 		return setError(std::string("ys_include_mayu: file not found: ") + path);
 
 	g_cmdQueue.push_back(QueueEntry::makeInclude(std::wstring(resolved)));
+	return true;
+}
+
+
+//=============================================================================
+// Scan-code query API  (valid only from within on_load_setting)
+//=============================================================================
+
+// Parse a raw registry "Scancode Map" blob (see header for layout).
+YS_API bool parseScancodeMapBlob(const unsigned char* data, size_t len,
+	std::vector<std::pair<uint16_t, uint16_t>>& out)
+{
+	out.clear();
+	if (!data || len < 12) return false;
+
+	auto readDword = [data](size_t off) -> uint32_t {
+		return  static_cast<uint32_t>(data[off])
+		     | (static_cast<uint32_t>(data[off + 1]) << 8)
+		     | (static_cast<uint32_t>(data[off + 2]) << 16)
+		     | (static_cast<uint32_t>(data[off + 3]) << 24);
+	};
+
+	uint32_t count = readDword(8);       // number of entries incl. null terminator
+	if (count < 1) return false;          // must hold at least the terminator
+	// header (12) + count DWORDs must fit in the blob.
+	if (len < static_cast<size_t>(12) + static_cast<size_t>(count) * 4)
+		return false;
+
+	size_t mappings = count - 1;          // last entry is the null terminator
+	out.reserve(mappings);
+	for (size_t i = 0; i < mappings; ++i) {
+		uint32_t e = readDword(12 + i * 4);
+		uint16_t from = static_cast<uint16_t>(e >> 16);   // HIWORD = original
+		uint16_t to   = static_cast<uint16_t>(e & 0xFFFF); // LOWORD = remapped
+		out.emplace_back(from, to);
+	}
+	return true;
+}
+
+// Read (and cache) the registry Scancode Map on first access.
+static void loadScancodeMapOnce()
+{
+	if (g_scancodeMapLoaded) return;
+	g_scancodeMapLoaded = true;
+	g_scancodeMap.clear();
+
+	DWORD size = 0;
+	LSTATUS st = RegGetValueW(HKEY_LOCAL_MACHINE,
+		L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout",
+		L"Scancode Map", RRF_RT_REG_BINARY, nullptr, nullptr, &size);
+	if (st != ERROR_SUCCESS || size == 0) return;
+
+	std::vector<unsigned char> buf(size);
+	st = RegGetValueW(HKEY_LOCAL_MACHINE,
+		L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout",
+		L"Scancode Map", RRF_RT_REG_BINARY, nullptr, buf.data(), &size);
+	if (st != ERROR_SUCCESS) return;
+
+	parseScancodeMapBlob(buf.data(), buf.size(), g_scancodeMap);
+}
+
+YS_API int ys_sc_resolve(const char* str)
+{
+	if (!str || !*str) return -1;
+
+	// Key names take priority over scan-code literals.
+	auto it = g_keyNameToScan.find(wstringi(from_UTF8(str)));
+	if (it != g_keyNameToScan.end())
+		return it->second;
+
+	// Fall back to parsing str as a scan-code literal ("0x1c", "E0-0x1c", "28").
+	AstScanCode sc;
+	if (!MayuParser::parseScanCode(wstringi(from_UTF8(str)), sc))
+		return -1;
+	return cmdScanToWord(MayuCompiler::compileScanCode(sc));
+}
+
+YS_API int ys_scancode_map_length(void)
+{
+	loadScancodeMapOnce();
+	return static_cast<int>(g_scancodeMap.size());
+}
+
+YS_API bool ys_scancode_map_entry(int idx, unsigned* from_word, unsigned* to_word)
+{
+	loadScancodeMapOnce();
+	if (idx < 0 || idx >= static_cast<int>(g_scancodeMap.size()))
+		return false;
+	if (from_word) *from_word = g_scancodeMap[idx].first;
+	if (to_word)   *to_word   = g_scancodeMap[idx].second;
 	return true;
 }
 

@@ -233,6 +233,103 @@ C API 対応: `ys_def_option(option_name, value)`
 
 ---
 
+## スキャンコード照会 (`sc` / `ScancodeMap`)
+
+レジストリ Scancode Map (HKLM レベルのキー入れ替え) が既に設定されている環境で、
+yamy 側で同じキーを二重に入れ替えないよう条件分岐するための照会 API。
+
+Scancode Map は kbdclass ドライバで適用されるため、yamy には変換**後**のスキャンコードが
+届く。「レジストリで済んでいれば yamy 側マッピングをスキップ」という判定に使う。
+
+### スキャンコード整数表現
+
+`sc` / `ScancodeMap` はスキャンコードを整数で受け渡しする。
+レジストリ Scancode Map の WORD 表現 (上位バイト = 0xE0/0xE1 プレフィクス、
+下位バイト = コード) とそのまま一致する。
+
+| 範囲 | 意味 |
+|------|------|
+| `0x00`–`0xFF` | プレーンスキャンコード |
+| `0xE000`–`0xE0FF` | E0 プレフィクス (拡張キー) |
+| `0xE100`–`0xE1FF` | E1 プレフィクス |
+
+範囲外の整数は `ArgumentError`。
+
+### `sc(キー名 or スキャンコード)` — 正規化
+
+キー名またはスキャンコード表現をスキャンコード整数に解決する。
+
+```ruby
+sc(0x1c)        # => 0x1c        (整数はそのまま。範囲検査のみ)
+sc(0xE10F)      # => 0xE10F
+sc("0x1c")      # => 0x1c        (スキャンコード文字列)
+sc("E1-0x0f")   # => 0xE10F
+sc("28")        # => 0x1c        (十進文字列)
+sc("LShift")    # => 0x2a        (defkey 定義済みキー名。第一引数の正規名に一致)
+sc("lshift")    # => 0x2a        (大文字小文字は非区別)
+```
+
+- 文字列はまず `defkey` 定義済みキー名 (エイリアス含む) として解決し、
+  見つからなければスキャンコードリテラルとしてパースする。
+- 実在するキー名はスキャンコードリテラル (`0x`/`E0-`/`E1-`/十進) と衝突しない。
+- キー名でもスキャンコード表現でも解釈不能な場合、範囲外整数の場合は `ArgumentError`。
+- キー名解決はそのキーの `defkey` 実行後 (例: `load "109.mayu.rb"` 後) に有効。
+
+C API 対応: `ys_sc_resolve(str)` (整数の範囲検査はバインディング層)
+
+### `ScancodeMap` — レジストリマップの参照 (読み取り専用モジュール)
+
+```ruby
+ScancodeMap[変換前]        # => 変換後スキャンコード整数 (マッピングなしは nil)
+ScancodeMap.from(変換前)   # => 同上 ([] のエイリアス)
+ScancodeMap.to(変換後)     # => [変換元スキャンコード整数, ...] (なければ空配列)
+```
+
+- 引数は整数・キー名 String・スキャンコード文字列いずれも可 (`sc()` と同じ解決)。
+- `.to` は複数の変換元が同じ変換先を持ちうるため配列を返す。
+- 変換先 `0x0000` (キー無効化) は整数 `0` を返す (`nil` = マッピングなしと区別できる)。
+- レジストリ値なし / パース不能時は空マップ扱い。
+- 実レジストリ Scancode Map は E0 のみ対応するため、結果に E1 (`0xE1nn`) は現れない。
+
+使用例:
+
+```ruby
+# LAlt⇔RAlt: レジストリ Scancode Map で両キーが未使用のときのみ yamy で入れ替え
+if ScancodeMap["LeftAlt"].nil?  && ScancodeMap.to("LeftAlt").empty? &&
+   ScancodeMap["RightAlt"].nil? && ScancodeMap.to("RightAlt").empty?
+  defsubst "*LAlt", to: "*RAlt"
+  defsubst "*RAlt", to: "*LAlt"
+end
+```
+
+`ScancodeMap["LeftAlt"].nil?` だけでは「他キー→LeftAlt へのマップ (LeftAlt が
+変換先として使われているケース)」を見落とすため、上記のように `.to(...).empty?` を
+併用する。
+
+C API 対応: `ys_scancode_map_length()` / `ys_scancode_map_entry(idx, from, to)`
+
+- レジストリ読み取りは HKLM の `SYSTEM\CurrentControlSet\Control\Keyboard Layout`
+  の `Scancode Map` 値 (`RegGetValueW`)。読み取りに管理者権限は不要。
+- 初回照会時に読んでキャッシュし、設定ロード (`resetQueue`) でキャッシュ破棄する
+  (本番はリロード毎にプロセス再起動のため実質毎回読み直し)。
+
+### 対応範囲
+
+本機能は mruby DSL (`.mayu.rb`) のみに実装する。レジストリ参照＋条件分岐という
+手続き的機能であり、宣言的なレガシーテキスト `.mayu` 形式には実装しない。
+純テキスト設定のユーザーは薄い `.mayu.rb` ラッパから `include_mayu "既存.mayu"` で
+取り込みつつ本機能を利用できる。
+
+### 実装メモ (キー名→スキャンコード表)
+
+`defkey` は元来 yamy へのコマンド送信のみで名前→スキャンコードを保持しないため、
+`ys_def_key` 内でキュー push と同時に併走テーブル `g_keyNameToScan`
+(`std::map<wstringi, uint16_t>`、大文字小文字非区別) へ第一スキャンコードの WORD を
+登録する。既存キーは後定義が優先 (`Keyboard::addKey` の後勝ちルックアップと一致)。
+このテーブルも `resetQueue` でクリアされる。
+
+---
+
 ## 条件シンボル (`define` / `symbol_defined?`)
 
 `.mayu` の `define SYM` と `if ( SYM )` に対応する DSL。
@@ -642,6 +739,8 @@ mruby バインディング実装時に追加された C API:
 - `ys_include_mayu(path)` — 指定パスの .mayu をコンパイルしてキューに積む
 - `ys_last_error()` — 最後のエラーメッセージを返す (UTF-8 NUL 終端、なければ NULL)
 - `ys_exec_keyseq(actions)` — キーシーケンスを実行 (`on_exec_user_func` 内でのみ有効)
+- `ys_sc_resolve(str)` — キー名 / スキャンコード文字列をスキャンコード WORD に解決 (`sc` の実体)
+- `ys_scancode_map_length()` / `ys_scancode_map_entry(idx, from, to)` — レジストリ Scancode Map の列挙 (`ScancodeMap` の実体)
 
 コールバック typedef:
 

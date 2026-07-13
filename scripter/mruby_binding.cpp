@@ -961,6 +961,71 @@ static mrb_value yamy_last_error(mrb_state *mrb, mrb_value)
 	return mrb_str_new_cstr(mrb, msg);
 }
 
+// Resolve a scan-code argument (Integer or key/scan-code String) to a WORD
+// value in the range 0x00-0xFF / 0xE000-0xE1FF, or raise ArgumentError.
+// Integer: range-checked and returned as is.  Symbols / other objects are
+// coerced to string (matching the DSL's symbol-as-string convention).
+static int scResolveArgOrRaise(mrb_state *mrb, mrb_value v)
+{
+	if (mrb_integer_p(v)) {
+		mrb_int n = mrb_integer(v);
+		bool inRange = (n >= 0 && n <= 0xFF) || (n >= 0xE000 && n <= 0xE1FF);
+		if (!inRange)
+			mrb_raisef(mrb, E_ARGUMENT_ERROR,
+				"scan code out of range: 0x%x "
+				"(expected 0x00-0xFF, 0xE000-0xE1FF)", (int)n);
+		return (int)n;
+	}
+	std::string s = toStdStr(mrb, v);
+	int word = ys_sc_resolve(s.c_str());
+	if (word < 0)
+		mrb_raisef(mrb, E_ARGUMENT_ERROR,
+			"unknown key name or scan code: %s", s.c_str());
+	return word;
+}
+
+// DSL#sc(key_or_scancode)  ->  scan-code integer (0x00-0xFF / 0xE000-0xE1FF)
+static mrb_value dsl_sc(mrb_state *mrb, mrb_value self)
+{
+	(void)self;
+	mrb_value v;
+	mrb_get_args(mrb, "o", &v);
+	return mrb_int_value(mrb, scResolveArgOrRaise(mrb, v));
+}
+
+// ScancodeMap[from] / ScancodeMap.from(from)  ->  remapped scan code or nil
+static mrb_value scancodemap_from(mrb_state *mrb, mrb_value self)
+{
+	(void)self;
+	mrb_value v;
+	mrb_get_args(mrb, "o", &v);
+	int from = scResolveArgOrRaise(mrb, v);
+	int n = ys_scancode_map_length();
+	for (int i = 0; i < n; ++i) {
+		unsigned f = 0, t = 0;
+		if (ys_scancode_map_entry(i, &f, &t) && (int)f == from)
+			return mrb_int_value(mrb, (mrb_int)t);
+	}
+	return mrb_nil_value();
+}
+
+// ScancodeMap.to(to)  ->  [original scan code, ...]  (empty when unmapped)
+static mrb_value scancodemap_to(mrb_state *mrb, mrb_value self)
+{
+	(void)self;
+	mrb_value v;
+	mrb_get_args(mrb, "o", &v);
+	int to = scResolveArgOrRaise(mrb, v);
+	mrb_value ary = mrb_ary_new(mrb);
+	int n = ys_scancode_map_length();
+	for (int i = 0; i < n; ++i) {
+		unsigned f = 0, t = 0;
+		if (ys_scancode_map_entry(i, &f, &t) && (int)t == to)
+			mrb_ary_push(mrb, ary, mrb_int_value(mrb, (mrb_int)f));
+	}
+	return ary;
+}
+
 
 //=============================================================================
 // yamy_mruby_init_internal  (static; called from mruby_on_load_setting)
@@ -1030,6 +1095,13 @@ static void yamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, dsl_cls, "symbol_defined?", dsl_symbol_defined_p, MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, dsl_cls, "deffunc",     dsl_deffunc,     MRB_ARGS_ANY());
 	mrb_define_method(mrb, dsl_cls, "exec_keyseq", dsl_exec_keyseq, MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, dsl_cls, "sc",          dsl_sc,          MRB_ARGS_REQ(1));
+
+	// ScancodeMap: read-only view of the registry Scancode Map (top-level module).
+	struct RClass *scmap = mrb_define_module(mrb, "ScancodeMap");
+	mrb_define_module_function(mrb, scmap, "[]",   scancodemap_from, MRB_ARGS_REQ(1));
+	mrb_define_module_function(mrb, scmap, "from", scancodemap_from, MRB_ARGS_REQ(1));
+	mrb_define_module_function(mrb, scmap, "to",   scancodemap_to,   MRB_ARGS_REQ(1));
 
 	// GC-protect the func table hash as a module constant
 	g_funcTable = mrb_hash_new(mrb);

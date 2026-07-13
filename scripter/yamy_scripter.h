@@ -209,6 +209,30 @@ YS_API bool ys_include_mayu(const char* path);
 
 
 //=============================================================================
+// Scan-code query API  (valid only from within on_load_setting)
+//=============================================================================
+
+/// Resolve a key name or scan-code string to its scan-code WORD value.
+/// The WORD is (prefix << 8) | code, where prefix is 0x00 (plain), 0xE0, or 0xE1
+/// -- the same encoding used by the registry Scancode Map.
+/// str: a key name defined by a prior ys_def_key (case-insensitive, aliases
+///      included), or a scan-code literal ("0x1c", "E0-0x1c", "E1-0x0f", "28").
+///      Key names take priority; a name that is not defined is parsed as a literal.
+/// Returns the WORD value (0..0xE1FF) on success, or -1 if unresolvable.
+YS_API int ys_sc_resolve(const char* str);
+
+/// Number of entries in the (cached) registry Scancode Map.
+/// The map is read lazily on first access and cleared by a new setting load.
+/// Returns 0 when no Scancode Map is configured or the value is malformed.
+YS_API int ys_scancode_map_length(void);
+
+/// Read one Scancode Map entry as WORD values (see ys_sc_resolve for the encoding).
+/// from_word: original scan code, to_word: remapped scan code (0 means disabled).
+/// Both out pointers may be NULL.  Returns false if idx is out of range.
+YS_API bool ys_scancode_map_entry(int idx, unsigned* from_word, unsigned* to_word);
+
+
+//=============================================================================
 // Path resolution API  (valid from on_load_setting and on_exec_user_func)
 //=============================================================================
 
@@ -248,4 +272,26 @@ YS_API const char* ys_last_error(void);
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
+
+
+//=============================================================================
+// C++-only helpers (exported for unit tests)
+//=============================================================================
+
+#ifdef __cplusplus
+#include <vector>
+#include <utility>
+
+/// Parse a raw registry "Scancode Map" REG_BINARY blob into (from, to) WORD
+/// pairs.  Layout: header1(4) + header2(4) + count(4) + count*DWORD entries,
+/// where the last entry is a null terminator, so the number of mappings is
+/// count-1.  Each entry DWORD packs HIWORD = original scan code, LOWORD =
+/// remapped scan code (0 disables the key).  A WORD is (prefix<<8)|code with
+/// the high byte 0x00 or 0xE0 (extended).
+/// out receives (from=HIWORD, to=LOWORD) for every mapping entry.
+/// Returns false (and leaves out empty) when the blob is malformed.
+YS_API bool parseScancodeMapBlob(const unsigned char* data, size_t len,
+	std::vector<std::pair<uint16_t, uint16_t>>& out);
+#endif // __cplusplus
+
 #endif // _YAMY_SCRIPTER_H
