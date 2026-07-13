@@ -18,14 +18,14 @@ keymap "EmacsMove", parent: "Global" do
   key["C-P"]       = "Up"
   key["C-Q"]       = "&Prefix(KeymapDefault)"
   key["C-S"]       = "C-F"
-  key["C-V"]       = "Next" unless symbol?("ZXCV")
+  key["C-V"]       = "Next" unless symbol_defined?("ZXCV")
   key["M-V"]       = "Prior"
   key["S-Home"]    = "S-C-Home"
   key["S-End"]     = "S-C-End"
   key["S-M-Comma"] = "C-Home"
   key["S-M-Period"] = "C-End"
 
-  if symbol?("EmacsMove/ShiftSelection")
+  if symbol_defined?("EmacsMove/ShiftSelection")
     key["S-C-A"] = "S-Home"
     key["S-C-B"] = "S-Left"
     key["S-C-E"] = "S-End"
@@ -101,11 +101,11 @@ keymap "EmacsEdit" do
   key["C-K"]        = "$EmacsEdit/kill-line"
   key["C-M"]        = "Return"
   key["C-O"]        = "Return Left"
-  key["C-T"]        = "$EmacsEdit/transpose-chars" unless symbol?("GANA")
+  key["C-T"]        = "$EmacsEdit/transpose-chars" unless symbol_defined?("GANA")
   key["C-W"]        = "C-X"
   key["M-W"]        = "C-C"
   key["C-U"]        = "&Variable(0, 4) &Prefix(EmacsC-U)"
-  key["C-X"]        = "&Prefix(EmacsC-X)" unless symbol?("ZXCV")
+  key["C-X"]        = "&Prefix(EmacsC-X)" unless symbol_defined?("ZXCV")
   key["C-Y"]        = "C-V"
   key["C-Slash"]    = "C-Z"
   key["M-U"]        = "$EmacsEdit/upcase-word"
@@ -124,7 +124,7 @@ keymap2 "EmacsMark" do
   key["C-G"]        = "$EmacsMark/cancel &Undefined"
   key["C-N"]        = "S-Down    &Prefix(EmacsMark)"
   key["C-P"]        = "S-Up      &Prefix(EmacsMark)"
-  key["C-V"]        = "S-Next    &Prefix(EmacsMark)" unless symbol?("ZXCV")
+  key["C-V"]        = "S-Next    &Prefix(EmacsMark)" unless symbol_defined?("ZXCV")
   key["M-V"]        = "S-Prior   &Prefix(EmacsMark)"
   key["C-W"]        = "C-X Left Right"
   key["M-W"]        = "C-C Left Right"
@@ -134,9 +134,9 @@ keymap2 "EmacsMark" do
   key["Up"]         = "S-Up      &Prefix(EmacsMark)"
   key["Right"]      = "S-Right   &Prefix(EmacsMark)"
   key["Down"]       = "S-Down    &Prefix(EmacsMark)"
-  if symbol?("MAP-ESCAPE-TO-META")
+  if symbol_defined?("MAP-ESCAPE-TO-META")
     key["Escape"] = "&Prefix(EmacsMarkEscape) &EditNextModifier(M-)"
-    if symbol?("KBD109") && !symbol?("KBD104on109")
+    if symbol_defined?("KBD109") && !symbol_defined?("KBD104on109")
       key["半角/全角"]   = "&Prefix(EmacsMarkEscape) &EditNextModifier(M-)"
       key["E0半角/全角"] = "&Prefix(EmacsMarkEscape) &EditNextModifier(M-)"
     end

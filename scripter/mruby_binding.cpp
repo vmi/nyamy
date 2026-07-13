@@ -789,8 +789,8 @@ static mrb_value dsl_define(mrb_state *mrb, mrb_value self)
 	return mrb_true_value();
 }
 
-// DSL#symbol?(name)  ->  true if <name> is defined   (mirrors .mayu `if (name)`)
-static mrb_value dsl_symbol_p(mrb_state *mrb, mrb_value self)
+// DSL#symbol_defined?(name)  ->  true if <name> is defined   (mirrors .mayu `if (name)`)
+static mrb_value dsl_symbol_defined_p(mrb_state *mrb, mrb_value self)
 {
 	(void)self;
 	mrb_value name_v;
@@ -881,8 +881,8 @@ static void yamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, dsl_cls, "key",       dsl_key,      MRB_ARGS_NONE());
 	mrb_define_method(mrb, dsl_cls, "event",     dsl_event,    MRB_ARGS_NONE());
 	mrb_define_method(mrb, dsl_cls, "mod",       dsl_mod,      MRB_ARGS_NONE());
-	mrb_define_method(mrb, dsl_cls, "define",      dsl_define,      MRB_ARGS_REQ(1));
-	mrb_define_method(mrb, dsl_cls, "symbol?",     dsl_symbol_p,    MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, dsl_cls, "define",          dsl_define,          MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, dsl_cls, "symbol_defined?", dsl_symbol_defined_p, MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, dsl_cls, "deffunc",     dsl_deffunc,     MRB_ARGS_ANY());
 	mrb_define_method(mrb, dsl_cls, "exec_keyseq", dsl_exec_keyseq, MRB_ARGS_REQ(1));
 
@@ -981,7 +981,7 @@ bool mruby_on_load_setting(void* exeCtx)
 	mrb_define_const(mrb, yamy, "FUNC_TABLE", g_funcTable);
 
 	// 7. Evaluate the script on a fresh Yamy::DSL instance so that the DSL
-	//    methods (keymap, key, event, mod, symbol?, define, load, ...) are in
+	//    methods (keymap, key, event, mod, symbol_defined?, define, load, ...) are in
 	//    scope for the top-level script.  DSL#load instance_eval's a .rb file
 	//    on the same object (and compiles a .mayu file via ys_include_mayu).
 	{

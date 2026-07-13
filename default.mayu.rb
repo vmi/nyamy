@@ -1,8 +1,8 @@
 # default.mayu.rb -- Ruby (mruby) version of default.mayu
 # Emacs-like general configuration.
 
-load "109.mayu.rb" unless symbol?("KBD109") || symbol?("KBD104")
-if symbol?("KBD104")
+load "109.mayu.rb" unless symbol_defined?("KBD109") || symbol_defined?("KBD104")
+if symbol_defined?("KBD104")
   defalias "↑",   as: "Up"
   defalias "↓",   as: "Down"
   defalias "←",   as: "Left"
@@ -52,7 +52,7 @@ keymap "Global" do
   key["C-S-U"]                = "&WindowRedraw"
   key["C-S-S"]                = '&LoadSetting &HelpMessage(Mayu, "再読込完了")'
   key["C-S-F1"]               = "&InvestigateCommand"
-  unless symbol?("EmacsMove/ShiftSelection")
+  unless symbol_defined?("EmacsMove/ShiftSelection")
     key["C-S-A", "C-S-B"] = "&WindowClingToLeft"
     key["C-S-F", "C-S-E"] = "&WindowClingToRight"
     key["C-S-P"]          = "&WindowClingToTop"
@@ -60,13 +60,13 @@ keymap "Global" do
     key["C-S-V"]          = "&WindowMoveVisibly"
   end
 
-  if symbol?("KBD109") && !symbol?("KBD104on109")
+  if symbol_defined?("KBD109") && !symbol_defined?("KBD104on109")
     key["*半角/全角"]   = "*Esc"
     key["*E0半角/全角"] = "*Esc"
     key["*Esc"]         = "*半角/全角"
   end
 
-  if symbol?("KBD109")
+  if symbol_defined?("KBD109")
     mod[:control] += "英数"
     key["*英数"]   = "*LControl"
     mod[:control] += "E0英数"
@@ -78,8 +78,8 @@ keymap "Global" do
     key["*E0CapsLock"] = "*LControl"
   end
 
-  if symbol?("GANA")
-    if symbol?("KBD109")
+  if symbol_defined?("GANA")
+    if symbol_defined?("KBD109")
       mod[:alt] += "!!無変換"
       mod[:alt] += "!!E0無変換"
       key["*無変換"]   = "*無変換"
@@ -104,9 +104,9 @@ keymap2 "GlobalEscape", parent: "Global", default: "&KeymapParent" do
 end
 
 keymap "Global" do
-  if symbol?("MAP-ESCAPE-TO-META")
+  if symbol_defined?("MAP-ESCAPE-TO-META")
     key["Escape"] = "&Prefix(GlobalEscape) &EditNextModifier(M-)"
-    if symbol?("KBD109") && !symbol?("KBD104on109")
+    if symbol_defined?("KBD109") && !symbol_defined?("KBD104on109")
       key["半角/全角"] = "&Prefix(GlobalEscape) &EditNextModifier(M-)"
     end
   end
@@ -114,7 +114,7 @@ end
 
 # almost-everything default keymap
 keymap "KeymapDefault", default: "&Default" do
-  if symbol?("KBD109")
+  if symbol_defined?("KBD109")
     mod[:control] += "英数"
     key["*英数"]   = "*LControl"
     mod[:control] += "E0英数"
@@ -125,8 +125,8 @@ keymap "KeymapDefault", default: "&Default" do
     mod[:control] += "E0CapsLock"
     key["*E0CapsLock"] = "*LControl"
   end
-  if symbol?("GANA")
-    if symbol?("KBD109")
+  if symbol_defined?("GANA")
+    if symbol_defined?("KBD109")
       mod[:alt] += "!!無変換"
       mod[:alt] += "!!E0無変換"
       key["*無変換"]   = "*無変換"
@@ -247,8 +247,8 @@ window "MicrosoftJava", class: ':Microsoft VM For Java\(TM\) Host Window Class:'
 # Emacs
 keymap "Emacsen", parent: "Global" do
   key["C-Yen"] = "&Default"
-  if symbol?("MAP-ESCAPE-TO-META")
-    if symbol?("KBD109") && !symbol?("KBD104on109")
+  if symbol_defined?("MAP-ESCAPE-TO-META")
+    if symbol_defined?("KBD109") && !symbol_defined?("KBD104on109")
       key["*半角/全角"]   = "*Esc"
       key["*E0半角/全角"] = "*Esc"
       key["*Esc"]         = "*半角/全角"
@@ -279,7 +279,7 @@ keymap2 "NotepadC-X", parent: "GeneralC-X" do
 end
 
 window "Notepad", class: ':Notepad:Edit$', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(NotepadC-X)" unless symbol?("ZXCV")
+  key["C-X"] = "&Prefix(NotepadC-X)" unless symbol_defined?("ZXCV")
   key["C-S"] = "F3"
   key["M-J"] = "C-G"
 end
@@ -294,11 +294,11 @@ end
 
 # Becky! Internet Mail
 window "BeckyInternetMail", class: 'Rebecca\.exe:BeckyComposeFrameClass:', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol?("ZXCV")
+  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 window "BeckyInternetMail2", class: 'B2\.exe:Becky2ComposeFrame:', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol?("ZXCV")
+  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft PowerPoint
@@ -307,26 +307,26 @@ keymap2 "PowerPointC-X", parent: "GeneralC-X" do
 end
 
 window "PowerPoint", class: 'POWERPNT\.EXE:.*:(paneClassDC|REComboBox20W|RichEdit20W)$', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(PowerPointC-X)" unless symbol?("ZXCV")
+  key["C-X"] = "&Prefix(PowerPointC-X)" unless symbol_defined?("ZXCV")
 end
 
 window "PowerPoint2", class: 'POWERPNT\.EXE:PP9FrameClass.*', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(PowerPointC-X)" unless symbol?("ZXCV")
+  key["C-X"] = "&Prefix(PowerPointC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft Visual Basic 6.0
 window "VisualBasic", class: 'vb6\.exe:.*:VbaWindow$', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol?("ZXCV")
+  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft Word
 window "MicrosoftWord", class: 'WINWORD\.EXE:.*:_WwG$', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol?("ZXCV")
+  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft Excel
 window "MicrosoftExcel", class: 'EXCEL\.EXE:XLMAIN:', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol?("ZXCV")
+  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft Pinball
@@ -361,7 +361,7 @@ window "TeraTerm", class: 'TTermPRO\.exe:VTWin32$', parent: "Global" do
   key["S-Prior"]      = "C-Prior"
   key["S-Next"]       = "C-Next"
   key["IC-M-X", "IL-M-X"] = "$ToggleIME M-X"
-  if symbol?("KBD109")
+  if symbol_defined?("KBD109")
     key["C-S-ReverseSolidus"] = "C-S-HyphenMinus"
   end
 end
@@ -468,7 +468,7 @@ window "WindowsMineSweeper", class: 'winmine.exe:マインスイーパ$', parent
 end
 
 # ICQ2000
-if symbol?("GANA")
+if symbol_defined?("GANA")
   window "ICQMessageSession", class: 'ICQ\.exe:#32770:Edit$', title: 'Message Session', parent: "EmacsEdit" do
     key["Enter"] = "M-S"
   end
