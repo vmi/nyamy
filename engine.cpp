@@ -779,6 +779,77 @@ void Engine::resetModifiersIfIdle()
 }
 
 
+// convert a single scan code to a virtual key code for GetAsyncKeyState.
+// returns 0 if the scan code has no reliable VK mapping.
+static USHORT scanCodeToVKey(const ScanCode &i_sc)
+{
+	if (i_sc.m_flags & ScanCode::E1)
+		return 0;
+	bool isE0 = !!(i_sc.m_flags & ScanCode::E0);
+	// fixed table for modifier keys; MAPVK_VSC_TO_VK_EX support for
+	// E0-prefixed scan codes varies between Windows versions
+	switch (i_sc.m_scan) {
+	case 0x2a:
+		return isE0 ? 0 : VK_LSHIFT;	// E0 0x2a is a fake shift prefix
+	case 0x36:
+		return isE0 ? 0 : VK_RSHIFT;
+	case 0x1d:
+		return isE0 ? VK_RCONTROL : VK_LCONTROL;
+	case 0x38:
+		return isE0 ? VK_RMENU : VK_LMENU;
+	case 0x5b:
+		return isE0 ? VK_LWIN : 0;
+	case 0x5c:
+		return isE0 ? VK_RWIN : 0;
+	}
+	UINT scan = i_sc.m_scan | (isE0 ? 0xe000 : 0);
+	return static_cast<USHORT>(MapVirtualKey(scan, MAPVK_VSC_TO_VK_EX));
+}
+
+
+// drop pressed-key marks that no longer match the OS key state.
+// The low-level hook consumes physical events and re-injects them, so
+// GetAsyncKeyState() mirrors what this engine has output: a key marked
+// m_isPressedOnWin32 but reported up by the OS means its release
+// bypassed the hook (secure desktop, elevated foreground window).
+// Keys the engine did not echo (true modifiers, substituted keys) are
+// unverifiable and dropped only when i_force is true (session unlock).
+void Engine::resyncKeyStates(bool i_force)
+{
+	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	auto s = m_setting.load(std::memory_order_acquire);
+	if (!s)
+		return;
+	// a stale pressed mark always keeps the count above zero
+	if (m_currentKeyPressCount <= 0 && !i_force)
+		return;
+
+	bool dropped = false;
+	for (Keyboard::KeyIterator i = s->m_keyboard.getKeyIterator(); *i; ++ i) {
+		Key *key = *i;
+		if (!key->m_isPressed)
+			continue;
+		USHORT vkey = 0;
+		if (key->m_isPressedOnWin32 && key->getScanCodesSize() == 1)
+			vkey = scanCodeToVKey(key->getScanCodes()[0]);
+		bool stale = vkey
+					 ? !(GetAsyncKeyState(vkey) & 0x8000)
+					 : i_force;
+		if (stale) {
+			{
+				Acquire a(&m_log, 1);
+				m_log << L"* resync: drop stale key " << *key << std::endl;
+			}
+			key->m_isPressed = false;
+			-- m_currentKeyPressCount;
+			dropped = true;
+		}
+	}
+	if (dropped)
+		resetModifiersIfIdle();
+}
+
+
 unsigned int WINAPI Engine::keyboardDetour(Engine *i_this, WPARAM i_wParam, LPARAM i_lParam)
 {
 	return i_this->keyboardDetour(reinterpret_cast<KBDLLHOOKSTRUCT*>(i_lParam));
@@ -1014,7 +1085,15 @@ void Engine::keyboardHandler()
 			}
 
 			if (m_inputQueue->empty()) {
+				// check the flag only after ResetEvent; the reverse order
+				// would let a request between the check and ResetEvent be
+				// deferred until the next key event
 				ResetEvent(m_readEvent);
+				if (m_resyncForceRequested.exchange(false)) {
+					ReleaseMutex(m_queueMutex);
+					resyncKeyStates(true);
+					WaitForSingleObject(m_queueMutex, INFINITE);
+				}
 				continue;
 			}
 
@@ -1028,6 +1107,11 @@ void Engine::keyboardHandler()
 
 		}
 		ReleaseMutex(m_queueMutex);
+
+		// a resync request may be consumed here instead of in the empty
+		// branch above when key events arrive together with the request
+		if (m_resyncForceRequested.exchange(false))
+			resyncKeyStates(true);
 
 		checkFocusWindow();
 
@@ -1094,6 +1178,11 @@ void Engine::keyboardHandler()
 			updateLastPressedKey(NULL);
 			continue;
 		}
+
+		// drop stale pressed marks before evaluating modifiers so the
+		// first key after returning from a secure desktop or an elevated
+		// foreground window is interpreted with the real modifier state
+		resyncKeyStates(false);
 
 		Current c;
 		c.m_keymap = m_currentKeymap;
@@ -1228,6 +1317,7 @@ Engine::Engine(womsgstream &i_log)
 		m_generateKeyboardEventsRecursionGuard(0),
 		m_currentKeyPressCount(0),
 		m_currentKeyPressCountOnWin32(0),
+		m_resyncForceRequested(false),
 		m_lastGeneratedKey(NULL),
 		m_oneShotRepeatableRepeatCount(0),
 		m_isPrefix(false),
@@ -1454,35 +1544,10 @@ Engine::Current Engine::reconstructCurrentFromContext(const TriggerInfo &ctx,
 
 void Engine::unlocked()
 {
-	if (!m_inputQueue) {
-		return;
-	}
-
-	releaseKey(0x5b);    // left win
-	releaseKey(0x38);    // left alt
-	releaseKey(0x1d);    // left ctrl
-	releaseKey(0x2a);    // left shift
-	//releaseKey(0x3a);  // caps lock
-	//releaseKey(0x01);  // Esc
-}
-
-void Engine::releaseKey(uint16_t scanCode)
-{
-	WaitForSingleObject(m_queueMutex, INFINITE);
-
-	KEYBOARD_INPUT_DATA kid;
-	kid.UnitId = 0;
-	kid.MakeCode = scanCode;
-	kid.Flags = 0;
-	kid.Flags |= KEYBOARD_INPUT_DATA::BREAK;
-	if (scanCode == 0x5b || scanCode == 0x3a) {
-		kid.Flags |= KEYBOARD_INPUT_DATA::E0;
-	}
-	kid.Reserved = 0;
-	kid.ExtraInformation = 0;
-	m_inputQueue->push_back(kid);
+	// store the flag before SetEvent so the handler thread, which
+	// re-checks the flag after ResetEvent, cannot miss the request
+	m_resyncForceRequested.store(true);
 	SetEvent(m_readEvent);
-	ReleaseMutex(m_queueMutex);
 }
 
 void Engine::checkShow(HWND i_hwnd) {

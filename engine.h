@@ -225,6 +225,8 @@ private:
                                                     phisically ? */
 	int m_currentKeyPressCountOnWin32;		/** how many keys are pressed
                                                     on win32 ? */
+	std::atomic<bool> m_resyncForceRequested;	/** force resyncKeyStates
+                                                    on next handler wakeup */
 	Key *m_lastGeneratedKey;			/// last generated key
 	Key *m_lastPressedKey[2];			/// last pressed key
 	ModifiedKey m_oneShotKey;			/// one shot key
@@ -326,6 +328,9 @@ private:
 
 	/// release modifiers and reset counters when no key is pressed
 	void resetModifiersIfIdle();
+
+	/// drop pressed-key marks that no longer match the OS key state
+	void resyncKeyStates(bool i_force);
 
 	/// get current modifiers
 	Modifier getCurrentModifiers(Key *i_key, bool i_isPressed);
@@ -588,9 +593,8 @@ public:
 		return m_isEnabled;
 	}
 
-	//
+	/// request a forced key state resync (called on session unlock)
 	void unlocked();
-	void releaseKey(uint16_t scanCode);
 
 	/// associated window
 	void setAssociatedWndow(HWND i_hwnd) {
