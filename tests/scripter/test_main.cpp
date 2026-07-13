@@ -76,14 +76,18 @@ struct Combo {
 
 int main()
 {
-	// Resolve our own directory; config / script files are copied next to us by
-	// the build, and .rb `load` resolves relative to the current directory.
+	// Resolve our own directory; config / script files are copied next to us
+	// by the build.  Deliberately move the cwd away from it: relative .rb
+	// loads must resolve via $LOAD_PATH (script directory + home
+	// directories), never via the current directory.
 	wchar_t exePath[MAX_PATH] = {};
 	GetModuleFileNameW(nullptr, exePath, MAX_PATH);
 	std::wstring exeDir(exePath);
 	size_t slash = exeDir.find_last_of(L"\\/");
 	if (slash != std::wstring::npos) exeDir.resize(slash);
-	SetCurrentDirectoryW(exeDir.c_str());
+	size_t parentSlash = exeDir.find_last_of(L"\\/");
+	if (parentSlash != std::wstring::npos)
+		SetCurrentDirectoryW(exeDir.substr(0, parentSlash).c_str());
 
 	std::string exeDirU8 = wideToUtf8(exeDir);
 	std::string rbScript    = exeDirU8 + "\\dot.mayu.rb";
@@ -165,7 +169,91 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 1;
+	// $LOAD_PATH / require semantics:
+	//  - a relative .rb load resolves via $LOAD_PATH (script directory)
+	//  - require evaluates a feature once and returns true / false
+	//  - directories pushed onto $LOAD_PATH by the script are honored
+	{
+		printf("[%d] load path / require ... ", idx + 2);
+		fflush(stdout);
+
+		std::wstring subDir = exeDir + L"\\__lp_sub__";
+		CreateDirectoryW(subDir.c_str(), nullptr);
+		writeUtf8File(exeDir + L"\\__lp_load_lib__.rb",
+			L"$load_lib_count = ($load_lib_count || 0) + 1\n");
+		writeUtf8File(exeDir + L"\\__lp_req_lib__.rb",
+			L"$req_lib_count = ($req_lib_count || 0) + 1\n");
+		writeUtf8File(subDir + L"\\__lp_sub_lib__.rb", L"$sub_loaded = true\n");
+
+		// Escape backslashes for use in a Ruby string literal.
+		std::wstring subDirRb;
+		for (wchar_t c : subDir) {
+			subDirRb += c;
+			if (c == L'\\') subDirRb += L'\\';
+		}
+
+		writeUtf8File(exeDir + L"\\__lp_main__.rb",
+			L"load \"__lp_load_lib__.rb\"\n"
+			L"raise \"load via $LOAD_PATH failed\" unless $load_lib_count == 1\n"
+			L"r1 = require \"__lp_req_lib__\"\n"
+			L"r2 = require \"__lp_req_lib__\"\n"
+			L"raise \"require should return true then false, got \" +\n"
+			L"      [r1, r2].inspect unless r1 == true && r2 == false\n"
+			L"raise \"require evaluated the file twice\" unless $req_lib_count == 1\n"
+			L"$LOAD_PATH.push \"" + subDirRb + L"\"\n"
+			L"load \"__lp_sub_lib__.rb\"\n"
+			L"raise \"load via pushed $LOAD_PATH entry failed\" unless $sub_loaded\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__lp_main__.rb", syms);
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (script raised or no commit)\n");
+			++failures;
+		}
+	}
+
+	// Default-script probe: with no script argument the scripter searches
+	// the home directories for ".mayu.rb".  Point USERPROFILE / LOCALAPPDATA
+	// at scratch directories so the probe is hermetic, and verify that the
+	// probed script's own directory ends up in $LOAD_PATH.
+	{
+		printf("[%d] .mayu.rb home directory probe ... ", idx + 3);
+		fflush(stdout);
+
+		std::wstring homeDir = exeDir + L"\\__home__";
+		std::wstring cfgDir  = homeDir + L"\\.config\\yamy";
+		CreateDirectoryW(homeDir.c_str(), nullptr);
+		CreateDirectoryW((homeDir + L"\\.config").c_str(), nullptr);
+		CreateDirectoryW(cfgDir.c_str(), nullptr);
+		writeUtf8File(cfgDir + L"\\__probe_lib__.rb", L"$probe_loaded = true\n");
+		writeUtf8File(cfgDir + L"\\.mayu.rb",
+			L"load \"__probe_lib__.rb\"\n"
+			L"raise \"script-dir load failed\" unless $probe_loaded\n");
+
+		wchar_t oldProf[MAX_PATH] = {}, oldLocal[MAX_PATH] = {};
+		GetEnvironmentVariableW(L"USERPROFILE", oldProf, MAX_PATH);
+		GetEnvironmentVariableW(L"LOCALAPPDATA", oldLocal, MAX_PATH);
+		SetEnvironmentVariableW(L"USERPROFILE", homeDir.c_str());
+		SetEnvironmentVariableW(L"LOCALAPPDATA", (homeDir + L"\\AppData\\Local").c_str());
+
+		Symbols syms;
+		std::shared_ptr<Setting> s = buildSetting(std::string(), syms);
+
+		SetEnvironmentVariableW(L"USERPROFILE", oldProf);
+		SetEnvironmentVariableW(L"LOCALAPPDATA", oldLocal);
+
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (probe failed or no commit)\n");
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 3;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

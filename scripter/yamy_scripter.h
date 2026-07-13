@@ -213,7 +213,8 @@ YS_API bool ys_include_mayu(const char* path);
 //=============================================================================
 
 /// Return the home directory list used for config file lookup (UTF-8 strings).
-/// Includes the executable directory and %LOCALAPPDATA%\Programs\Yamy[\conf].
+/// Includes %USERPROFILE%\.config\yamy, %LOCALAPPDATA%\Yamy\Config, and the
+/// executable directory, in that search order.
 /// Lifetime: managed by the callback session; do not free manually.
 YS_API YsStrs* ys_get_home_directories(void);
 

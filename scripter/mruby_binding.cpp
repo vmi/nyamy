@@ -21,6 +21,7 @@
 #include <mruby/variable.h>
 #include <mruby/compile.h>
 
+#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -52,6 +53,123 @@ static void raiseApiError(mrb_state *mrb, const char *fallback)
 {
 	const char *msg = ys_last_error();
 	mrb_raise(mrb, E_RUNTIME_ERROR, msg ? msg : fallback);
+}
+
+static std::wstring utf8ToWide(const char *s, size_t len)
+{
+	if (len == 0)
+		return std::wstring();
+	int wn = MultiByteToWideChar(CP_UTF8, 0, s, (int)len, nullptr, 0);
+	std::wstring w(wn, L'\0');
+	MultiByteToWideChar(CP_UTF8, 0, s, (int)len, &w[0], wn);
+	return w;
+}
+
+static std::wstring utf8ToWide(const std::string &s)
+{
+	return utf8ToWide(s.c_str(), s.size());
+}
+
+static std::string wideToUtf8(const std::wstring &w)
+{
+	if (w.empty())
+		return std::string();
+	int n = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(),
+		nullptr, 0, nullptr, nullptr);
+	std::string s(n, '\0');
+	WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(),
+		&s[0], n, nullptr, nullptr);
+	return s;
+}
+
+static bool isAbsolutePath(const std::string &path)
+{
+	if (path.size() >= 2 && isalpha((unsigned char)path[0]) && path[1] == ':')
+		return true;
+	return !path.empty() && (path[0] == '\\' || path[0] == '/');
+}
+
+static bool isRegularFileW(const std::wstring &path)
+{
+	DWORD attr = GetFileAttributesW(path.c_str());
+	return attr != INVALID_FILE_ATTRIBUTES &&
+		!(attr & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+// Make the path absolute and normalized (UTF-8 in/out).
+// Falls back to the input on failure.
+static std::string canonicalizePath(const std::wstring &wpath)
+{
+	DWORD need = GetFullPathNameW(wpath.c_str(), 0, nullptr, nullptr);
+	if (need == 0)
+		return wideToUtf8(wpath);
+	std::wstring full(need, L'\0');
+	DWORD n = GetFullPathNameW(wpath.c_str(), need, &full[0], nullptr);
+	if (n == 0 || n >= need)
+		return wideToUtf8(wpath);
+	full.resize(n);
+	return wideToUtf8(full);
+}
+
+// Resolve a .rb path to a canonical absolute path.  An absolute path is
+// used as is; a relative path is searched in $LOAD_PATH (re-read on every
+// call so that script-side modifications take effect).  Raises when the
+// file is not found.
+static std::string resolveRbPath(mrb_state *mrb, const std::string &path)
+{
+	if (isAbsolutePath(path)) {
+		if (isRegularFileW(utf8ToWide(path)))
+			return canonicalizePath(utf8ToWide(path));
+		mrb_raisef(mrb, E_RUNTIME_ERROR,
+			"cannot open file: %s", path.c_str());
+	}
+
+	std::string searched;
+	mrb_value lp = mrb_gv_get(mrb, mrb_intern_lit(mrb, "$LOAD_PATH"));
+	if (mrb_array_p(lp)) {
+		mrb_int n = RARRAY_LEN(lp);
+		for (mrb_int i = 0; i < n; ++i) {
+			mrb_value dir = mrb_ary_ref(mrb, lp, i);
+			if (!mrb_string_p(dir))
+				continue;
+			std::string d(RSTRING_PTR(dir), RSTRING_LEN(dir));
+			if (d.empty())
+				continue;
+			std::wstring candidate = utf8ToWide(d + "\\" + path);
+			if (isRegularFileW(candidate))
+				return canonicalizePath(candidate);
+			if (!searched.empty())
+				searched += ";";
+			searched += d;
+		}
+	}
+	mrb_raisef(mrb, E_RUNTIME_ERROR,
+		"file not found in $LOAD_PATH: %s (searched: %s)",
+		path.c_str(), searched.c_str());
+	return std::string();	// not reached
+}
+
+// Evaluate the .rb file at the canonical absolute path via instance_eval
+// on the DSL object.  A pending exception (mrb->exc) is left to the caller.
+static void evalRbFile(mrb_state *mrb, mrb_value self, const std::string &absPath)
+{
+	FILE *f = _wfopen(utf8ToWide(absPath).c_str(), L"rb");
+	if (!f)
+		mrb_raisef(mrb, E_RUNTIME_ERROR,
+			"cannot open file: %s", absPath.c_str());
+	fseek(f, 0, SEEK_END);
+	long sz = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	std::string buf(sz, '\0');
+	fread(&buf[0], 1, sz, f);
+	fclose(f);
+
+	mrb_value code = mrb_str_new(mrb, buf.c_str(), buf.size());
+	// Pass the file name and start line so that exception backtraces
+	// point into the loaded script instead of "(eval)".
+	mrb_funcall(mrb, self, "instance_eval", 3, code,
+		mrb_str_new_cstr(mrb, absPath.c_str()),
+		mrb_int_value(mrb, 1));
 }
 
 // Print the pending mruby exception (message and backtrace) to stderr with
@@ -450,25 +568,44 @@ static mrb_value dsl_load(mrb_state *mrb, mrb_value self)
 		path.compare(path.size() - 3, 3, ".rb") == 0;
 
 	if (is_rb) {
-		FILE *f = fopen(path.c_str(), "rb");
-		if (!f)
-			mrb_raisef(mrb, E_RUNTIME_ERROR,
-				"load: cannot open file: %s", path.c_str());
-		fseek(f, 0, SEEK_END);
-		long sz = ftell(f);
-		fseek(f, 0, SEEK_SET);
-		std::string buf(sz, '\0');
-		fread(&buf[0], 1, sz, f);
-		fclose(f);
-		mrb_value code = mrb_str_new(mrb, buf.c_str(), buf.size());
-		// Pass the file name and start line so that exception backtraces
-		// point into the loaded script instead of "(eval)".
-		mrb_funcall(mrb, self, "instance_eval", 3, code,
-			mrb_str_new_cstr(mrb, path.c_str()),
-			mrb_int_value(mrb, 1));
+		evalRbFile(mrb, self, resolveRbPath(mrb, path));
 	} else {
 		if (!ys_include_mayu(path.c_str()))
 			raiseApiError(mrb, "ys_include_mayu failed");
+	}
+	return mrb_true_value();
+}
+
+static mrb_value dsl_require(mrb_state *mrb, mrb_value self)
+{
+	const char *name_cstr = nullptr;
+	mrb_get_args(mrb, "z", &name_cstr);
+	std::string name(name_cstr);
+	if (name.size() < 3 || name.compare(name.size() - 3, 3, ".rb") != 0)
+		name += ".rb";
+
+	std::string resolved = resolveRbPath(mrb, name);
+	mrb_value resolvedStr = mrb_str_new(mrb, resolved.c_str(), resolved.size());
+
+	mrb_value features = mrb_gv_get(mrb,
+		mrb_intern_lit(mrb, "$LOADED_FEATURES"));
+	if (!mrb_array_p(features)) {
+		features = mrb_ary_new(mrb);
+		mrb_gv_set(mrb, mrb_intern_lit(mrb, "$LOADED_FEATURES"), features);
+	}
+	mrb_int n = RARRAY_LEN(features);
+	for (mrb_int i = 0; i < n; ++i) {
+		if (mrb_str_equal(mrb, mrb_ary_ref(mrb, features, i), resolvedStr))
+			return mrb_false_value();
+	}
+
+	// Record the feature before evaluating so that circular requires
+	// terminate; drop it again when the evaluation raised.
+	mrb_ary_push(mrb, features, resolvedStr);
+	evalRbFile(mrb, self, resolved);
+	if (mrb->exc) {
+		mrb_ary_pop(mrb, features);
+		return mrb_nil_value();
 	}
 	return mrb_true_value();
 }
@@ -874,6 +1011,7 @@ static void yamy_mruby_init_internal(mrb_state *mrb)
 	struct RClass *dsl_cls = mrb_define_class_under(mrb, yamy, "DSL",
 		mrb->object_class);
 	mrb_define_method(mrb, dsl_cls, "load",      dsl_load,     MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, dsl_cls, "require",   dsl_require,  MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, dsl_cls, "load_mayu", dsl_load_mayu, MRB_ARGS_NONE());
 	mrb_define_method(mrb, dsl_cls, "keyseq",    dsl_keyseq,   MRB_ARGS_ARG(1, 1));
 	mrb_define_method(mrb, dsl_cls, "defkey",    dsl_defkey,   MRB_ARGS_ANY());
@@ -916,25 +1054,10 @@ bool mruby_on_load_setting(void* exeCtx)
 	if (ctx->argc >= 2) {
 		script = ctx->argv[1];
 	} else {
-		YsStrs *dirs = ys_get_home_directories();
-		int n = dirs ? ys_strs_length(dirs) : 0;
-		for (int i = 0; i < n; ++i) {
-			const char *p = nullptr; size_t len = 0;
-			ys_strs_get(dirs, i, &p, &len);
-			// Convert UTF-8 dir to wchar_t, append "\.mayu.rb", probe existence.
-			int wn = MultiByteToWideChar(CP_UTF8, 0, p, (int)len, nullptr, 0);
-			std::wstring wd(wn, L'\0');
-			MultiByteToWideChar(CP_UTF8, 0, p, (int)len, &wd[0], wn);
-			std::wstring candidate = wd + L"\\.mayu.rb";
-			if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES) {
-				int u8n = WideCharToMultiByte(CP_UTF8, 0,
-					candidate.c_str(), -1, nullptr, 0, nullptr, nullptr);
-				scriptStorage.resize((size_t)u8n - 1);
-				WideCharToMultiByte(CP_UTF8, 0,
-					candidate.c_str(), -1, &scriptStorage[0], u8n, nullptr, nullptr);
-				script = scriptStorage.c_str();
-				break;
-			}
+		const char *found = nullptr;
+		if (ys_resolve_config_path(".mayu.rb", &found) && found) {
+			scriptStorage = found;
+			script = scriptStorage.c_str();
 		}
 		argv_start = 1;
 	}
@@ -955,19 +1078,35 @@ bool mruby_on_load_setting(void* exeCtx)
 	ctx->mrb = mrb;
 	yamy_mruby_init_internal(mrb);
 
-	// 3. Set $LOAD_PATH from home directories.
+	// 3. Set $LOAD_PATH to the script's directory followed by the home
+	//    directories, and $LOADED_FEATURES to an empty array.  DSL#load and
+	//    DSL#require search $LOAD_PATH when given a relative .rb path.
 	{
-		YsStrs *dirs = ys_get_home_directories();
 		mrb_value load_path = mrb_ary_new(mrb);
+
+		std::string scriptDir;
+		std::string scriptAbs =
+			canonicalizePath(utf8ToWide(script, strlen(script)));
+		size_t sep = scriptAbs.find_last_of("\\/");
+		if (sep != std::string::npos && sep > 0) {
+			scriptDir = scriptAbs.substr(0, sep);
+			mrb_ary_push(mrb, load_path,
+				mrb_str_new(mrb, scriptDir.c_str(), scriptDir.size()));
+		}
+
+		YsStrs *dirs = ys_get_home_directories();
 		int n = dirs ? ys_strs_length(dirs) : 0;
 		for (int i = 0; i < n; ++i) {
 			const char *p = nullptr; size_t len = 0;
 			ys_strs_get(dirs, i, &p, &len);
-			if (p && len > 0)
+			if (p && len > 0 && scriptDir.compare(0, scriptDir.size(),
+					p, len) != 0)
 				mrb_ary_push(mrb, load_path,
 					mrb_str_new(mrb, p, (mrb_int)len));
 		}
 		mrb_gv_set(mrb, mrb_intern_cstr(mrb, "$LOAD_PATH"), load_path);
+		mrb_gv_set(mrb, mrb_intern_cstr(mrb, "$LOADED_FEATURES"),
+			mrb_ary_new(mrb));
 	}
 
 	// 4. Set $0 to the script path.

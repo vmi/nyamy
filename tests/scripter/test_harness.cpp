@@ -77,9 +77,11 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	setHandleEnv(L"YS_CTRL", ctrlR);   // scripter reads this end
 	setHandleEnv(L"YS_CMD",  dataW);   // scripter writes this end
 
-	// Scripter context: argv = { program, scriptPath }.
+	// Scripter context: argv = { program, scriptPath }.  An empty script
+	// path runs the no-argument form (home directory probe for .mayu.rb).
+	int argc = i_scriptPathUtf8.empty() ? 1 : 2;
 	const char *argv[2] = { "yamy-scripter-tests", i_scriptPathUtf8.c_str() };
-	MRubyContext ctx = { 2, argv, nullptr };
+	MRubyContext ctx = { argc, argv, nullptr };
 	YsCallbacks cb = {};
 	cb.on_load_setting = mruby_on_load_setting;
 	cb.on_quit         = mruby_on_quit;

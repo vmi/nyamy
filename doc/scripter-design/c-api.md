@@ -178,7 +178,8 @@ YS_API bool ys_exec_keyseq(const char* actions);
 YS_API bool ys_include_mayu(const char* path);
 
 // ホームディレクトリ一覧を返す (設定ファイル探索の基準パス群, UTF-8 YsStrs)
-// 実行ファイルのディレクトリ, %LOCALAPPDATA%\Programs\Yamy, 同\conf を含む
+// %USERPROFILE%\.config\yamy, %LOCALAPPDATA%\Yamy\Config, 実行ファイルのディレクトリ
+// をこの探索順で含む
 // 返り値: コールバックセッションのライフタイムで管理。手動解放不要
 // on_load_setting / on_exec_user_func 内で有効
 YS_API YsStrs* ys_get_home_directories(void);
