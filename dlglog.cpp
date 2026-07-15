@@ -129,7 +129,7 @@ public:
 			cf.Flags = CF_INITTOLOGFONTSTRUCT | CF_SCREENFONTS;
 			if (ChooseFont(&cf)) {
 				HFONT hfontNew = CreateFontIndirect(&m_lf);
-				SetWindowFont(m_hwnd, hfontNew, true);
+				SetWindowFont(m_hwndEdit, hfontNew, true);
 				DeleteObject(m_hfont);
 				m_hfont = hfontNew;
 				Registry::write(MAYU_REGISTRY_ROOT, L"logFont", m_lf);
