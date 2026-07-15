@@ -202,7 +202,8 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
 	// hCtrlRead, hDataWrite, hMsgWrite are inherited (sa.bInheritHandle=TRUE)
 
-	// determine scripter's executable path
+	// determine yamy's home directory (used for ${YAMY_HOME} and the default
+	// scripter path)
 	wchar_t exePath[GANA_MAX_PATH];
 	wchar_t exeDrive[GANA_MAX_PATH];
 	wchar_t exeDir[GANA_MAX_PATH];
@@ -211,28 +212,29 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	              NULL, 0, NULL, 0);
 	wstringi yamyHome = exeDrive;
 	yamyHome += exeDir;
-	wstringi scripterPath = yamyHome + L"yamy-scripter.exe";
 
-	// Read optional extra arguments from ini/registry.
-	wstringi iniExtra;
+	// The ini/registry value "cmdLine", if present, is the FULL command line
+	// (executable plus arguments) used to launch the scripter, so that any
+	// program speaking the scripter protocol can be substituted.  When absent,
+	// fall back to yamy-scripter.exe next to yamy.exe.
+	wstringi iniCmdLine;
 	{
 		Registry reg(MAYU_REGISTRY_ROOT);
-		reg.read(L"cmdLine", &iniExtra);
+		reg.read(L"cmdLine", &iniCmdLine);
 	}
 
-	// build command line
-	std::wstring cmdLineStr = L"\"" + std::wstring(scripterPath.c_str()) + L"\"";
-	if (!iniExtra.empty()) {
+	std::wstring cmdLineStr;
+	if (!iniCmdLine.empty()) {
 		std::vector<std::wstring> unknownVars;
-		std::wstring expanded = expandVars(iniExtra, yamyHome, &unknownVars);
+		cmdLineStr = expandVars(iniCmdLine, yamyHome, &unknownVars);
 		for (const auto &uv : unknownVars) {
 			if (m_log) {
 				Acquire a(m_soLog, 0);
 				*m_log << L"warning: cmdLine: unknown variable: ${" << uv << L"}" << std::endl;
 			}
 		}
-		cmdLineStr += L" ";
-		cmdLineStr += expanded;
+	} else {
+		cmdLineStr = L"\"" + std::wstring((yamyHome + L"yamy-scripter.exe").c_str()) + L"\"";
 	}
 
 	// build an environment block that includes YS_CTRL and YS_CMD
@@ -283,7 +285,10 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	si.hStdError  = hMsgWrite;  // stderr = same pipe (merged)
 
 	PROCESS_INFORMATION pi = {};
-	BOOL result = CreateProcess(NULL, cmdLineStr.data(), NULL, NULL, TRUE,
+	// CreateProcess may modify the command line buffer; pass a copy so that
+	// cmdLineStr stays intact for logging
+	std::wstring cmdLineBuf = cmdLineStr;
+	BOOL result = CreateProcess(NULL, cmdLineBuf.data(), NULL, NULL, TRUE,
 	                            CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
 	                            envBlock.data(), NULL, &si, &pi);
 	DWORD lastErr = GetLastError();
@@ -297,7 +302,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	if (!result) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << L"ScripterManager: failed to start " << scripterPath
+			*m_log << L"ScripterManager: failed to start " << cmdLineStr
 			       << L" (error " << lastErr << L")" << std::endl;
 		}
 		return false;
@@ -318,7 +323,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 
 	if (m_log) {
 		Acquire a(m_soLog, 0);
-		*m_log << L"ScripterManager: started " << scripterPath << std::endl;
+		*m_log << L"ScripterManager: started " << cmdLineStr << std::endl;
 	}
 
 	// Send CtrlId::Start with config name, path, and symbols.
