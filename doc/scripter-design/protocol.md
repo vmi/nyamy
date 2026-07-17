@@ -2,13 +2,13 @@
 
 ## 概要
 
-yamy ↔ yamy-scripter 間の通信は **4 本のハンドル** で行う。
+nyamy ↔ nyamy-scripter 間の通信は **4 本のハンドル** で行う。
 
 | チャネル | 方向 | 渡し方 | 内容 |
 |--------|------|--------|------|
-| ctrl パイプ | yamy → scripter | 環境変数 `YS_CTRL` (継承ハンドル番号) | CtrlStream (バイナリ) |
-| cmd パイプ | scripter → yamy | 環境変数 `YS_CMD` (継承ハンドル番号) | CmdStream (バイナリ) |
-| msg パイプ | scripter → yamy | STARTUPINFO (stdout+stderr をマージ) | ログ出力 (テキスト) |
+| ctrl パイプ | nyamy → scripter | 環境変数 `NYS_CTRL` (継承ハンドル番号) | CtrlStream (バイナリ) |
+| cmd パイプ | scripter → nyamy | 環境変数 `NYS_CMD` (継承ハンドル番号) | CmdStream (バイナリ) |
+| msg パイプ | scripter → nyamy | STARTUPINFO (stdout+stderr をマージ) | ログ出力 (テキスト) |
 | NUL | — | STARTUPINFO stdin | 即 EOF |
 
 **stdin/stdout/stderr はバイナリプロトコルに使用しない。**
@@ -23,7 +23,7 @@ CmdStream を汚染しない。
 
 ## プロセス起動とハンドル継承
 
-yamy 側 (`ScripterManager::launchScripter()`) の処理:
+nyamy 側 (`ScripterManager::launchScripter()`) の処理:
 
 ```cpp
 // パイプ生成 (sa.bInheritHandle = TRUE で子プロセスに継承可能)
@@ -32,7 +32,7 @@ CreatePipe(&m_hDataRead, &hDataWrite,   &sa, 0);  // cmd (data)
 CreatePipe(&m_hMsgRead,  &hMsgWrite,    &sa, 0);  // msg (log)
 hNul = CreateFile(L"NUL", GENERIC_READ, ..., &sa, ...);  // stdin 代替
 
-// yamy 側ハンドルは子プロセスに継承させない
+// nyamy 側ハンドルは子プロセスに継承させない
 SetHandleInformation(m_hCtrlWrite, HANDLE_FLAG_INHERIT, 0);
 SetHandleInformation(m_hDataRead,  HANDLE_FLAG_INHERIT, 0);
 SetHandleInformation(m_hMsgRead,   HANDLE_FLAG_INHERIT, 0);
@@ -43,7 +43,7 @@ SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
 wchar_t ctrlVal[32], cmdVal[32];
 swprintf_s(ctrlVal, L"%llu", (unsigned long long)(uintptr_t)hCtrlRead);
 swprintf_s(cmdVal,  L"%llu", (unsigned long long)(uintptr_t)hDataWrite);
-// YS_CTRL=ctrlVal, YS_CMD=cmdVal を先頭に持つ環境ブロックを構築 (既存 env をマージ)
+// NYS_CTRL=ctrlVal, NYS_CMD=cmdVal を先頭に持つ環境ブロックを構築 (既存 env をマージ)
 
 // コマンドライン (ハンドル引数なし)
 swprintf_s(cmdLine, L"\"%s\"", scripterPath.c_str());
@@ -56,17 +56,17 @@ si.hStdError  = hMsgWrite;  // 同じパイプにマージ
 CreateProcess(NULL, cmdLine, NULL, NULL, TRUE, CREATE_UNICODE_ENVIRONMENT, envBlock, NULL, &si, &pi);
 ```
 
-scripter 側 (`ys_start()` 内) の処理:
+scripter 側 (`nys_start()` 内) の処理:
 
 ```cpp
-// 環境変数 YS_CTRL / YS_CMD からハンドルを復元
+// 環境変数 NYS_CTRL / NYS_CMD からハンドルを復元
 wchar_t buf[32];
-GetEnvironmentVariableW(L"YS_CTRL", buf, 32);
+GetEnvironmentVariableW(L"NYS_CTRL", buf, 32);
 HANDLE hCtrlRead  = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
-GetEnvironmentVariableW(L"YS_CMD", buf, 32);
+GetEnvironmentVariableW(L"NYS_CMD", buf, 32);
 HANDLE hDataWrite = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(wcstoull(buf, nullptr, 10)));
 
-// stderr を UTF-16 に設定 (wcerr 経由のログを yamy が wchar_t 単位で読む)
+// stderr を UTF-16 に設定 (wcerr 経由のログを nyamy が wchar_t 単位で読む)
 _setmode(_fileno(stderr), _O_U16TEXT);
 
 // 継承ハンドルを streambuf でラップ
@@ -84,15 +84,15 @@ CmdStreamWriter  dataWriter(dataStream);
 
 ## msg パイプ (ログ)
 
-scripter の stdout と stderr を 1 本のパイプにマージして yamy がログとして受信する。
+scripter の stdout と stderr を 1 本のパイプにマージして nyamy がログとして受信する。
 
 - scripter 側: stderr に `_O_U16TEXT` を設定 → `std::wcerr` 出力が UTF-16 LE になる
-- yamy 側: `PipeReadWStreambuf` (wchar_t = 2 バイト単位読み取り) で受信
+- nyamy 側: `PipeReadWStreambuf` (wchar_t = 2 バイト単位読み取り) で受信
 - stdout に書き込まれたバイト列もこのパイプに流れるが、scripter が `std::cout` 等をログ目的で使う場合は UTF-16 でないと文字化けする
 
 ---
 
-## CtrlStream (yamy → scripter)
+## CtrlStream (nyamy → scripter)
 
 ### 現在の実装
 
@@ -157,7 +157,7 @@ enum class CtrlId : uint8_t {
 
 ---
 
-## CmdStream (scripter → yamy)
+## CmdStream (scripter → nyamy)
 
 ### 現在の実装
 
@@ -166,7 +166,7 @@ CmdStream のコマンドは用途で 2 系統に分かれる (ID 定義は下�
 | 系統 | コマンド | 用途 |
 |------|---------|------|
 | 設定構築 | `Reset` / `RegKeySeq` / `Def*` / `BeginKeymap` / `Assign*` / `Commit` | on_load_setting で構築した設定を Engine へ送出 |
-| ランタイム | `ExecKeySeq` (0x02) | `ys_exec_keyseq` による adhoc キーシーケンス実行要求 |
+| ランタイム | `ExecKeySeq` (0x02) | `nys_exec_keyseq` による adhoc キーシーケンス実行要求 |
 
 **設定定義ブロック**: 設定構築コマンドは `Reset` (0xFE) で開始し `Commit` (0xFF) で
 完了する。consumer (CmdProcessor) は `Reset` で新しい Setting の構築を開始し
@@ -207,20 +207,20 @@ enum class CmdId : uint8_t {
 
 ```mermaid
 sequenceDiagram
-    participant yamy
-    participant scripter as yamy-scripter
+    participant nyamy
+    participant scripter as nyamy-scripter
 
-    yamy->>scripter: CreateProcess("yamy-scripter.exe",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: YS_CTRL=N, YS_CMD=M)
-    Note right of scripter: 1. env から YS_CTRL/YS_CMD を取得
-    yamy->>scripter: CtrlStream: Start(configName, configPath, syms)
+    nyamy->>scripter: CreateProcess("nyamy-scripter.exe",<br/>stdin=NUL, stdout+stderr=msgPipe,<br/>env: NYS_CTRL=N, NYS_CMD=M)
+    Note right of scripter: 1. env から NYS_CTRL/NYS_CMD を取得
+    nyamy->>scripter: CtrlStream: Start(configName, configPath, syms)
     Note right of scripter: 2. on_load_setting (.mayu コンパイル or スクリプト実行)
-    scripter->>yamy: Reset (0xFE)
-    scripter->>yamy: CmdStream (all cmds)
-    scripter->>yamy: Commit (0xFF)
+    scripter->>nyamy: Reset (0xFE)
+    scripter->>nyamy: CmdStream (all cmds)
+    scripter->>nyamy: Commit (0xFF)
     Note right of scripter: 3. CtrlStream 待ちループ
-    yamy->>scripter: ExecUserFunc (0x02)
-    scripter->>yamy: ExecKeySeq (0x02)
-    yamy->>scripter: CtrlStream: Quit (0xFF)
+    nyamy->>scripter: ExecUserFunc (0x02)
+    scripter->>nyamy: ExecKeySeq (0x02)
+    nyamy->>scripter: CtrlStream: Quit (0xFF)
     Note right of scripter: 4. 終了
 ```
 
@@ -232,19 +232,19 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant yamy
+    participant nyamy
     participant old as scripter (旧)
     participant new as scripter (新)
 
-    yamy->>old: CtrlStream: Quit 送信 + ctrl パイプをクローズ
-    old-->>yamy: 終了
-    yamy->>yamy: WaitForMultipleObjects(process/threads) / closeHandles
-    yamy->>new: CreateProcess (新パイプ + 新 CmdProcessor)
-    yamy->>new: CtrlStream: Start(syms)
-    new->>yamy: Reset (0xFE) + CmdStream + Commit (0xFF)
+    nyamy->>old: CtrlStream: Quit 送信 + ctrl パイプをクローズ
+    old-->>nyamy: 終了
+    nyamy->>nyamy: WaitForMultipleObjects(process/threads) / closeHandles
+    nyamy->>new: CreateProcess (新パイプ + 新 CmdProcessor)
+    nyamy->>new: CtrlStream: Start(syms)
+    new->>nyamy: Reset (0xFE) + CmdStream + Commit (0xFF)
 ```
 
-補足: `ys_start()` のループは同一プロセスへの複数回 Start も処理できる
+補足: `nys_start()` のループは同一プロセスへの複数回 Start も処理できる
 (consumer 側も Reset ごとに新しい Setting の構築を開始するため成立する)。
 本番の再読み込みはプロセス再起動方式であり、この経路はテストハーネス
 (`buildSetting(..., loadCount)`) が使用する。

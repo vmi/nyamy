@@ -7,7 +7,7 @@
 
 
 #  include "../ctrl_stream.h"
-#  include "ys_types.h"
+#  include "nys_types.h"
 #  include <istream>
 
 
@@ -22,7 +22,7 @@ struct CtrlArgsStart {
 /// Payload of the ExecUserFunc control command (pairs with CtrlId::ExecUserFunc)
 struct CtrlArgsExecUserFunc {
 	wstringi    name;
-	YsFuncArgs  args;     // move-only
+	NYsFuncArgs  args;     // move-only
 	TriggerInfo context;
 };
 

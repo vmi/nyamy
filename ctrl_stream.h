@@ -12,7 +12,7 @@
 #  include <cstdint>
 
 
-/// Control command IDs (yamy -> scripter direction)
+/// Control command IDs (nyamy -> scripter direction)
 enum class CtrlId : uint8_t {
 	Start       = 0x01,  ///< (Re)compile with the given symbols; sent on every scripter startup
 	ExecUserFunc = 0x02, ///< Engine -> scripter: invoke user-defined function

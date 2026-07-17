@@ -59,7 +59,7 @@ bool Registry::read(HKEY i_root, const std::wstring &i_path,
 		*o_value = i_defaultValue;
 		return false;
 	} else {
-		*o_value = GetPrivateProfileInt(L"yamy", i_name.c_str(), i_defaultValue, i_path.c_str());
+		*o_value = GetPrivateProfileInt(L"nyamy", i_name.c_str(), i_defaultValue, i_path.c_str());
 		return true;
 	}
 }
@@ -86,7 +86,7 @@ bool Registry::write(HKEY i_root, const std::wstring &i_path, const std::wstring
 		wchar_t buf[GANA_MAX_PATH];
 
 		_swprintf(buf, L"%d", i_value);
-		ret =  WritePrivateProfileString(L"yamy", i_name.c_str(),
+		ret =  WritePrivateProfileString(L"nyamy", i_name.c_str(),
 										 buf, i_path.c_str());
 		return ret != 0;
 	}
@@ -125,7 +125,7 @@ bool Registry::read(HKEY i_root, const std::wstring &i_path, const std::wstring 
 	} else {
 		wchar_t buf[GANA_MAX_PATH];
 		DWORD len;
-		len = GetPrivateProfileString(L"yamy", i_name.c_str(), L"",
+		len = GetPrivateProfileString(L"nyamy", i_name.c_str(), L"",
 									  buf, sizeof(buf) / sizeof(buf[0]), i_path.c_str());
 		if (len > 0) {
 			*o_value = buf;
@@ -158,7 +158,7 @@ bool Registry::write(HKEY i_root, const std::wstring &i_path,
 	} else {
 		DWORD ret;
 
-		ret =  WritePrivateProfileString(L"yamy", i_name.c_str(),
+		ret =  WritePrivateProfileString(L"nyamy", i_name.c_str(),
 										 i_value.c_str(), i_path.c_str());
 		return ret != 0;
 	}

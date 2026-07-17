@@ -1,15 +1,15 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // mruby_binding.cpp
 //
-// mruby DSL binding for yamy-scripter.exe (mruby variant).
-// Implements Yamy::DSL, Yamy::KeySeq, Yamy::KeyMap,
-// Yamy::EventMap, Yamy::ModMap, Yamy::ModValue, and Yamy::Modifier.
+// mruby DSL binding for nyamy-scripter.exe (mruby variant).
+// Implements NYamy::DSL, NYamy::KeySeq, NYamy::KeyMap,
+// NYamy::EventMap, NYamy::ModMap, NYamy::ModValue, and NYamy::Modifier.
 //
-// The .rb script is evaluated via instance_eval on a Yamy::DSL object
+// The .rb script is evaluated via instance_eval on a NYamy::DSL object
 // each time on_load_setting is called.
 
 #include "mruby_binding.h"
-#include "yamy_scripter.h"
+#include "nyamy_scripter.h"
 
 #include <mruby.h>
 #include <mruby/array.h>
@@ -51,7 +51,7 @@ static std::string toStdStr(mrb_state *mrb, mrb_value v)
 // Raise RuntimeError with the last C API error, or fallback if none.
 static void raiseApiError(mrb_state *mrb, const char *fallback)
 {
-	const char *msg = ys_last_error();
+	const char *msg = nys_last_error();
 	mrb_raise(mrb, E_RUNTIME_ERROR, msg ? msg : fallback);
 }
 
@@ -197,7 +197,7 @@ static void printPendingException(mrb_state *mrb, const char *prefix)
 	mrb->exc = nullptr;	// in case inspect/backtrace raised
 }
 
-// Resolve a Ruby value (String / Symbol / Yamy::KeySeq) to a keyseq index.
+// Resolve a Ruby value (String / Symbol / NYamy::KeySeq) to a keyseq index.
 // A Symbol is treated exactly like the equivalent String: both are parsed
 // as action text, where "$Name" refers to a named keyseq and a bare token
 // is a key name.
@@ -213,45 +213,45 @@ static int resolveRhs(mrb_state *mrb, mrb_value rhs)
 		} else {
 			actions = toStdStr(mrb, rhs);
 		}
-		int idx = ys_reg_keyseq(nullptr, actions.c_str());
+		int idx = nys_reg_keyseq(nullptr, actions.c_str());
 		if (idx < 0)
-			raiseApiError(mrb, "ys_reg_keyseq failed");
+			raiseApiError(mrb, "nys_reg_keyseq failed");
 		return idx;
 	}
 
-	// Yamy::KeySeq: read @idx
+	// NYamy::KeySeq: read @idx
 	mrb_value idx_v = mrb_iv_get(mrb, rhs, mrb_intern_lit(mrb, "@idx"));
 	if (!mrb_nil_p(idx_v) && mrb_integer_p(idx_v))
 		return (int)mrb_integer(idx_v);
 
 	mrb_raise(mrb, E_TYPE_ERROR,
-		"rhs must be a String, Symbol, or Yamy::KeySeq");
+		"rhs must be a String, Symbol, or NYamy::KeySeq");
 	return -1;
 }
 
-// Build a YsStrs* from an mrb Array of strings or a single string value.
-static YsStrs *buildYsStrs(mrb_state *mrb, mrb_value v)
+// Build a NYsStrs* from an mrb Array of strings or a single string value.
+static NYsStrs *buildYsStrs(mrb_state *mrb, mrb_value v)
 {
-	YsStrs *ss = ys_strs_new();
+	NYsStrs *ss = nys_strs_new();
 	if (mrb_array_p(v)) {
 		mrb_int n = RARRAY_LEN(v);
 		for (mrb_int i = 0; i < n; ++i) {
 			std::string s = toStdStr(mrb, mrb_ary_ref(mrb, v, i));
-			ys_strs_push(ss, s.c_str(), s.size());
+			nys_strs_push(ss, s.c_str(), s.size());
 		}
 	} else {
 		std::string s = toStdStr(mrb, v);
-		ys_strs_push(ss, s.c_str(), s.size());
+		nys_strs_push(ss, s.c_str(), s.size());
 	}
 	return ss;
 }
 
-// Build a YsStrs* for LHS key specs.  A single String is split on whitespace;
+// Build a NYsStrs* for LHS key specs.  A single String is split on whitespace;
 // an Array is treated as individual elements.
-static YsStrs *buildLhsStrs(mrb_state *mrb, mrb_value lhs)
+static NYsStrs *buildLhsStrs(mrb_state *mrb, mrb_value lhs)
 {
 	if (mrb_string_p(lhs)) {
-		YsStrs *ss = ys_strs_new();
+		NYsStrs *ss = nys_strs_new();
 		std::string s = toStdStr(mrb, lhs);
 		const char *p = s.c_str();
 		while (*p) {
@@ -259,46 +259,46 @@ static YsStrs *buildLhsStrs(mrb_state *mrb, mrb_value lhs)
 			if (!*p) break;
 			const char *start = p;
 			while (*p && *p != ' ' && *p != '\t') ++p;
-			ys_strs_push(ss, start, (size_t)(p - start));
+			nys_strs_push(ss, start, (size_t)(p - start));
 		}
 		return ss;
 	}
 	return buildYsStrs(mrb, lhs);
 }
 
-// Convert a YsFuncArgs* to an mrb Array of Ruby values.
-static mrb_value funcArgsToMrb(mrb_state *mrb, const YsFuncArgs *fas)
+// Convert a NYsFuncArgs* to an mrb Array of Ruby values.
+static mrb_value funcArgsToMrb(mrb_state *mrb, const NYsFuncArgs *fas)
 {
 	mrb_value ary = mrb_ary_new(mrb);
 	if (!fas) return ary;
-	int n = ys_func_args_length(fas);
+	int n = nys_func_args_length(fas);
 	for (int i = 0; i < n; ++i) {
 		int64_t val = 0, len = 0;
-		YsType t = ys_func_args_get(fas, i, &val, &len);
+		NYsType t = nys_func_args_get(fas, i, &val, &len);
 		mrb_value elem = mrb_nil_value();
 		switch (t) {
-		case YsType_String:
-		case YsType_Regexp: {
+		case NYsType_String:
+		case NYsType_Regexp: {
 			const char *p = reinterpret_cast<const char *>((uintptr_t)val);
 			elem = mrb_str_new(mrb, p, (mrb_int)len);
-			if (t == YsType_Regexp)
+			if (t == NYsType_Regexp)
 				elem = mrb_funcall(mrb, elem, "to_regexp", 0);
 			break;
 		}
-		case YsType_Number:
+		case NYsType_Number:
 			elem = mrb_int_value(mrb, (mrb_int)val);
 			break;
-		case YsType_KeySeqIdx: {
+		case NYsType_KeySeqIdx: {
 			struct RClass *cls = mrb_class_get_under(mrb,
-				mrb_module_get(mrb, "Yamy"), "KeySeq");
+				mrb_module_get(mrb, "NYamy"), "KeySeq");
 			elem = mrb_obj_new(mrb, cls, 0, nullptr);
 			mrb_iv_set(mrb, elem, mrb_intern_lit(mrb, "@idx"),
 				mrb_int_value(mrb, (mrb_int)val));
 			break;
 		}
-		case YsType_ModifierSpec: {
+		case NYsType_ModifierSpec: {
 			struct RClass *cls = mrb_class_get_under(mrb,
-				mrb_module_get(mrb, "Yamy"), "Modifier");
+				mrb_module_get(mrb, "NYamy"), "Modifier");
 			mrb_value args[2] = {
 				mrb_int_value(mrb, (mrb_int)(uint64_t)val),
 				mrb_int_value(mrb, (mrb_int)(uint64_t)len),
@@ -306,14 +306,14 @@ static mrb_value funcArgsToMrb(mrb_state *mrb, const YsFuncArgs *fas)
 			elem = mrb_obj_new(mrb, cls, 2, args);
 			break;
 		}
-		case YsType_TokenSeq: {
-			const YsStrs *ss =
-				reinterpret_cast<const YsStrs *>((uintptr_t)val);
+		case NYsType_TokenSeq: {
+			const NYsStrs *ss =
+				reinterpret_cast<const NYsStrs *>((uintptr_t)val);
 			elem = mrb_ary_new(mrb);
-			int sn = ys_strs_length(ss);
+			int sn = nys_strs_length(ss);
 			for (int j = 0; j < sn; ++j) {
 				const char *sp = nullptr; size_t sl = 0;
-				ys_strs_get(ss, j, &sp, &sl);
+				nys_strs_get(ss, j, &sp, &sl);
 				mrb_ary_push(mrb, elem,
 					mrb_str_new(mrb, sp, (mrb_int)sl));
 			}
@@ -340,7 +340,7 @@ static std::string regexpOrStr(mrb_state *mrb, mrb_value v)
 
 
 //=============================================================================
-// Yamy::KeySeq  (wraps a keyseq index)
+// NYamy::KeySeq  (wraps a keyseq index)
 //=============================================================================
 
 static mrb_value keyseq_initialize(mrb_state *mrb, mrb_value self)
@@ -361,7 +361,7 @@ static mrb_value keyseq_idx(mrb_state *mrb, mrb_value self)
 
 
 //=============================================================================
-// Yamy::KeyMap  (key assignment proxy; used as key[lhs] = rhs)
+// NYamy::KeyMap  (key assignment proxy; used as key[lhs] = rhs)
 //=============================================================================
 
 static mrb_value keymap_assign(mrb_state *mrb, mrb_value self)
@@ -377,25 +377,25 @@ static mrb_value keymap_assign(mrb_state *mrb, mrb_value self)
 	mrb_value rhs = argv[argc - 1];
 	int rhs_idx = resolveRhs(mrb, rhs);
 
-	YsStrs *lhs_ss;
+	NYsStrs *lhs_ss;
 	if (argc == 2) {
 		lhs_ss = buildLhsStrs(mrb, argv[0]);
 	} else {
-		lhs_ss = ys_strs_new();
+		lhs_ss = nys_strs_new();
 		for (mrb_int i = 0; i < argc - 1; ++i) {
 			std::string s = toStdStr(mrb, argv[i]);
-			ys_strs_push(lhs_ss, s.c_str(), s.size());
+			nys_strs_push(lhs_ss, s.c_str(), s.size());
 		}
 	}
 
-	bool ok = ys_assign_key(lhs_ss, rhs_idx);
-	if (!ok) raiseApiError(mrb, "ys_assign_key failed");
+	bool ok = nys_assign_key(lhs_ss, rhs_idx);
+	if (!ok) raiseApiError(mrb, "nys_assign_key failed");
 	return rhs;
 }
 
 
 //=============================================================================
-// Yamy::EventMap  (event assignment proxy; used as event[name] = rhs)
+// NYamy::EventMap  (event assignment proxy; used as event[name] = rhs)
 //=============================================================================
 
 static mrb_value eventmap_assign(mrb_state *mrb, mrb_value self)
@@ -405,14 +405,14 @@ static mrb_value eventmap_assign(mrb_state *mrb, mrb_value self)
 	mrb_get_args(mrb, "oo", &name_v, &rhs);
 	std::string name = toStdStr(mrb, name_v);
 	int rhs_idx = resolveRhs(mrb, rhs);
-	if (!ys_assign_event(name.c_str(), rhs_idx))
-		raiseApiError(mrb, "ys_assign_event failed");
+	if (!nys_assign_event(name.c_str(), rhs_idx))
+		raiseApiError(mrb, "nys_assign_event failed");
 	return rhs;
 }
 
 
 //=============================================================================
-// Yamy::ModValue  (carries op + keys for ModMap operator+/-)
+// NYamy::ModValue  (carries op + keys for ModMap operator+/-)
 //=============================================================================
 
 static mrb_value modvalue_initialize(mrb_state *mrb, mrb_value self)
@@ -462,7 +462,7 @@ static mrb_value modvalue_minus(mrb_state *mrb, mrb_value self)
 
 
 //=============================================================================
-// Yamy::ModMap  (modifier assignment proxy)
+// NYamy::ModMap  (modifier assignment proxy)
 //=============================================================================
 
 static mrb_value modmap_initialize(mrb_state *mrb, mrb_value self)
@@ -478,7 +478,7 @@ static mrb_value modmap_get(mrb_state *mrb, mrb_value self)
 {
 	(void)self;
 	struct RClass *cls = mrb_class_get_under(mrb,
-		mrb_module_get(mrb, "Yamy"), "ModValue");
+		mrb_module_get(mrb, "NYamy"), "ModValue");
 	mrb_value args[2] = {
 		mrb_str_new_lit(mrb, "="),
 		mrb_ary_new(mrb),
@@ -494,7 +494,7 @@ static mrb_value modmap_set(mrb_state *mrb, mrb_value self)
 	std::string name = toStdStr(mrb, name_v);
 
 	struct RClass *mv_cls = mrb_class_get_under(mrb,
-		mrb_module_get(mrb, "Yamy"), "ModValue");
+		mrb_module_get(mrb, "NYamy"), "ModValue");
 
 	// Wrap plain value as "=" ModValue if not already one
 	if (!mrb_obj_is_kind_of(mrb, value_v, mv_cls)) {
@@ -512,15 +512,15 @@ static mrb_value modmap_set(mrb_state *mrb, mrb_value self)
 	mrb_value keys_v = mrb_iv_get(mrb, value_v,
 		mrb_intern_lit(mrb, "@keys"));
 
-	YsStrs *keys_ss = buildYsStrs(mrb, keys_v);
+	NYsStrs *keys_ss = buildYsStrs(mrb, keys_v);
 
 	mrb_value pfx_v = mrb_iv_get(mrb, self, mrb_intern_lit(mrb, "@prefixes"));
-	YsStrs *pfx_ss = nullptr;
+	NYsStrs *pfx_ss = nullptr;
 	if (!mrb_nil_p(pfx_v) && mrb_array_p(pfx_v))
 		pfx_ss = buildYsStrs(mrb, pfx_v);
 
-	bool ok = ys_assign_mod(pfx_ss, name.c_str(), op.c_str(), keys_ss);
-	if (!ok) raiseApiError(mrb, "ys_assign_mod failed");
+	bool ok = nys_assign_mod(pfx_ss, name.c_str(), op.c_str(), keys_ss);
+	if (!ok) raiseApiError(mrb, "nys_assign_mod failed");
 	return value_v;
 }
 
@@ -533,13 +533,13 @@ static mrb_value modmap_prefix(mrb_state *mrb, mrb_value self)
 	if (!mrb_array_p(pfx))
 		pfx = mrb_ary_new_from_values(mrb, 1, &pfx);
 	struct RClass *cls = mrb_class_get_under(mrb,
-		mrb_module_get(mrb, "Yamy"), "ModMap");
+		mrb_module_get(mrb, "NYamy"), "ModMap");
 	return mrb_obj_new(mrb, cls, 1, &pfx);
 }
 
 
 //=============================================================================
-// Yamy::Modifier  (wraps modifiers + dontcares bitmasks from preset args)
+// NYamy::Modifier  (wraps modifiers + dontcares bitmasks from preset args)
 //=============================================================================
 
 static mrb_value modifier_initialize(mrb_state *mrb, mrb_value self)
@@ -555,7 +555,7 @@ static mrb_value modifier_initialize(mrb_state *mrb, mrb_value self)
 
 
 //=============================================================================
-// Yamy::DSL  (main DSL object; .rb script is instance_eval'd on it)
+// NYamy::DSL  (main DSL object; .rb script is instance_eval'd on it)
 //=============================================================================
 
 static mrb_value dsl_load(mrb_state *mrb, mrb_value self)
@@ -570,8 +570,8 @@ static mrb_value dsl_load(mrb_state *mrb, mrb_value self)
 	if (is_rb) {
 		evalRbFile(mrb, self, resolveRbPath(mrb, path));
 	} else {
-		if (!ys_include_mayu(path.c_str()))
-			raiseApiError(mrb, "ys_include_mayu failed");
+		if (!nys_include_mayu(path.c_str()))
+			raiseApiError(mrb, "nys_include_mayu failed");
 	}
 	return mrb_true_value();
 }
@@ -613,7 +613,7 @@ static mrb_value dsl_require(mrb_state *mrb, mrb_value self)
 static mrb_value dsl_load_mayu(mrb_state *mrb, mrb_value self)
 {
 	(void)self;
-	if (!ys_load_mayu()) raiseApiError(mrb, "ys_load_mayu failed");
+	if (!nys_load_mayu()) raiseApiError(mrb, "nys_load_mayu failed");
 	return mrb_true_value();
 }
 
@@ -649,11 +649,11 @@ static mrb_value dsl_keyseq(mrb_state *mrb, mrb_value self)
 		actions   = actions_s.c_str();
 	}
 
-	int idx = ys_reg_keyseq(name, actions);
-	if (idx < 0) raiseApiError(mrb, "ys_reg_keyseq failed");
+	int idx = nys_reg_keyseq(name, actions);
+	if (idx < 0) raiseApiError(mrb, "nys_reg_keyseq failed");
 
 	struct RClass *cls = mrb_class_get_under(mrb,
-		mrb_module_get(mrb, "Yamy"), "KeySeq");
+		mrb_module_get(mrb, "NYamy"), "KeySeq");
 	mrb_value ks = mrb_obj_new(mrb, cls, 0, nullptr);
 	mrb_iv_set(mrb, ks, mrb_intern_lit(mrb, "@idx"),
 		mrb_int_value(mrb, (mrb_int)idx));
@@ -680,24 +680,24 @@ static mrb_value dsl_defkey(mrb_state *mrb, mrb_value self)
 	if (mrb_nil_p(scan_v))
 		mrb_raise(mrb, E_ARGUMENT_ERROR, "defkey requires scan: keyword");
 
-	YsStrs *names_ss = ys_strs_new();
+	NYsStrs *names_ss = nys_strs_new();
 	for (mrb_int i = 0; i < argc; ++i) {
 		if (mrb_array_p(argv[i])) {
 			mrb_int n = RARRAY_LEN(argv[i]);
 			for (mrb_int j = 0; j < n; ++j) {
 				std::string s = toStdStr(mrb,
 					mrb_ary_ref(mrb, argv[i], j));
-				ys_strs_push(names_ss, s.c_str(), s.size());
+				nys_strs_push(names_ss, s.c_str(), s.size());
 			}
 		} else {
 			std::string s = toStdStr(mrb, argv[i]);
-			ys_strs_push(names_ss, s.c_str(), s.size());
+			nys_strs_push(names_ss, s.c_str(), s.size());
 		}
 	}
 
-	YsStrs *scan_ss = buildYsStrs(mrb, scan_v);
-	bool ok = ys_def_key(names_ss, scan_ss);
-	if (!ok) raiseApiError(mrb, "ys_def_key failed");
+	NYsStrs *scan_ss = buildYsStrs(mrb, scan_v);
+	bool ok = nys_def_key(names_ss, scan_ss);
+	if (!ok) raiseApiError(mrb, "nys_def_key failed");
 	return mrb_true_value();
 }
 
@@ -716,9 +716,9 @@ static mrb_value dsl_defmod(mrb_state *mrb, mrb_value self)
 		mrb_raise(mrb, E_ARGUMENT_ERROR, "defmod requires keys: keyword");
 
 	std::string name = toStdStr(mrb, name_v);
-	YsStrs *keys_ss  = buildYsStrs(mrb, keys_v);
-	bool ok = ys_def_mod(name.c_str(), keys_ss);
-	if (!ok) raiseApiError(mrb, "ys_def_mod failed");
+	NYsStrs *keys_ss  = buildYsStrs(mrb, keys_v);
+	bool ok = nys_def_mod(name.c_str(), keys_ss);
+	if (!ok) raiseApiError(mrb, "nys_def_mod failed");
 	return mrb_true_value();
 }
 
@@ -727,9 +727,9 @@ static mrb_value dsl_defsync(mrb_state *mrb, mrb_value self)
 	(void)self;
 	mrb_value v;
 	mrb_get_args(mrb, "o", &v);
-	YsStrs *ss = buildYsStrs(mrb, v);
-	bool ok = ys_def_sync(ss);
-	if (!ok) raiseApiError(mrb, "ys_def_sync failed");
+	NYsStrs *ss = buildYsStrs(mrb, v);
+	bool ok = nys_def_sync(ss);
+	if (!ok) raiseApiError(mrb, "nys_def_sync failed");
 	return mrb_true_value();
 }
 
@@ -749,8 +749,8 @@ static mrb_value dsl_defalias(mrb_state *mrb, mrb_value self)
 
 	std::string alias_name = toStdStr(mrb, alias_v);
 	std::string key_name   = toStdStr(mrb, as_v);
-	if (!ys_def_alias(alias_name.c_str(), key_name.c_str()))
-		raiseApiError(mrb, "ys_def_alias failed");
+	if (!nys_def_alias(alias_name.c_str(), key_name.c_str()))
+		raiseApiError(mrb, "nys_def_alias failed");
 	return mrb_true_value();
 }
 
@@ -769,9 +769,9 @@ static mrb_value dsl_defsubst(mrb_state *mrb, mrb_value self)
 		mrb_raise(mrb, E_ARGUMENT_ERROR, "defsubst requires to: keyword");
 
 	int rhs_idx = resolveRhs(mrb, to_v);
-	YsStrs *lhs_ss = buildLhsStrs(mrb, lhs_v);
-	bool ok = ys_def_subst(lhs_ss, rhs_idx);
-	if (!ok) raiseApiError(mrb, "ys_def_subst failed");
+	NYsStrs *lhs_ss = buildLhsStrs(mrb, lhs_v);
+	bool ok = nys_def_subst(lhs_ss, rhs_idx);
+	if (!ok) raiseApiError(mrb, "nys_def_subst failed");
 	return mrb_true_value();
 }
 
@@ -791,8 +791,8 @@ static mrb_value dsl_defoption(mrb_state *mrb, mrb_value self)
 
 	std::string name = toStdStr(mrb, name_v);
 	std::string val  = toStdStr(mrb, mrb_funcall(mrb, val_v, "to_s", 0));
-	if (!ys_def_option(name.c_str(), val.c_str()))
-		raiseApiError(mrb, "ys_def_option failed");
+	if (!nys_def_option(name.c_str(), val.c_str()))
+		raiseApiError(mrb, "nys_def_option failed");
 	return mrb_true_value();
 }
 
@@ -827,7 +827,7 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 	if (!mrb_nil_p(default_v))
 		default_idx = resolveRhs(mrb, default_v);
 
-	if (!ys_begin_keymap(
+	if (!nys_begin_keymap(
 			keyword,
 			name.c_str(),
 			class_s.empty()  ? nullptr : class_s.c_str(),
@@ -835,7 +835,7 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 			op_s.empty()     ? nullptr : op_s.c_str(),
 			parent_s.empty() ? nullptr : parent_s.c_str(),
 			default_idx))
-		raiseApiError(mrb, "ys_begin_keymap failed");
+		raiseApiError(mrb, "nys_begin_keymap failed");
 
 	if (!mrb_nil_p(blk) && mrb_proc_p(blk))
 		mrb_funcall_with_block(mrb, self,
@@ -859,42 +859,42 @@ static mrb_value dsl_window(mrb_state *mrb, mrb_value self)
 	return dsl_begin_keymap(mrb, self, "window");
 }
 
-// key  -> Yamy::KeyMap singleton on the DSL instance
+// key  -> NYamy::KeyMap singleton on the DSL instance
 static mrb_value dsl_key(mrb_state *mrb, mrb_value self)
 {
 	mrb_sym iv = mrb_intern_lit(mrb, "@__keymap__");
 	mrb_value km = mrb_iv_get(mrb, self, iv);
 	if (mrb_nil_p(km)) {
 		struct RClass *cls = mrb_class_get_under(mrb,
-			mrb_module_get(mrb, "Yamy"), "KeyMap");
+			mrb_module_get(mrb, "NYamy"), "KeyMap");
 		km = mrb_obj_new(mrb, cls, 0, nullptr);
 		mrb_iv_set(mrb, self, iv, km);
 	}
 	return km;
 }
 
-// event -> Yamy::EventMap singleton on the DSL instance
+// event -> NYamy::EventMap singleton on the DSL instance
 static mrb_value dsl_event(mrb_state *mrb, mrb_value self)
 {
 	mrb_sym iv = mrb_intern_lit(mrb, "@__eventmap__");
 	mrb_value em = mrb_iv_get(mrb, self, iv);
 	if (mrb_nil_p(em)) {
 		struct RClass *cls = mrb_class_get_under(mrb,
-			mrb_module_get(mrb, "Yamy"), "EventMap");
+			mrb_module_get(mrb, "NYamy"), "EventMap");
 		em = mrb_obj_new(mrb, cls, 0, nullptr);
 		mrb_iv_set(mrb, self, iv, em);
 	}
 	return em;
 }
 
-// mod -> Yamy::ModMap singleton on the DSL instance (no prefixes)
+// mod -> NYamy::ModMap singleton on the DSL instance (no prefixes)
 static mrb_value dsl_mod(mrb_state *mrb, mrb_value self)
 {
 	mrb_sym iv = mrb_intern_lit(mrb, "@__modmap__");
 	mrb_value mm = mrb_iv_get(mrb, self, iv);
 	if (mrb_nil_p(mm)) {
 		struct RClass *cls = mrb_class_get_under(mrb,
-			mrb_module_get(mrb, "Yamy"), "ModMap");
+			mrb_module_get(mrb, "NYamy"), "ModMap");
 		mm = mrb_obj_new(mrb, cls, 0, nullptr);
 		mrb_iv_set(mrb, self, iv, mm);
 	}
@@ -910,8 +910,8 @@ static mrb_value dsl_deffunc(mrb_state *mrb, mrb_value self)
 
 	std::string func_name = toStdStr(mrb, name_v);
 
-	if (!ys_reg_user_func(func_name.c_str(), mruby_on_exec_user_func))
-		raiseApiError(mrb, "ys_reg_user_func failed");
+	if (!nys_reg_user_func(func_name.c_str(), mruby_on_exec_user_func))
+		raiseApiError(mrb, "nys_reg_user_func failed");
 
 	if (!mrb_nil_p(blk) && mrb_proc_p(blk)) {
 		mrb_value key = mrb_str_new(mrb, func_name.c_str(),
@@ -928,8 +928,8 @@ static mrb_value dsl_define(mrb_state *mrb, mrb_value self)
 	mrb_value name_v;
 	mrb_get_args(mrb, "o", &name_v);
 	std::string name = toStdStr(mrb, name_v);
-	if (!ys_define_symbol(name.c_str()))
-		raiseApiError(mrb, "ys_define_symbol failed");
+	if (!nys_define_symbol(name.c_str()))
+		raiseApiError(mrb, "nys_define_symbol failed");
 	return mrb_true_value();
 }
 
@@ -940,7 +940,7 @@ static mrb_value dsl_symbol_defined_p(mrb_state *mrb, mrb_value self)
 	mrb_value name_v;
 	mrb_get_args(mrb, "o", &name_v);
 	std::string name = toStdStr(mrb, name_v);
-	return mrb_bool_value(ys_has_symbol(name.c_str()));
+	return mrb_bool_value(nys_has_symbol(name.c_str()));
 }
 
 // DSL#exec_keyseq(actions)  (runtime API; valid from on_exec_user_func)
@@ -949,14 +949,14 @@ static mrb_value dsl_exec_keyseq(mrb_state *mrb, mrb_value self)
 	(void)self;
 	const char *actions = nullptr;
 	mrb_get_args(mrb, "z", &actions);
-	return mrb_bool_value(ys_exec_keyseq(actions));
+	return mrb_bool_value(nys_exec_keyseq(actions));
 }
 
-// Yamy.last_error  (module-level method)
-static mrb_value yamy_last_error(mrb_state *mrb, mrb_value)
+// NYamy.last_error  (module-level method)
+static mrb_value nyamy_last_error(mrb_state *mrb, mrb_value)
 {
 	(void)mrb;
-	const char *msg = ys_last_error();
+	const char *msg = nys_last_error();
 	if (!msg) return mrb_nil_value();
 	return mrb_str_new_cstr(mrb, msg);
 }
@@ -977,7 +977,7 @@ static int scResolveArgOrRaise(mrb_state *mrb, mrb_value v)
 		return (int)n;
 	}
 	std::string s = toStdStr(mrb, v);
-	int word = ys_sc_resolve(s.c_str());
+	int word = nys_sc_resolve(s.c_str());
 	if (word < 0)
 		mrb_raisef(mrb, E_ARGUMENT_ERROR,
 			"unknown key name or scan code: %s", s.c_str());
@@ -1000,10 +1000,10 @@ static mrb_value scancodemap_from(mrb_state *mrb, mrb_value self)
 	mrb_value v;
 	mrb_get_args(mrb, "o", &v);
 	int from = scResolveArgOrRaise(mrb, v);
-	int n = ys_scancode_map_length();
+	int n = nys_scancode_map_length();
 	for (int i = 0; i < n; ++i) {
 		unsigned f = 0, t = 0;
-		if (ys_scancode_map_entry(i, &f, &t) && (int)f == from)
+		if (nys_scancode_map_entry(i, &f, &t) && (int)f == from)
 			return mrb_int_value(mrb, (mrb_int)t);
 	}
 	return mrb_nil_value();
@@ -1017,10 +1017,10 @@ static mrb_value scancodemap_to(mrb_state *mrb, mrb_value self)
 	mrb_get_args(mrb, "o", &v);
 	int to = scResolveArgOrRaise(mrb, v);
 	mrb_value ary = mrb_ary_new(mrb);
-	int n = ys_scancode_map_length();
+	int n = nys_scancode_map_length();
 	for (int i = 0; i < n; ++i) {
 		unsigned f = 0, t = 0;
-		if (ys_scancode_map_entry(i, &f, &t) && (int)t == to)
+		if (nys_scancode_map_entry(i, &f, &t) && (int)t == to)
 			mrb_ary_push(mrb, ary, mrb_int_value(mrb, (mrb_int)f));
 	}
 	return ary;
@@ -1028,30 +1028,30 @@ static mrb_value scancodemap_to(mrb_state *mrb, mrb_value self)
 
 
 //=============================================================================
-// yamy_mruby_init_internal  (static; called from mruby_on_load_setting)
+// nyamy_mruby_init_internal  (static; called from mruby_on_load_setting)
 //=============================================================================
 
-static void yamy_mruby_init_internal(mrb_state *mrb)
+static void nyamy_mruby_init_internal(mrb_state *mrb)
 {
-	struct RClass *yamy = mrb_define_module(mrb, "Yamy");
-	mrb_define_module_function(mrb, yamy, "last_error",
-		yamy_last_error, MRB_ARGS_NONE());
+	struct RClass *nyamy = mrb_define_module(mrb, "NYamy");
+	mrb_define_module_function(mrb, nyamy, "last_error",
+		nyamy_last_error, MRB_ARGS_NONE());
 
-	struct RClass *ks_cls = mrb_define_class_under(mrb, yamy, "KeySeq",
+	struct RClass *ks_cls = mrb_define_class_under(mrb, nyamy, "KeySeq",
 		mrb->object_class);
 	mrb_define_method(mrb, ks_cls, "initialize",
 		keyseq_initialize, MRB_ARGS_OPT(1));
 	mrb_define_method(mrb, ks_cls, "idx", keyseq_idx, MRB_ARGS_NONE());
 
-	struct RClass *km_cls = mrb_define_class_under(mrb, yamy, "KeyMap",
+	struct RClass *km_cls = mrb_define_class_under(mrb, nyamy, "KeyMap",
 		mrb->object_class);
 	mrb_define_method(mrb, km_cls, "[]=", keymap_assign, MRB_ARGS_ANY());
 
-	struct RClass *em_cls = mrb_define_class_under(mrb, yamy, "EventMap",
+	struct RClass *em_cls = mrb_define_class_under(mrb, nyamy, "EventMap",
 		mrb->object_class);
 	mrb_define_method(mrb, em_cls, "[]=", eventmap_assign, MRB_ARGS_REQ(2));
 
-	struct RClass *mv_cls = mrb_define_class_under(mrb, yamy, "ModValue",
+	struct RClass *mv_cls = mrb_define_class_under(mrb, nyamy, "ModValue",
 		mrb->object_class);
 	mrb_define_method(mrb, mv_cls, "initialize",
 		modvalue_initialize, MRB_ARGS_REQ(2));
@@ -1060,7 +1060,7 @@ static void yamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, mv_cls, "+",    modvalue_plus,  MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, mv_cls, "-",    modvalue_minus, MRB_ARGS_REQ(1));
 
-	struct RClass *mm_cls = mrb_define_class_under(mrb, yamy, "ModMap",
+	struct RClass *mm_cls = mrb_define_class_under(mrb, nyamy, "ModMap",
 		mrb->object_class);
 	mrb_define_method(mrb, mm_cls, "initialize",
 		modmap_initialize, MRB_ARGS_OPT(1));
@@ -1068,12 +1068,12 @@ static void yamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, mm_cls, "[]=",    modmap_set,    MRB_ARGS_REQ(2));
 	mrb_define_method(mrb, mm_cls, "prefix", modmap_prefix, MRB_ARGS_REQ(1));
 
-	struct RClass *mod_cls = mrb_define_class_under(mrb, yamy, "Modifier",
+	struct RClass *mod_cls = mrb_define_class_under(mrb, nyamy, "Modifier",
 		mrb->object_class);
 	mrb_define_method(mrb, mod_cls, "initialize",
 		modifier_initialize, MRB_ARGS_OPT(2));
 
-	struct RClass *dsl_cls = mrb_define_class_under(mrb, yamy, "DSL",
+	struct RClass *dsl_cls = mrb_define_class_under(mrb, nyamy, "DSL",
 		mrb->object_class);
 	mrb_define_method(mrb, dsl_cls, "load",      dsl_load,     MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, dsl_cls, "require",   dsl_require,  MRB_ARGS_REQ(1));
@@ -1105,7 +1105,7 @@ static void yamy_mruby_init_internal(mrb_state *mrb)
 
 	// GC-protect the func table hash as a module constant
 	g_funcTable = mrb_hash_new(mrb);
-	mrb_define_const(mrb, yamy, "FUNC_TABLE", g_funcTable);
+	mrb_define_const(mrb, nyamy, "FUNC_TABLE", g_funcTable);
 }
 
 
@@ -1127,7 +1127,7 @@ bool mruby_on_load_setting(void* exeCtx)
 		script = ctx->argv[1];
 	} else {
 		const char *found = nullptr;
-		if (ys_resolve_config_path(".mayu.rb", &found) && found) {
+		if (nys_resolve_config_path(".mayu.rb", &found) && found) {
 			scriptStorage = found;
 			script = scriptStorage.c_str();
 		}
@@ -1137,7 +1137,7 @@ bool mruby_on_load_setting(void* exeCtx)
 	if (!script) {
 		fprintf(stderr,
 			"error: script file required (or place .mayu.rb in a home directory)\n"
-			"usage: yamy-scripter.exe path.rb [args...]\n");
+			"usage: nyamy-scripter.exe path.rb [args...]\n");
 		return false;
 	}
 
@@ -1148,7 +1148,7 @@ bool mruby_on_load_setting(void* exeCtx)
 		return false;
 	}
 	ctx->mrb = mrb;
-	yamy_mruby_init_internal(mrb);
+	nyamy_mruby_init_internal(mrb);
 
 	// 3. Set $LOAD_PATH to the script's directory followed by the home
 	//    directories, and $LOADED_FEATURES to an empty array.  DSL#load and
@@ -1166,11 +1166,11 @@ bool mruby_on_load_setting(void* exeCtx)
 				mrb_str_new(mrb, scriptDir.c_str(), scriptDir.size()));
 		}
 
-		YsStrs *dirs = ys_get_home_directories();
-		int n = dirs ? ys_strs_length(dirs) : 0;
+		NYsStrs *dirs = nys_get_home_directories();
+		int n = dirs ? nys_strs_length(dirs) : 0;
 		for (int i = 0; i < n; ++i) {
 			const char *p = nullptr; size_t len = 0;
-			ys_strs_get(dirs, i, &p, &len);
+			nys_strs_get(dirs, i, &p, &len);
 			if (p && len > 0 && scriptDir.compare(0, scriptDir.size(),
 					p, len) != 0)
 				mrb_ary_push(mrb, load_path,
@@ -1195,16 +1195,16 @@ bool mruby_on_load_setting(void* exeCtx)
 
 	// 6. Reset the func table for this load cycle.
 	g_funcTable = mrb_hash_new(mrb);
-	struct RClass *yamy = mrb_module_get(mrb, "Yamy");
-	mrb_define_const(mrb, yamy, "FUNC_TABLE", g_funcTable);
+	struct RClass *nyamy = mrb_module_get(mrb, "NYamy");
+	mrb_define_const(mrb, nyamy, "FUNC_TABLE", g_funcTable);
 
-	// 7. Evaluate the script on a fresh Yamy::DSL instance so that the DSL
+	// 7. Evaluate the script on a fresh NYamy::DSL instance so that the DSL
 	//    methods (keymap, key, event, mod, symbol_defined?, define, load, ...) are in
 	//    scope for the top-level script.  DSL#load instance_eval's a .rb file
-	//    on the same object (and compiles a .mayu file via ys_include_mayu).
+	//    on the same object (and compiles a .mayu file via nys_include_mayu).
 	{
 		struct RClass *dsl_cls = mrb_class_get_under(mrb,
-			mrb_module_get(mrb, "Yamy"), "DSL");
+			mrb_module_get(mrb, "NYamy"), "DSL");
 		mrb_value dsl = mrb_obj_new(mrb, dsl_cls, 0, nullptr);
 		mrb_funcall(mrb, dsl, "load", 1, mrb_str_new_cstr(mrb, script));
 	}
@@ -1236,7 +1236,7 @@ void mruby_on_quit(void *exeCtx)
 //=============================================================================
 
 void mruby_on_exec_user_func(void *exeCtx, const char *func_name,
-	const YsFuncArgs *args)
+	const NYsFuncArgs *args)
 {
 	MRubyContext *ctx = static_cast<MRubyContext *>(exeCtx);
 	if (!ctx->mrb) return;

@@ -45,7 +45,7 @@
     <CustomBuild Include="..\workaround.reg">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\yamy.ini">
+    <CustomBuild Include="..\nyamy.ini">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
   </ItemGroup>

@@ -1,7 +1,7 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // test_harness.h
 //
-// Drives the yamy-scripter pipeline in-process: runs ys_start() with the
+// Drives the nyamy-scripter pipeline in-process: runs nys_start() with the
 // mruby callbacks on a worker thread, feeds it a Start command (with the
 // given symbol set) over an anonymous pipe, and consumes the resulting
 // CmdStream with CmdProcessor to build a Setting.

@@ -78,9 +78,9 @@ CtrlArgsExecUserFunc CtrlStreamReader::readExecUserFunc()
 	data.name = readString();
 	uint16_t argCount = readU16();
 	for (uint16_t i = 0; i < argCount; ++i) {
-		YsFuncArg e;
-		e.type = static_cast<YsType>(readU8());  // FuncArgTag values == YsType values
-		if (e.type == YsType_Number) {
+		NYsFuncArg e;
+		e.type = static_cast<NYsType>(readU8());  // FuncArgTag values == NYsType values
+		if (e.type == NYsType_Number) {
 			int32_t v = 0;
 			for (int j = 0; j < 8; ++j)
 				v |= static_cast<int32_t>(readU8()) << (8 * j);

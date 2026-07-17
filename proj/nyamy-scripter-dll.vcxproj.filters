@@ -45,7 +45,7 @@
     <ClInclude Include="..\misc.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="..\scripter\yamy_scripter.h">
+    <ClInclude Include="..\scripter\nyamy_scripter.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="..\pipe_streambuf.h">
@@ -86,7 +86,7 @@
     <ClCompile Include="..\windowstool.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="..\scripter\yamy_scripter.cpp">
+    <ClCompile Include="..\scripter\nyamy_scripter.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="..\scripter_types.cpp">

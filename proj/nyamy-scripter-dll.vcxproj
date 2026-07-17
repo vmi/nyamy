@@ -13,7 +13,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
     <ProjectGuid>{9dbbc740-68e1-4cd7-9b40-ff3f002e1115}</ProjectGuid>
-    <RootNamespace>yamyscripterdll</RootNamespace>
+    <RootNamespace>nyamyscripterdll</RootNamespace>
     <Keyword>Win32Proj</Keyword>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -37,25 +37,25 @@
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="yamy.props" />
+    <Import Project="nyamy.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="yamy.props" />
+    <Import Project="nyamy.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <TargetName>yamy-scripter</TargetName>
+    <TargetName>nyamy-scripter</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <TargetName>yamy-scripter</TargetName>
+    <TargetName>nyamy-scripter</TargetName>
   </PropertyGroup>
   <!-- x64 Debug -->
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>_DEBUG;YAMYSCRIPTERDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;NYAMYSCRIPTERDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader />
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
@@ -74,7 +74,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;YAMYSCRIPTERDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;NYAMYSCRIPTERDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..;$(ProjectDir)..\scripter;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader />
@@ -95,7 +95,7 @@
     <ClCompile Include="..\scripter\config_files.cpp" />
     <ClCompile Include="..\scripter\ctrl_stream_reader.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
-    <ClCompile Include="..\scripter\yamy_scripter.cpp" />
+    <ClCompile Include="..\scripter\nyamy_scripter.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\windowstool.cpp" />
   </ItemGroup>
@@ -113,7 +113,7 @@
     <ClInclude Include="..\scripter\lexer.h" />
     <ClInclude Include="..\scripter\mayu_compiler.h" />
     <ClInclude Include="..\scripter\mayu_parser.h" />
-    <ClInclude Include="..\scripter\yamy_scripter.h" />
+    <ClInclude Include="..\scripter\nyamy_scripter.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

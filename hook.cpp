@@ -138,7 +138,7 @@ bool initialize(bool i_isYamy)
 #ifdef HOOK_LOG_TO_FILE
 	wchar_t logFileName[GANA_MAX_PATH];
 	GetEnvironmentVariable(L"USERPROFILE", logFileName, NUMBER_OF(logFileName));
-	wcsncat(logFileName, L"\\AppData\\LocalLow\\yamydll.txt", wcslen(L"\\AppData\\LocalLow\\yamydll.log"));
+	wcsncat(logFileName, L"\\AppData\\LocalLow\\nyamydll.txt", wcslen(L"\\AppData\\LocalLow\\nyamydll.txt"));
 	g.m_logFile = CreateFile(logFileName, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
 		OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 #endif // HOOK_LOG_TO_FILE

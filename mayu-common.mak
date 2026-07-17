@@ -28,9 +28,9 @@ COMMON_DEFINES	= -DSTRICT -D_WIN32_IE=0x0500 $(OS_SPECIFIC_DEFINES)
 BOOST_DIR	= ../boost_$(BOOST_VER)_0($(MAYU_ARCH))
 
 
-# yamy		###############################################################
+# nyamy		###############################################################
 
-TARGET_1	= $(OUT_DIR_EXE)\yamy$(MAYU_ARCH)
+TARGET_1	= $(OUT_DIR_EXE)\nyamy$(MAYU_ARCH)
 OBJS_1		=					\
 		$(OUT_DIR)\compiler_specific_func.obj	\
 		$(OUT_DIR)\dlgeditsetting.obj		\
@@ -82,40 +82,40 @@ LIBS_1		=			\
 		shell32.lib		\
 		comctl32.lib		\
 		wtsapi32.lib		\
-		$(OUT_DIR_EXE)\yamy$(MAYU_ARCH).lib	\
+		$(OUT_DIR_EXE)\nyamy$(MAYU_ARCH).lib	\
 
-EXTRADEP_1	= $(OUT_DIR_EXE)\yamy$(MAYU_ARCH).lib
+EXTRADEP_1	= $(OUT_DIR_EXE)\nyamy$(MAYU_ARCH).lib
 
-# yamy.dll	###############################################################
+# nyamy.dll	###############################################################
 
-TARGET_2	= $(OUT_DIR_EXE)\yamy$(MAYU_ARCH).dll
+TARGET_2	= $(OUT_DIR_EXE)\nyamy$(MAYU_ARCH).dll
 OBJS_2		= $(OUT_DIR)\hook.obj $(OUT_DIR)\stringtool.obj
 SRCS_2		= hook.cpp stringtool.cpp
 LIBS_2		= $(guixlibsmt) imm32.lib
 
 
-# yamy.lib	###############################################################
+# nyamy.lib	###############################################################
 
-TARGET_3	= $(OUT_DIR_EXE)\yamy$(MAYU_ARCH).lib
-DLL_3		= $(OUT_DIR_EXE)\yamy$(MAYU_ARCH).dll
+TARGET_3	= $(OUT_DIR_EXE)\nyamy$(MAYU_ARCH).lib
+DLL_3		= $(OUT_DIR_EXE)\nyamy$(MAYU_ARCH).dll
 
 
-# yamyd		###############################################################
+# nyamyd		###############################################################
 
 !if "$(MAYU_ARCH)" == "32"
-TARGET_4	= $(OUT_DIR_EXE)\yamyd$(MAYU_ARCH)
+TARGET_4	= $(OUT_DIR_EXE)\nyamyd$(MAYU_ARCH)
 OBJS_4		= $(OUT_DIR)\yamyd.obj
 
 SRCS_4		= yamyd.cpp
-LIBS_4		= user32.lib $(OUT_DIR_EXE)\yamy$(MAYU_ARCH).lib
+LIBS_4		= user32.lib $(OUT_DIR_EXE)\nyamy$(MAYU_ARCH).lib
 
-EXTRADEP_4	= $(OUT_DIR_EXE)\yamy$(MAYU_ARCH).lib
+EXTRADEP_4	= $(OUT_DIR_EXE)\nyamy$(MAYU_ARCH).lib
 !endif
 
-# yamy.exe	###############################################################
+# nyamy.exe	###############################################################
 
 !if "$(MAYU_ARCH)" == "32"
-TARGET_5	= $(OUT_DIR_EXE)\yamy.exe
+TARGET_5	= $(OUT_DIR_EXE)\nyamy.exe
 OBJS_5		= $(OUT_DIR)\yamy.obj
 
 SRCS_5		= yamy.cpp
@@ -224,10 +224,10 @@ depend::
 
 distrib:
 		-@echo "we need cygwin tool"
-		-rm -f yamy-$(VERSION).zip
-		zip yamy-$(VERSION).zip yamy.ini 104.mayu 109.mayu default.mayu emacsedit.mayu 104on109.mayu 109on104.mayu dot.mayu workaround.mayu workaround.reg readme.txt
+		-rm -f nyamy-$(VERSION).zip
+		zip nyamy-$(VERSION).zip nyamy.ini 104.mayu 109.mayu default.mayu emacsedit.mayu 104on109.mayu 109on104.mayu dot.mayu workaround.mayu workaround.reg readme.txt
 		cd $(OUT_DIR_EXE)
-		zip ../yamy-$(VERSION).zip yamy.exe yamy32 yamy64 yamy32.dll yamy64.dll yamyd32
+		zip ../nyamy-$(VERSION).zip nyamy.exe nyamy32 nyamy64 nyamy32.dll nyamy64.dll nyamyd32
 		cd ..
 
 srcdesc::

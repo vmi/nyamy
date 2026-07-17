@@ -746,7 +746,7 @@ private:
 		return DefWindowProc(i_hwnd, i_message, i_wParam, i_lParam);
 	}
 
-	// Read the active config profile from the registry (or yamy.ini).
+	// Read the active config profile from the registry (or nyamy.ini).
 	// Returns false if no valid entry exists.
 	static bool readRegistryConfig(wstringi *o_name, wstringi *o_path, Symbols *o_symbols)
 	{
@@ -1191,7 +1191,7 @@ public:
 		_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH, NULL, 0, NULL, 0);
 		yamydPath = exeDrive;
 		yamydPath += exeDir;
-		yamydPath += L"yamyd32";
+		yamydPath += L"nyamyd32";
 
 		BOOL result = CreateProcess(yamydPath.c_str(), NULL, NULL, NULL, FALSE,
 							   NORMAL_PRIORITY_CLASS, 0, NULL, &m_si, &m_pi);
@@ -1206,7 +1206,7 @@ public:
 			LoadString(GetModuleHandle(NULL), IDS_mayu,
 					   title2, sizeof(title2)/sizeof(title2[0]));
 			std::swprintf(buf, NUMBER_OF(buf),
-						text, L"yamyd32", GetLastError());
+						text, L"nyamyd32", GetLastError());
 	 		MessageBox((HWND)NULL, buf, title2, MB_OK | MB_ICONSTOP);
 		} else {
 			CloseHandle(m_pi.hThread);

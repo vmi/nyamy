@@ -113,10 +113,10 @@ flowchart TD
 WH_GETMESSAGE / WH_CALLWNDPROC フックは **グローバルフック** (threadId=0) であり、
 フックを登録したプロセスのビット数に対応した DLL がフック対象プロセスに注入される。
 
-- **yamy.exe (64-bit)** が `installMessageHook()` を呼ぶ → **yamy64.dll** が 64-bit プロセスに注入
-- **yamyd32.exe (32-bit)** が `installMessageHook(0)` を呼ぶ → **yamy32.dll** が 32-bit プロセスに注入
+- **nyamy.exe (64-bit)** が `installMessageHook()` を呼ぶ → **nyamy64.dll** が 64-bit プロセスに注入
+- **nyamyd32.exe (32-bit)** が `installMessageHook(0)` を呼ぶ → **nyamy32.dll** が 32-bit プロセスに注入
 
-どちらの DLL も同じ hook.cpp を共有しており、フォーカス変化を WM_COPYDATA で yamy.exe へ送る。
+どちらの DLL も同じ hook.cpp を共有しており、フォーカス変化を WM_COPYDATA で nyamy.exe へ送る。
 
 ```mermaid
 ---
@@ -124,23 +124,23 @@ config:
   layout: elk
 ---
 flowchart TD
-    subgraph proc_yamy["yamy.exe (64-bit)"]
-        INIT["mayu.cpp:1064<br>installMessageHook(m_hwndTaskTray)<br>→ yamy64.dll を 64-bit プロセスへ注入"]
-        SPAWN["mayu.cpp:1142〜1156<br>CreateMutex(MUTEX_YAMYD_BLOCKER)<br>CreateProcess(yamyd32.exe)"]
+    subgraph proc_nyamy["nyamy.exe (64-bit)"]
+        INIT["mayu.cpp:1064<br>installMessageHook(m_hwndTaskTray)<br>→ nyamy64.dll を 64-bit プロセスへ注入"]
+        SPAWN["mayu.cpp:1142〜1156<br>CreateMutex(MUTEX_YAMYD_BLOCKER)<br>CreateProcess(nyamyd32.exe)"]
     end
 
-    subgraph proc_yamyd["yamyd32.exe (32-bit)"]
-        YAMYD["yamyd.cpp:wWinMain():19<br>OpenMutex(MUTEX_YAMYD_BLOCKER)<br>installMessageHook(0)<br>→ yamy32.dll を 32-bit プロセスへ注入<br>WaitForSingleObject (mutex が解放されるまで待機)"]
+    subgraph proc_nyamyd["nyamyd32.exe (32-bit)"]
+        NYAMYD["yamyd.cpp:wWinMain():19<br>OpenMutex(MUTEX_YAMYD_BLOCKER)<br>installMessageHook(0)<br>→ nyamy32.dll を 32-bit プロセスへ注入<br>WaitForSingleObject (mutex が解放されるまで待機)"]
     end
 
-    subgraph hook_dll64["yamy64.dll — hook.cpp (64-bit プロセス内)"]
+    subgraph hook_dll64["nyamy64.dll — hook.cpp (64-bit プロセス内)"]
         A64["getMessageProc():556<br>WH_GETMESSAGE — フォーカス変化検出<br>ロックキー / IME 状態変化も検出"]
         A264["callWndProc():637<br>WH_CALLWNDPROC — ウィンドウアクティブ化検出"]
         B64["notifySetFocus():389<br>notifyName() → SendMessageTimeout()<br>WM_COPYDATA で m_hwndTaskTray へ送信"]
         B264["notifyLockState():535<br>WM_COPYDATA で m_hwndTaskTray へ送信"]
     end
 
-    subgraph hook_dll32["yamy32.dll — hook.cpp (32-bit プロセス内)"]
+    subgraph hook_dll32["nyamy32.dll — hook.cpp (32-bit プロセス内)"]
         A32["getMessageProc():556<br>(同上・32-bit プロセス内で動作)"]
         A232["callWndProc():637"]
         B32["notifySetFocus():389<br>WM_COPYDATA で m_hwndTaskTray へ送信"]
@@ -159,9 +159,9 @@ flowchart TD
         E[/"m_currentFocusOfThread<br>m_currentKeymap を更新"/]
     end
 
-    SPAWN -->|"起動"| proc_yamyd
+    SPAWN -->|"起動"| proc_nyamyd
     INIT --> hook_dll64
-    YAMYD --> hook_dll32
+    NYAMYD --> hook_dll32
 
     A64 --> B64
     A264 --> B64
@@ -178,13 +178,13 @@ flowchart TD
     NH_SF --> C --> D --> E
 ```
 
-### yamyd32 のライフサイクル
+### nyamyd32 のライフサイクル
 
 | フェーズ | 処理 |
 |--------|------|
-| 起動 | `OpenMutex(MUTEX_YAMYD_BLOCKER)` が成功した場合のみ動作 (yamy.exe が保持) |
-| 動作中 | `installMessageHook(0)` → yamy32.dll を 32-bit プロセスへグローバル注入 |
-| 終了 | yamy.exe が `ReleaseMutex()` → `WaitForSingleObject` が解除 → `uninstallMessageHook()` して終了 |
+| 起動 | `OpenMutex(MUTEX_YAMYD_BLOCKER)` が成功した場合のみ動作 (nyamy.exe が保持) |
+| 動作中 | `installMessageHook(0)` → nyamy32.dll を 32-bit プロセスへグローバル注入 |
+| 終了 | nyamy.exe が `ReleaseMutex()` → `WaitForSingleObject` が解除 → `uninstallMessageHook()` して終了 |
 
 ---
 
@@ -204,7 +204,7 @@ sequenceDiagram
     participant sm as scripter_manager.cpp<br/>ScripterManager
     participant async as scripter_manager.cpp<br/>launchScripter() [async]
     participant dt as scripter_manager.cpp<br/>dataThread / runReader()
-    participant sc as yamy_scripter.cpp<br/>scripter_engine()
+    participant sc as nyamy_scripter.cpp<br/>scripter_engine()
 
     mayu->>sm: start(syms):95
     sm->>async: std::async → launchScripter(syms):108
@@ -215,7 +215,7 @@ sequenceDiagram
     async->>async: WaitForMultipleObjects<br/>(process + dataThread + msgThread)
     async->>async: closeHandles() / m_quitSent=false
 
-    async->>sc: CreateProcess(yamy-scripter.exe)<br/>パイプ確立 + dataThread / msgThread 起動
+    async->>sc: CreateProcess(nyamy-scripter.exe)<br/>パイプ確立 + dataThread / msgThread 起動
     async->>sc: CtrlStreamWriter::writeStart(syms)<br/>→ ctrl パイプ書き込み
 
     sc->>sc: ctrlReader.readNext(id):122<br/>CtrlId::Start を受信
@@ -260,7 +260,7 @@ config:
   layout: elk
 ---
 flowchart LR
-    subgraph proc_yamy["yamy.exe プロセス (64-bit)"]
+    subgraph proc_nyamy["nyamy.exe プロセス (64-bit)"]
         T_main["メインスレッド<br>mayu.cpp<br>Win32 メッセージループ"]
         T_kb["InputHandler (キーボード)<br>engine.cpp :1198<br>WH_KEYBOARD_LL フックを保持"]
         T_mouse["InputHandler (マウス)<br>engine.cpp :1199<br>WH_MOUSE_LL フックを保持"]
@@ -269,16 +269,16 @@ flowchart LR
         T_msg["msgThread<br>scripter_manager.cpp :318<br>scripter ログ (UTF-16) 表示"]
     end
 
-    subgraph proc_yamyd["yamyd32.exe プロセス (32-bit)"]
-        T_yamyd["wWinMain()<br>yamyd.cpp :19<br>yamy32.dll を 32-bit プロセスへ注入<br>MUTEX_YAMYD_BLOCKER を監視"]
+    subgraph proc_nyamyd["nyamyd32.exe プロセス (32-bit)"]
+        T_nyamyd["wWinMain()<br>yamyd.cpp :19<br>nyamy32.dll を 32-bit プロセスへ注入<br>MUTEX_YAMYD_BLOCKER を監視"]
     end
 
-    subgraph proc_sc["yamy-scripter.exe プロセス"]
-        T_sc["scripter_engine()<br>yamy_scripter.cpp :85<br>.mayu コンパイル・CmdStream 送出"]
+    subgraph proc_sc["nyamy-scripter.exe プロセス"]
+        T_sc["scripter_engine()<br>nyamy_scripter.cpp :85<br>.mayu コンパイル・CmdStream 送出"]
     end
 
-    App32[("32-bit アプリ<br>(yamy32.dll 注入済)")]
-    App64[("64-bit アプリ<br>(yamy64.dll 注入済)")]
+    App32[("32-bit アプリ<br>(nyamy32.dll 注入済)")]
+    App64[("64-bit アプリ<br>(nyamy64.dll 注入済)")]
     Windows[(Windows)]
 
     T_kb -->|"WH_KEYBOARD_LL<br>→ keyboardDetour()"| T_handler
@@ -288,8 +288,8 @@ flowchart LR
     T_sc -->|"cmd パイプ (CmdStream)"| T_data
     T_sc -->|"msg パイプ (stdout+stderr)"| T_msg
     T_main -->|"ctrl パイプ (CtrlStream: Start / Quit)"| T_sc
-    T_main -->|"CreateMutex + CreateProcess"| T_yamyd
-    T_yamyd -->|"WH_GETMESSAGE / WH_CALLWNDPROC<br>DLL 注入"| App32
+    T_main -->|"CreateMutex + CreateProcess"| T_nyamyd
+    T_nyamyd -->|"WH_GETMESSAGE / WH_CALLWNDPROC<br>DLL 注入"| App32
     T_main -->|"WH_GETMESSAGE / WH_CALLWNDPROC<br>DLL 注入"| App64
     App32 -->|"WM_COPYDATA (フォーカス / ロックキー通知)<br>notifySetFocus():389 / notifyLockState():535"| T_main
     App64 -->|"WM_COPYDATA (フォーカス / ロックキー通知)<br>notifySetFocus():389 / notifyLockState():535"| T_main
@@ -308,16 +308,16 @@ flowchart LR
 | `lowLevelKeyboardProc()` | 771 | WH_KEYBOARD_LL コールバック |
 | `installKeyboardHook()` | 826 | WH_KEYBOARD_LL フックを登録/解除 |
 | `installMouseHook()` | 847 | WH_MOUSE_LL フックを登録/解除 |
-| `installMessageHook()` | 793 | WH_GETMESSAGE + WH_CALLWNDPROC を登録 (yamy.exe / yamyd32.exe 共用) |
+| `installMessageHook()` | 793 | WH_GETMESSAGE + WH_CALLWNDPROC を登録 (nyamy.exe / nyamyd32.exe 共用) |
 | `uninstallMessageHook()` | 812 | 上記フックを解除 |
-| `notifySetFocus()` | 389 | フォーカス変化を WM_COPYDATA で yamy.exe へ通知 |
-| `notifyLockState()` | 535 | ロックキー変化を WM_COPYDATA で yamy.exe へ通知 |
+| `notifySetFocus()` | 389 | フォーカス変化を WM_COPYDATA で nyamy.exe へ通知 |
+| `notifyLockState()` | 535 | ロックキー変化を WM_COPYDATA で nyamy.exe へ通知 |
 
 ### yamyd.cpp
 
 | 関数 | 行 | 役割 |
 |------|---:|------|
-| `wWinMain()` | 19 | MUTEX_YAMYD_BLOCKER を取得後 `installMessageHook(0)` で yamy32.dll をグローバル注入。yamy.exe が mutex を解放したら `uninstallMessageHook()` して終了 |
+| `wWinMain()` | 19 | MUTEX_YAMYD_BLOCKER を取得後 `installMessageHook(0)` で nyamy32.dll をグローバル注入。nyamy.exe が mutex を解放したら `uninstallMessageHook()` して終了 |
 
 ### engine.cpp
 
@@ -353,7 +353,7 @@ flowchart LR
 | `ScripterManager::runReader()` | 293 | CmdProcessor でパイプを消費 |
 | `ScripterManager::msgThread()` | 318 | scripter ログ読み取りスレッドエントリ |
 
-### yamy_scripter.cpp (scripter/)
+### nyamy_scripter.cpp (scripter/)
 
 | 関数 | 行 | 役割 |
 |------|---:|------|
@@ -378,4 +378,4 @@ flowchart LR
 | `WM_COPYDATA` ハンドラ | 301 | hook DLL からのフォーカス/ロックキー通知を受信 → `notifyHandler()` |
 | `notifyHandler()` | 150 | Notify 種別に応じて `Engine::setFocus()` などを呼び出し |
 | `m_scripter->start(syms)` | 771 | 初回起動時・リロード時に scripter を (再)起動 |
-| yamyd32 起動 | 1143〜1157 | `CreateMutex(MUTEX_YAMYD_BLOCKER)` + `CreateProcess("yamyd32")` |
+| nyamyd32 起動 | 1143〜1157 | `CreateMutex(MUTEX_YAMYD_BLOCKER)` + `CreateProcess("nyamyd32")` |

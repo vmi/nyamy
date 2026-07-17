@@ -1,4 +1,4 @@
-# yamy 側の変更仕様
+# nyamy 側の変更仕様
 
 ## 実装済みの変更
 
@@ -6,17 +6,17 @@
 
 ```
 旧: stdin=CtrlStream, stdout=CmdStream, stderr=ログ
-新: stdin=NUL, stdout+stderr=msgパイプ(マージ), 環境変数 YS_CTRL でCtrlStream, YS_CMD でCmdStream
+新: stdin=NUL, stdout+stderr=msgパイプ(マージ), 環境変数 NYS_CTRL でCtrlStream, NYS_CMD でCmdStream
 ```
 
 scripter の stdin は NUL デバイス (即 EOF)。CtrlStream / CmdStream は
-継承ハンドルの番号を環境変数 `YS_CTRL` / `YS_CMD` で渡す。
+継承ハンドルの番号を環境変数 `NYS_CTRL` / `NYS_CMD` で渡す。
 これにより scripter 実装が `printf` / `std::cout` 等を使っても CmdStream を汚染しない。
 
 ### `pipe_streambuf.h` — 新規追加
 
 `PipeWriteStreambuf` / `PipeReadStreambuf` / `PipeReadWStreambuf` を
-`pipe_streambuf.h` に集約。`scripter_manager.cpp` と `yamy_scripter.cpp` の
+`pipe_streambuf.h` に集約。`scripter_manager.cpp` と `nyamy_scripter.cpp` の
 重複実装を除去した。
 
 ### `ScripterManager` インターフェース (現状)
@@ -43,9 +43,9 @@ public:
     static const UINT WM_ScripterSettingReady;
 
 private:
-    HANDLE m_hCtrlWrite;    ///< yamy -> scripter (CtrlStream, non-stdio)
-    HANDLE m_hDataRead;     ///< scripter -> yamy (CmdStream, non-stdio)
-    HANDLE m_hMsgRead;      ///< scripter stdout+stderr -> yamy (log, merged)
+    HANDLE m_hCtrlWrite;    ///< nyamy -> scripter (CtrlStream, non-stdio)
+    HANDLE m_hDataRead;     ///< scripter -> nyamy (CmdStream, non-stdio)
+    HANDLE m_hMsgRead;      ///< scripter stdout+stderr -> nyamy (log, merged)
     HANDLE m_hScripterProcess;
     HANDLE m_hDataThread;
     HANDLE m_hMsgThread;    ///< (旧 m_hStderrThread)
@@ -58,27 +58,27 @@ scripter 側は受信後に .mayu をコンパイルし、CmdStream (cmd パイ�
 
 `execUserFunc(name, args, ctx)` は CtrlStream の ExecUserFunc コマンド (0x02) を送信する。
 scripter 側は受信後に `on_exec_user_func` コールバックを呼び出す。
-scripter が `ys_exec_keyseq()` を呼ぶと CmdStream の ExecKeySeq (0x02) が返り、
+scripter が `nys_exec_keyseq()` を呼ぶと CmdStream の ExecKeySeq (0x02) が返り、
 `setExecKeySeqCallback` で登録したコールバックが呼ばれる。
 
 `m_hMsgRead` は scripter の stdout+stderr をマージした msg パイプ。
 `msgThread` / `runMsgReader()` が `PipeReadWStreambuf` (wchar_t 単位) で読み取り、
-1 行ずつ yamy のログウィンドウに表示する。
+1 行ずつ nyamy のログウィンドウに表示する。
 
 ### `start(syms)` — コマンドライン構築とシンボル送信
 
-`YS_CTRL` / `YS_CMD` を先頭に持つ環境ブロックを構築し、子プロセスに継承させる。
+`NYS_CTRL` / `NYS_CMD` を先頭に持つ環境ブロックを構築し、子プロセスに継承させる。
 コマンドライン自体にはハンドル番号を含まない。
 
 ```cpp
 wchar_t ctrlVal[32], cmdVal[32];
 swprintf_s(ctrlVal, L"%llu", (unsigned long long)(uintptr_t)hCtrlRead);
 swprintf_s(cmdVal,  L"%llu", (unsigned long long)(uintptr_t)hDataWrite);
-// YS_CTRL + YS_CMD を先頭に持つ環境ブロックを作成 (既存 env をマージ)
+// NYS_CTRL + NYS_CMD を先頭に持つ環境ブロックを作成 (既存 env をマージ)
 
 wchar_t cmdLine[1024];
 swprintf_s(cmdLine, L"\"%s\"", scripterPath.c_str());
-// yamy.ini の cmdLine 設定があれば追加
+// nyamy.ini の cmdLine 設定があれば追加
 
 si.hStdInput  = hNul;      // NUL (即 EOF)
 si.hStdOutput = hMsgWrite; // ログパイプ
@@ -95,7 +95,7 @@ CreateProcess(NULL, cmdLine, NULL, NULL, TRUE /*bInheritHandles*/,
 以下は設計済みだが未実装の変更。
 
 - `scripter_manager.cpp/h` — reload = 再起動 (プロセス再起動方式)
-- `yamy.ini` — [yamy-scripter] セクション追加
+- `nyamy.ini` — [nyamy-scripter] セクション追加
 
 ---
 
@@ -124,15 +124,15 @@ public:
 ```cpp
 bool ScripterManager::start(const Symbols& syms)
 {
-    // 1. yamy.ini から command= を読み取り
+    // 1. nyamy.ini から command= を読み取り
     wstringi cmdLine = readScripterCommand(exeDir);
     if (cmdLine.empty())
-        cmdLine = L"yamy-scripter.exe";
+        cmdLine = L"nyamy-scripter.exe";
 
     // 2. ${ENV_VAR} 展開
     cmdLine = expandEnvVars(cmdLine);
 
-    // 3. 相対パスを yamy.exe ディレクトリ基準で解決
+    // 3. 相対パスを nyamy.exe ディレクトリ基準で解決
     resolveRelativePath(cmdLine, exeDir);
 
     // 4. シンボルを引数として追加
@@ -165,7 +165,7 @@ enum class CtrlId : uint8_t {
 ```
 
 ```cpp
-// ctrl_stream_writer.h (yamy 側)
+// ctrl_stream_writer.h (nyamy 側)
 class CtrlStreamWriter {
 public:
     void writeStart(const Symbols &syms);
@@ -199,18 +199,18 @@ public:
 
 ---
 
-## yamy.ini の将来の変更 (未実装)
+## nyamy.ini の将来の変更 (未実装)
 
 3 箇所 (ルート / Release / Debug) に以下のセクションを追加。
 
 ```ini
-[yamy-scripter]
-; scripter 起動コマンド。省略時: yamy-scripter.exe を使用
-; 相対パス: yamy.exe のあるディレクトリからの相対
+[nyamy-scripter]
+; scripter 起動コマンド。省略時: nyamy-scripter.exe を使用
+; 相対パス: nyamy.exe のあるディレクトリからの相対
 ; ${VAR}: 環境変数展開
-; command=yamy-scripter.exe
+; command=nyamy-scripter.exe
 ; command=${LOCALAPPDATA}\MyApp\custom-scripter.exe --option
-; command=python ${APPDATA}\yamy\myscripter.py
+; command=python ${APPDATA}\nyamy\myscripter.py
 ```
 
 ---

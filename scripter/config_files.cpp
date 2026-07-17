@@ -26,9 +26,9 @@ void ConfigFiles::getHomeDirectories(HomeDirectories *o_pathes) const
 	wchar_t buf[GANA_MAX_PATH];
 
 	if (GetEnvironmentVariable(L"USERPROFILE", buf, NUMBER_OF(buf)))
-		o_pathes->push_back(wstringi(std::wstring(buf) + L"\\.config\\yamy"));
+		o_pathes->push_back(wstringi(std::wstring(buf) + L"\\.config\\nyamy"));
 	if (GetEnvironmentVariable(L"LOCALAPPDATA", buf, NUMBER_OF(buf)))
-		o_pathes->push_back(wstringi(std::wstring(buf) + L"\\Yamy\\Config"));
+		o_pathes->push_back(wstringi(std::wstring(buf) + L"\\NYamy\\Config"));
 	if (GetModuleFileName(GetModuleHandle(NULL), buf, NUMBER_OF(buf)))
 		o_pathes->push_back(pathRemoveFileSpec(buf));
 }

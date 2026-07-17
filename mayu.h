@@ -7,7 +7,7 @@
 
 
 ///
-#define MAYU_REGISTRY_ROOT 0, L"yamy"
+#define MAYU_REGISTRY_ROOT 0, L"nyamy"
 
 ///
 #  define MUTEX_MAYU_EXCLUSIVE_RUNNING		\

@@ -35,7 +35,7 @@ if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
 }
 
-$pkgFile = "yamy-$Version.zip"
+$pkgFile = "nyamy-$Version.zip"
 $pkgPath = Join-Path $targetDir $pkgFile
 
 # Remove existing zip
@@ -44,7 +44,7 @@ if (Test-Path $pkgPath) {
 }
 
 $files = @(
-    "yamy.ini",
+    "nyamy.ini",
     "104.mayu",
     "109.mayu",
     "default.mayu",
@@ -55,14 +55,14 @@ $files = @(
     "workaround.mayu",
     "workaround.reg",
     "readme.txt",
-    "yamy.exe",
-    "yamy32.dll",
-    "yamyd32",
-    "yamy64.dll",
-    "yamy-scripter.exe",
-    "yamy-scripter.dll",
-    "yamy-scripter.lib",
-    "yamy_scripter.h"
+    "nyamy.exe",
+    "nyamy32.dll",
+    "nyamyd32",
+    "nyamy64.dll",
+    "nyamy-scripter.exe",
+    "nyamy-scripter.dll",
+    "nyamy-scripter.lib",
+    "nyamy_scripter.h"
 )
 
 $filesToArchive = @()

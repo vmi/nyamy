@@ -5,7 +5,7 @@
 
 #include "test_harness.h"
 
-#include "yamy_scripter.h"     // ys_start, YsCallbacks (DLL C API)
+#include "nyamy_scripter.h"     // nys_start, NYsCallbacks (DLL C API)
 #include "mruby_binding.h"     // mruby_on_load_setting / mruby_on_quit / MRubyContext
 #include "ctrl_stream_writer.h"
 #include "cmd_stream_reader.h"
@@ -24,7 +24,7 @@
 namespace {
 
 // Store a HANDLE value into an environment variable as a decimal string,
-// matching how ys_start() parses YS_CTRL / YS_CMD.
+// matching how nys_start() parses NYS_CTRL / NYS_CMD.
 void setHandleEnv(const wchar_t *i_name, HANDLE i_handle)
 {
 	wchar_t buf[32];
@@ -65,8 +65,8 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
                                       const Symbols &i_symbols,
                                       int i_loadCount)
 {
-	// ctrl pipe: test (write) -> scripter (read, via YS_CTRL)
-	// data pipe: scripter (write, via YS_CMD) -> test (read)
+	// ctrl pipe: test (write) -> scripter (read, via NYS_CTRL)
+	// data pipe: scripter (write, via NYS_CMD) -> test (read)
 	HANDLE ctrlR = nullptr, ctrlW = nullptr, dataR = nullptr, dataW = nullptr;
 	if (!CreatePipe(&ctrlR, &ctrlW, nullptr, 0)) return nullptr;
 	if (!CreatePipe(&dataR, &dataW, nullptr, 0)) {
@@ -74,19 +74,19 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 		return nullptr;
 	}
 
-	setHandleEnv(L"YS_CTRL", ctrlR);   // scripter reads this end
-	setHandleEnv(L"YS_CMD",  dataW);   // scripter writes this end
+	setHandleEnv(L"NYS_CTRL", ctrlR);   // scripter reads this end
+	setHandleEnv(L"NYS_CMD",  dataW);   // scripter writes this end
 
 	// Scripter context: argv = { program, scriptPath }.  An empty script
 	// path runs the no-argument form (home directory probe for .mayu.rb).
 	int argc = i_scriptPathUtf8.empty() ? 1 : 2;
-	const char *argv[2] = { "yamy-scripter-tests", i_scriptPathUtf8.c_str() };
+	const char *argv[2] = { "nyamy-scripter-tests", i_scriptPathUtf8.c_str() };
 	MRubyContext ctx = { argc, argv, nullptr };
-	YsCallbacks cb = {};
+	NYsCallbacks cb = {};
 	cb.on_load_setting = mruby_on_load_setting;
 	cb.on_quit         = mruby_on_quit;
 
-	std::thread scripterThread([&]() { ys_start(&cb, &ctx); });
+	std::thread scripterThread([&]() { nys_start(&cb, &ctx); });
 
 	// Consumer: read the CmdStream and build a Setting.
 	PipeReadStreambuf dataBuf(dataR);
@@ -127,7 +127,7 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	scripterThread.join();
 	consumerThread.join();
 
-	// ctrlR and dataW are closed by ys_start(); close our remaining ends.
+	// ctrlR and dataW are closed by nys_start(); close our remaining ends.
 	CloseHandle(ctrlW);
 	CloseHandle(dataR);
 	return result;

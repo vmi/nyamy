@@ -7,7 +7,7 @@
 //
 // The .mayu reference path reuses the mruby runtime via a tiny generated
 // loader script (__via_mayu__.rb -> `load "dot.mayu"`), so both paths run
-// through the same ys_start() / flushQueue() / CmdProcessor plumbing and
+// through the same nys_start() / flushQueue() / CmdProcessor plumbing and
 // differ only in the script that is executed.
 
 #include "misc.h"
@@ -16,7 +16,7 @@
 #include "setting_dump.h"
 #include "setting.h"
 #include "symbols.h"
-#include "yamy_scripter.h"   // parseScancodeMapBlob (exported test helper)
+#include "nyamy_scripter.h"   // parseScancodeMapBlob (exported test helper)
 
 #include <windows.h>
 #include <cstdio>
@@ -227,7 +227,7 @@ int main()
 		fflush(stdout);
 
 		std::wstring homeDir = exeDir + L"\\__home__";
-		std::wstring cfgDir  = homeDir + L"\\.config\\yamy";
+		std::wstring cfgDir  = homeDir + L"\\.config\\nyamy";
 		CreateDirectoryW(homeDir.c_str(), nullptr);
 		CreateDirectoryW((homeDir + L"\\.config").c_str(), nullptr);
 		CreateDirectoryW(cfgDir.c_str(), nullptr);

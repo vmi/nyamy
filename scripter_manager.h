@@ -1,7 +1,7 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // scripter_manager.h
 //
-// Manages the lifecycle and communication with the yamy-scripter subprocess.
+// Manages the lifecycle and communication with the nyamy-scripter subprocess.
 // Spawns the process, sends control commands (CtrlStream), and receives
 // compiled CmdStream, delivering the resulting Setting asynchronously.
 
@@ -60,9 +60,9 @@ public:
 
 private:
 	// pipe handles
-	HANDLE m_hCtrlWrite;        ///< yamy -> scripter (CtrlStream, non-stdio)
-	HANDLE m_hDataRead;         ///< scripter -> yamy (CmdStream, non-stdio)
-	HANDLE m_hMsgRead;          ///< scripter stdout+stderr -> yamy (log text, merged)
+	HANDLE m_hCtrlWrite;        ///< nyamy -> scripter (CtrlStream, non-stdio)
+	HANDLE m_hDataRead;         ///< scripter -> nyamy (CmdStream, non-stdio)
+	HANDLE m_hMsgRead;          ///< scripter stdout+stderr -> nyamy (log text, merged)
 	HANDLE m_hScripterProcess;
 
 	// background threads (data + msg)

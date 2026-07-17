@@ -39,7 +39,7 @@ public:
 			_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH, NULL, 0, NULL, 0);
 			m_path = exeDrive;
 			m_path += exeDir;
-			m_path += L"yamy.ini";
+			m_path += L"nyamy.ini";
 		}
 	}
 

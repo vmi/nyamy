@@ -34,11 +34,11 @@
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="yamy.props" />
+    <Import Project="nyamy.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="yamy.props" />
+    <Import Project="nyamy.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
@@ -46,13 +46,13 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PostBuildEvent>
-      <Command>copy /Y ..\scripter\yamy_scripter.h $(OutDir)yamy_scripter.h
+      <Command>copy /Y ..\scripter\nyamy_scripter.h $(OutDir)nyamy_scripter.h
 ..\tools\ps1exec.cmd ..\tools\makedistrib.ps1 $(Configuration) $(VERSION)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <PostBuildEvent>
-      <Command>copy /Y ..\scripter\yamy_scripter.h $(OutDir)yamy_scripter.h
+      <Command>copy /Y ..\scripter\nyamy_scripter.h $(OutDir)nyamy_scripter.h
 ..\tools\ps1exec.cmd ..\tools\makedistrib.ps1 $(Configuration) $(VERSION)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -129,7 +129,7 @@
 </Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
     </CustomBuild>
-    <CustomBuild Include="..\yamy.ini">
+    <CustomBuild Include="..\nyamy.ini">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
 </Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
@@ -149,19 +149,19 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="yamy.vcxproj">
+    <ProjectReference Include="nyamy.vcxproj">
       <Project>{da7de112-259f-46ea-8f7d-a4298c5639f3}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="yamy32dll.vcxproj">
+    <ProjectReference Include="nyamy32dll.vcxproj">
       <Project>{af8183b3-0ff2-4a6a-8b8d-9bb9baee6dcc}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="yamy64dll.vcxproj">
+    <ProjectReference Include="nyamy64dll.vcxproj">
       <Project>{ffec7383-47f7-459c-9d12-be79572793fe}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="yamyd32.vcxproj">
+    <ProjectReference Include="nyamyd32.vcxproj">
       <Project>{bf9e2f1c-a900-4f36-b185-12ba6430673d}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>

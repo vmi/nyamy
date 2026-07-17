@@ -37,7 +37,7 @@ private:
 	/// When non-null, inline key-sequence literals (parenthesised sub-sequences
 	/// used as function arguments) are collected here instead of being written
 	/// to m_writer.  compileKeySequence() then returns the sub-sequence's index
-	/// within this collector (post-order).  Used by ys_reg_keyseq() so the caller
+	/// within this collector (post-order).  Used by nys_reg_keyseq() so the caller
 	/// can register each sub-sequence as a separate keyseq and fix up the indices.
 	std::vector<std::vector<CmdAction>> *m_subSeqCollector = nullptr;
 

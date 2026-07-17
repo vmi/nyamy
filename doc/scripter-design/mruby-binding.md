@@ -5,10 +5,10 @@
 
 ## 目的
 
-`yamy-scripter.exe` 内蔵の mruby ランタイム向けに、
+`nyamy-scripter.exe` 内蔵の mruby ランタイム向けに、
 `.mayu` 構文と同等の設定を **Ruby らしく** 記述できる DSL を提供する。
 
-- `YsFuncArgs*` / `YsStrs*` などの C 構造体管理を Ruby 側に完全隠蔽する
+- `NYsFuncArgs*` / `NYsStrs*` などの C 構造体管理を Ruby 側に完全隠蔽する
 - ブロック・シンボル・配列・演算子などの Ruby イディオムを活かす
 - `.mayu` の主要機能をすべて表現できる
 - `.mayu` を `load` で読み込みつつ Ruby で追記する使い方も可能にする
@@ -19,8 +19,8 @@
 
 ```
 scripter/
-  mruby_binding.h/cpp   ← mruby C 拡張 (Yamy::DSL 等を登録; mruby_on_load_setting 実装)
-  mruby_main.cpp        ← yamy-scripter.exe エントリポイント
+  mruby_binding.h/cpp   ← mruby C 拡張 (NYamy::DSL 等を登録; mruby_on_load_setting 実装)
+  mruby_main.cpp        ← nyamy-scripter.exe エントリポイント
 ```
 
 ---
@@ -28,10 +28,10 @@ scripter/
 ## 暗黙の実行コンテキスト
 
 `.rb` ファイルはそのまま `load_setting` コールバックの本体として実行される。
-`Yamy.start { ... }` の囲みは不要。
+`NYamy.start { ... }` の囲みは不要。
 
 ```ruby
-# yamy_config.rb — これが全体
+# nyamy_config.rb — これが全体
 load "104.mayu"          # キーボード定義を .mayu からロード
 load "emacsedit.rb"      # 別の .rb を同一コンテキストで実行
 
@@ -48,7 +48,7 @@ deffunc "NotifyTime" do
 end
 ```
 
-内部では `Yamy::DSL` のインスタンスを生成し、ファイル内容を `instance_eval` で実行する。
+内部では `NYamy::DSL` のインスタンスを生成し、ファイル内容を `instance_eval` で実行する。
 再読み込み (scripter プロセス再起動) のたびにこのファイルが再実行される。
 
 ---
@@ -58,7 +58,7 @@ end
 **.mayu 相当:** `include "filename.mayu"`
 
 ```ruby
-load "104.mayu"          # .mayu をコンパイルしてキューに積む (ys_include_mayu)
+load "104.mayu"          # .mayu をコンパイルしてキューに積む (nys_include_mayu)
 load "emacsedit.rb"      # .rb を同一 DSL コンテキストで instance_eval
 ```
 
@@ -72,11 +72,11 @@ Ruby の `Kernel#load` を DSL スコープ内で上書きする。
 ## `load_mayu` — 現行 `.mayu` ファイルのロード
 
 ```ruby
-load_mayu   # ConfigFiles が解決する .mayu をコンパイル (ys_load_mayu)
+load_mayu   # ConfigFiles が解決する .mayu をコンパイル (nys_load_mayu)
 ```
 
 `load "104.mayu"` で個別ファイルを読むのではなく、
-`yamy.ini` が指す `.mayu` をそのまま使いたい場合に利用する。
+`nyamy.ini` が指す `.mayu` をそのまま使いたい場合に利用する。
 
 ---
 
@@ -108,7 +108,7 @@ $WINDOW_CLOSE = keyseq "$WindowClose", "A-F4"
 
 | | 名前参照 | 変数参照 |
 |---|---|---|
-| 名前テーブルへの登録 | ✅ (`ys_get_keyseq_idx` で引ける) | ❌ (形式 B) / ✅ (形式 C) |
+| 名前テーブルへの登録 | ✅ (`nys_get_keyseq_idx` で引ける) | ❌ (形式 B) / ✅ (形式 C) |
 | `key[...] = rhs` で使える | ✅ `"$Name"` として | ✅ `$VAR` として |
 | `to:` kwarg での見た目 | `to: "$Name"` | `to: $WINDOW_CLOSE` |
 | `.mayu` ファイルからの参照 | ✅ `$Name` として | ❌ |
@@ -117,11 +117,11 @@ $WINDOW_CLOSE = keyseq "$WindowClose", "A-F4"
 `KeySeq#idx` を直接参照するため名前解決を介さない。
 `.mayu` との相互運用が不要な純 Ruby 設定では形式 B で十分。
 
-C API 対応: `ys_reg_keyseq(name, actions)`
+C API 対応: `nys_reg_keyseq(name, actions)`
 
 - `"$Name"` → 先頭 `$` を除いた `"Name"` で登録
-- 重複登録は `ys_get_keyseq_idx` で既存インデックスを返す (べき等)
-- 戻り値は `Yamy::KeySeq` オブジェクト (内部に `keyseq_idx` を保持)
+- 重複登録は `nys_get_keyseq_idx` で既存インデックスを返す (べき等)
+- 戻り値は `NYamy::KeySeq` オブジェクト (内部に `keyseq_idx` を保持)
 
 ---
 
@@ -145,7 +145,7 @@ defkey "Pause", scan: ["E1-0x1d", "0x45"]
 defkey ["Esc", "Escape"], scan: "0x01"
 ```
 
-C API 対応: `ys_def_key(names, scancodes)`
+C API 対応: `nys_def_key(names, scancodes)`
 
 ---
 
@@ -163,7 +163,7 @@ defmod "Windows", keys: ["LWindows", "RWindows"]
 defmod "Shift", keys: "LShift"
 ```
 
-C API 対応: `ys_def_mod(modifier_name, key_names)`
+C API 対応: `nys_def_mod(modifier_name, key_names)`
 
 ---
 
@@ -176,7 +176,7 @@ defsync "0x7e"
 defsync ["E1-0x1d", "0x45"]
 ```
 
-C API 対応: `ys_def_sync(scan_codes)`
+C API 対応: `nys_def_sync(scan_codes)`
 
 ---
 
@@ -192,7 +192,7 @@ defalias "→",   as: "Right"
 defalias "Yen", as: "BackSlash"
 ```
 
-C API 対応: `ys_def_alias(alias_name, key_name)`
+C API 対応: `nys_def_alias(alias_name, key_name)`
 
 ---
 
@@ -210,7 +210,7 @@ defsubst "*-LButton", to: "S-A B C"              # インラインアクショ�
 defsubst ["*-LButton", "*-RButton"], to: $WINDOW_CLOSE
 ```
 
-C API 対応: `ys_def_subst(lhs_mod_keys, rhs_keyseq_idx)`
+C API 対応: `nys_def_subst(lhs_mod_keys, rhs_keyseq_idx)`
 
 RHS (`to:` の値) の解決は `key[...] =` と同じ規則 (String / Symbol / KeySeq)。
 
@@ -227,7 +227,7 @@ defoption "mouse-event",    value: true
 defoption "drag-threshold", value: 10
 ```
 
-C API 対応: `ys_def_option(option_name, value)`
+C API 対応: `nys_def_option(option_name, value)`
 
 `value:` の値は `to_s` で文字列化して渡す (`true` → `"true"`, `500` → `"500"`)。
 
@@ -236,10 +236,10 @@ C API 対応: `ys_def_option(option_name, value)`
 ## スキャンコード照会 (`sc` / `ScancodeMap`)
 
 レジストリ Scancode Map (HKLM レベルのキー入れ替え) が既に設定されている環境で、
-yamy 側で同じキーを二重に入れ替えないよう条件分岐するための照会 API。
+nyamy 側で同じキーを二重に入れ替えないよう条件分岐するための照会 API。
 
-Scancode Map は kbdclass ドライバで適用されるため、yamy には変換**後**のスキャンコードが
-届く。「レジストリで済んでいれば yamy 側マッピングをスキップ」という判定に使う。
+Scancode Map は kbdclass ドライバで適用されるため、nyamy には変換**後**のスキャンコードが
+届く。「レジストリで済んでいれば nyamy 側マッピングをスキップ」という判定に使う。
 
 ### スキャンコード整数表現
 
@@ -275,7 +275,7 @@ sc("lshift")    # => 0x2a        (大文字小文字は非区別)
 - キー名でもスキャンコード表現でも解釈不能な場合、範囲外整数の場合は `ArgumentError`。
 - キー名解決はそのキーの `defkey` 実行後 (例: `load "109.mayu.rb"` 後) に有効。
 
-C API 対応: `ys_sc_resolve(str)` (整数の範囲検査はバインディング層)
+C API 対応: `nys_sc_resolve(str)` (整数の範囲検査はバインディング層)
 
 ### `ScancodeMap` — レジストリマップの参照 (読み取り専用モジュール)
 
@@ -294,7 +294,7 @@ ScancodeMap.to(変換後)     # => [変換元スキャンコード整数, ...] (
 使用例:
 
 ```ruby
-# LAlt⇔RAlt: レジストリ Scancode Map で両キーが未使用のときのみ yamy で入れ替え
+# LAlt⇔RAlt: レジストリ Scancode Map で両キーが未使用のときのみ nyamy で入れ替え
 if ScancodeMap["LeftAlt"].nil?  && ScancodeMap.to("LeftAlt").empty? &&
    ScancodeMap["RightAlt"].nil? && ScancodeMap.to("RightAlt").empty?
   defsubst "*LAlt", to: "*RAlt"
@@ -306,7 +306,7 @@ end
 変換先として使われているケース)」を見落とすため、上記のように `.to(...).empty?` を
 併用する。
 
-C API 対応: `ys_scancode_map_length()` / `ys_scancode_map_entry(idx, from, to)`
+C API 対応: `nys_scancode_map_length()` / `nys_scancode_map_entry(idx, from, to)`
 
 - レジストリ読み取りは HKLM の `SYSTEM\CurrentControlSet\Control\Keyboard Layout`
   の `Scancode Map` 値 (`RegGetValueW`)。読み取りに管理者権限は不要。
@@ -322,8 +322,8 @@ C API 対応: `ys_scancode_map_length()` / `ys_scancode_map_entry(idx, from, to)
 
 ### 実装メモ (キー名→スキャンコード表)
 
-`defkey` は元来 yamy へのコマンド送信のみで名前→スキャンコードを保持しないため、
-`ys_def_key` 内でキュー push と同時に併走テーブル `g_keyNameToScan`
+`defkey` は元来 nyamy へのコマンド送信のみで名前→スキャンコードを保持しないため、
+`nys_def_key` 内でキュー push と同時に併走テーブル `g_keyNameToScan`
 (`std::map<wstringi, uint16_t>`、大文字小文字非区別) へ第一スキャンコードの WORD を
 登録する。既存キーは後定義が優先 (`Keyboard::addKey` の後勝ちルックアップと一致)。
 このテーブルも `resetQueue` でクリアされる。
@@ -355,7 +355,7 @@ end
 load "104.mayu.rb" if symbol_defined?("USE104")
 ```
 
-C API 対応: `ys_define_symbol(name)` / `ys_has_symbol(name)`
+C API 対応: `nys_define_symbol(name)` / `nys_has_symbol(name)`
 
 - `define` は呼び出し時点でシンボル集合に追加するため、後続の `symbol_defined?` から見える
   (`.mayu` のファイル順序と同じ意味論)。
@@ -427,7 +427,7 @@ window "SomeWin",
 window "EmacsEdit", class: /:Edit$/, parent: "EmacsMove"
 ```
 
-C API 対応: `ys_begin_keymap(keymap_type, name, window_class, window_title, op, parent_name, default_keyseq_idx)`
+C API 対応: `nys_begin_keymap(keymap_type, name, window_class, window_title, op, parent_name, default_keyseq_idx)`
 
 | Ruby 引数 | C API 引数 |
 |-----------|-----------|
@@ -482,21 +482,21 @@ obj["C-S-M", "C-A-M"] = rhs
 → lhs   = args      # ["C-S-M", "C-A-M"]
 ```
 
-C API 対応: `ys_assign_key(lhs_mod_keys, rhs_keyseq_idx)`
+C API 対応: `nys_assign_key(lhs_mod_keys, rhs_keyseq_idx)`
 
 **LHS の解決:**
 
 | Ruby 記法 | 変換 |
 |-----------|------|
-| `key["C-S-M", "C-A-M"]` | `YsStrs(["C-S-M","C-A-M"])` |
-| `key["C-S-M C-A-M"]` | 空白分割 → `YsStrs(["C-S-M","C-A-M"])` |
-| `key["C-S-L"]` | `YsStrs(["C-S-L"])` |
+| `key["C-S-M", "C-A-M"]` | `NYsStrs(["C-S-M","C-A-M"])` |
+| `key["C-S-M C-A-M"]` | 空白分割 → `NYsStrs(["C-S-M","C-A-M"])` |
+| `key["C-S-L"]` | `NYsStrs(["C-S-L"])` |
 
 **RHS の解決 (key / event / defsubst `to:` / `default:` 共通):**
 
 | Ruby 値 | 例 | 変換 |
 |---------|-----|------|
-| `String` | `"$WindowClose"` / `"A-F4"` | アクション文字列としてパースし `ys_reg_keyseq(nil, actions)` で匿名登録。`$Name` は名前付き keyseq への参照、裸のトークンはキー名 |
+| `String` | `"$WindowClose"` / `"A-F4"` | アクション文字列としてパースし `nys_reg_keyseq(nil, actions)` で匿名登録。`$Name` は名前付き keyseq への参照、裸のトークンはキー名 |
 | `Symbol` | `:"$WindowClose"` / `:Escape` | 同等の String と完全に同一視 (`:X` ≡ `"X"`) |
 | `KeySeq` | `$WINDOW_CLOSE` | `.idx` を直接使用 (名前テーブル不要) |
 
@@ -531,7 +531,7 @@ event["before-key-down"] = "&HelpMessage"
 event["after-key-up"]    = "$MyHandler"
 ```
 
-C API 対応: `ys_assign_event(event_name, rhs_keyseq_idx)`
+C API 対応: `nys_assign_event(event_name, rhs_keyseq_idx)`
 
 RHS の解決は `key` と同じ。
 
@@ -591,7 +591,7 @@ mod.prefix(["!Shift", "!!!Ctrl"])[:shift] += ["LShift", "RShift"]
 ```
 1. mod[:control]          → ModValue.placeholder  (op="=", keys=[])
 2. .+("英数")             → ModValue.new(op="+=", keys=["英数"])
-3. mod[:control] = <↑>   → ys_assign_mod(nil, "control", "+=", YsStrs(["英数"]))
+3. mod[:control] = <↑>   → nys_assign_mod(nil, "control", "+=", NYsStrs(["英数"]))
 ```
 
 #### `ModMap` / `ModValue` の概念実装
@@ -630,14 +630,14 @@ class ModValue
 end
 ```
 
-C API 対応: `ys_assign_mod(prefixes, modifier_name, op, keys)`
+C API 対応: `nys_assign_mod(prefixes, modifier_name, op, keys)`
 
 | Ruby | C API |
 |------|-------|
-| `mod[:control] += "英数"` | `ys_assign_mod(NULL, "control", "+=", ["英数"])` |
-| `mod[:control] -= "CapsLock"` | `ys_assign_mod(NULL, "control", "-=", ["CapsLock"])` |
-| `mod[:control] = ["LC", "RC"]` | `ys_assign_mod(NULL, "control", "=", ["LC","RC"])` |
-| `mod.prefix("!Shift")[:shift] += "LShift"` | `ys_assign_mod(["!Shift"], "shift", "+=", ["LShift"])` |
+| `mod[:control] += "英数"` | `nys_assign_mod(NULL, "control", "+=", ["英数"])` |
+| `mod[:control] -= "CapsLock"` | `nys_assign_mod(NULL, "control", "-=", ["CapsLock"])` |
+| `mod[:control] = ["LC", "RC"]` | `nys_assign_mod(NULL, "control", "=", ["LC","RC"])` |
+| `mod.prefix("!Shift")[:shift] += "LShift"` | `nys_assign_mod(["!Shift"], "shift", "+=", ["LShift"])` |
 
 モディファイア名は `Symbol` / `String` どちらでも受け付け、`to_s` して渡す。
 
@@ -673,13 +673,13 @@ end
 
 `deffunc` は内部で:
 
-1. `ys_reg_user_func(func_name, handler)` でエンジンに登録
+1. `nys_reg_user_func(func_name, handler)` でエンジンに登録
 2. `func_name → block` テーブル (mruby Hash) に保存
 
 `on_exec_user_func` コールバック受信時:
 
 1. `func_name` でハッシュを検索
-2. `YsFuncArgs*` → Ruby 値の配列に変換 (型変換表参照)
+2. `NYsFuncArgs*` → Ruby 値の配列に変換 (型変換表参照)
 3. `mrb_yield_argv` でブロックを呼び出す
 
 ### キーシーケンス文字列内でのユーザー定義関数呼び出し
@@ -694,13 +694,13 @@ key["C-F1"] = "&ExecUserFunc(NotifyTime)"
 
 #### 方法 B: `@FuncName` プレフィックス (未実装)
 
-バインディング層が `ys_reg_keyseq` に渡す前に `@Name` を `&ExecUserFunc(Name)` へ置換する
+バインディング層が `nys_reg_keyseq` に渡す前に `@Name` を `&ExecUserFunc(Name)` へ置換する
 糖衣構文。現状は未実装のため、方法 A (`&ExecUserFunc(Name)`) を使うこと。
 
 
 ### `exec_keyseq` — キーシーケンス実行 (deffunc ブロック内)
 
-DSL オブジェクトのメソッドとして提供される (`ys_exec_keyseq` の薄いラッパー)。
+DSL オブジェクトのメソッドとして提供される (`nys_exec_keyseq` の薄いラッパー)。
 `on_exec_user_func` コールバック実行中のみ有効で、受信時のトリガーコンテキストが自動的に引き継がれる。
 
 ```ruby
@@ -710,25 +710,25 @@ end
 ```
 
 制約:
-- `on_load_setting` 内では `ys_exec_keyseq` が false を返す
+- `on_load_setting` 内では `nys_exec_keyseq` が false を返す
 - `&ExecUserFunc` を含む actions は C API レベルでガードされ false を返す (無限ループ防止)
 
 ---
 
 ## 型変換
 
-### `YsFuncArgs` → Ruby 値 (on_exec_user_func 受信時)
+### `NYsFuncArgs` → Ruby 値 (on_exec_user_func 受信時)
 
-`YsFuncArgs*` の各要素を Ruby 値に変換してブロックに渡す:
+`NYsFuncArgs*` の各要素を Ruby 値に変換してブロックに渡す:
 
-| `YsType`             | Ruby 型              | 変換方法 |
+| `NYsType`             | Ruby 型              | 変換方法 |
 |----------------------|----------------------|----------|
-| `YsType_String`      | `String`             | UTF-8 文字列 |
-| `YsType_Number`      | `Integer`            | `int32_t` |
-| `YsType_Regexp`      | `Regexp`             | `"pattern".to_regexp` (mruby 拡張) |
-| `YsType_KeySeqIdx`   | `Yamy::KeySeq`       | インデックスをラップ |
-| `YsType_ModifierSpec`| `Yamy::Modifier`     | `modifiers` + `dontcares` の 2 値 |
-| `YsType_TokenSeq`    | `Array` of `String`  | `YsStrs*` → 文字列配列 |
+| `NYsType_String`      | `String`             | UTF-8 文字列 |
+| `NYsType_Number`      | `Integer`            | `int32_t` |
+| `NYsType_Regexp`      | `Regexp`             | `"pattern".to_regexp` (mruby 拡張) |
+| `NYsType_KeySeqIdx`   | `NYamy::KeySeq`       | インデックスをラップ |
+| `NYsType_ModifierSpec`| `NYamy::Modifier`     | `modifiers` + `dontcares` の 2 値 |
+| `NYsType_TokenSeq`    | `Array` of `String`  | `NYsStrs*` → 文字列配列 |
 
 ---
 
@@ -736,40 +736,40 @@ end
 
 mruby バインディング実装時に追加された C API:
 
-- `ys_include_mayu(path)` — 指定パスの .mayu をコンパイルしてキューに積む
-- `ys_last_error()` — 最後のエラーメッセージを返す (UTF-8 NUL 終端、なければ NULL)
-- `ys_exec_keyseq(actions)` — キーシーケンスを実行 (`on_exec_user_func` 内でのみ有効)
-- `ys_sc_resolve(str)` — キー名 / スキャンコード文字列をスキャンコード WORD に解決 (`sc` の実体)
-- `ys_scancode_map_length()` / `ys_scancode_map_entry(idx, from, to)` — レジストリ Scancode Map の列挙 (`ScancodeMap` の実体)
+- `nys_include_mayu(path)` — 指定パスの .mayu をコンパイルしてキューに積む
+- `nys_last_error()` — 最後のエラーメッセージを返す (UTF-8 NUL 終端、なければ NULL)
+- `nys_exec_keyseq(actions)` — キーシーケンスを実行 (`on_exec_user_func` 内でのみ有効)
+- `nys_sc_resolve(str)` — キー名 / スキャンコード文字列をスキャンコード WORD に解決 (`sc` の実体)
+- `nys_scancode_map_length()` / `nys_scancode_map_entry(idx, from, to)` — レジストリ Scancode Map の列挙 (`ScancodeMap` の実体)
 
 コールバック typedef:
 
 ```c
-// exeCtx: ys_start() に渡した呼び出し元コンテキストポインタ (MRubyContext* など)
-typedef bool (*ys_on_load_setting)(void* exeCtx);
-typedef void (*ys_on_exec_user_func)(void*             /* exeCtx */,
+// exeCtx: nys_start() に渡した呼び出し元コンテキストポインタ (MRubyContext* など)
+typedef bool (*nys_on_load_setting)(void* exeCtx);
+typedef void (*nys_on_exec_user_func)(void*             /* exeCtx */,
                                      const char*       /* func_name */,
-                                     const YsFuncArgs* /* args */);
+                                     const NYsFuncArgs* /* args */);
 
-typedef struct YsCallbacks {
+typedef struct NYsCallbacks {
     bool (*on_load_setting)(void* exeCtx);
     void (*on_quit)(void* exeCtx);   // Quit 直前に呼ばれる (NULL 可)
-} YsCallbacks;
+} NYsCallbacks;
 ```
 
-`ys_start` は `YsCallbacks` テーブルと `exeCtx` を受け取る:
+`nys_start` は `NYsCallbacks` テーブルと `exeCtx` を受け取る:
 
 ```c
-YS_API int ys_start(const YsCallbacks* callbacks, void* exeCtx);
+NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx);
 ```
 
-`on_exec_user_func` は `ys_reg_user_func` で関数ごとに個別登録する:
+`on_exec_user_func` は `nys_reg_user_func` で関数ごとに個別登録する:
 
 ```c
-YS_API bool ys_reg_user_func(const char* func_name, ys_on_exec_user_func on_exec_user_func);
+NYS_API bool nys_reg_user_func(const char* func_name, nys_on_exec_user_func on_exec_user_func);
 ```
 
-`ys_exec_keyseq` での `&ExecUserFunc` ガード (実装済み):
+`nys_exec_keyseq` での `&ExecUserFunc` ガード (実装済み):
 - actions 文字列に `&ExecUserFunc` が含まれる場合は即 false を返す (無限ループ防止)
 
 ---
@@ -779,7 +779,7 @@ YS_API bool ys_reg_user_func(const char* func_name, ys_on_exec_user_func on_exec
 `default.mayu` + `104.mayu` の Ruby 版 (抜粋):
 
 ```ruby
-# yamy_config.rb
+# nyamy_config.rb
 
 # キーボード定義を .mayu からロード
 load "104.mayu"
@@ -905,27 +905,27 @@ static mrb_value g_funcTable;  // mruby Hash: String => Proc (GC保護済み)
 ```
 
 `mrb_state*` は `MRubyContext` が保持する。スクリプトパスは `mruby_on_load_setting` 内で
-`ctx->argv[1]` または `ys_get_home_directories()` を使って解決する。
+`ctx->argv[1]` または `nys_get_home_directories()` を使って解決する。
 
 ### コールバック
 
 ```cpp
 // mruby_binding.h / mruby_binding.cpp
 
-// YsCallbacks.on_load_setting に渡す。mrb_open してDSLクラス登録→スクリプト実行
+// NYsCallbacks.on_load_setting に渡す。mrb_open してDSLクラス登録→スクリプト実行
 bool mruby_on_load_setting(void* exeCtx);  // exeCtx = MRubyContext*
 
-// YsCallbacks.on_quit に渡す。mrb_close して mrb を nullptr に
+// NYsCallbacks.on_quit に渡す。mrb_close して mrb を nullptr に
 void mruby_on_quit(void* exeCtx);          // exeCtx = MRubyContext*
 
-// ys_reg_user_func で関数ごとに登録する。g_funcTable からブロックを検索し呼び出す
-void mruby_on_exec_user_func(void* exeCtx, const char* func_name, const YsFuncArgs* args);
+// nys_reg_user_func で関数ごとに登録する。g_funcTable からブロックを検索し呼び出す
+void mruby_on_exec_user_func(void* exeCtx, const char* func_name, const NYsFuncArgs* args);
 ```
 
 ### `mruby_main.cpp` の構成
 
 ```cpp
-#include "yamy_scripter.h"
+#include "nyamy_scripter.h"
 #include "mruby_binding.h"
 #include <windows.h>
 
@@ -933,11 +933,11 @@ int main(int argc, char *argv[])  // UTF-8 activeCodePage マニフェスト使�
 {
     MRubyContext ctx = { argc, (const char* const*)argv, nullptr };
 
-    YsCallbacks callbacks = {};
+    NYsCallbacks callbacks = {};
     callbacks.on_load_setting = mruby_on_load_setting;
     callbacks.on_quit         = mruby_on_quit;
 
-    return ys_start(&callbacks, &ctx);
+    return nys_start(&callbacks, &ctx);
 }
 ```
 
@@ -967,7 +967,7 @@ int main(int argc, char *argv[])  // UTF-8 activeCodePage マニフェスト使�
   別物になり混乱を招くため廃止した。keyseq 参照は表記によらず `$` シジルで行う。
 
 - **`deffunc` とキーマップ定義の順序**: 順序制約なし。
-  `ys_reg_user_func` の呼び出しタイミングはキューイングの順序に影響しない。
+  `nys_reg_user_func` の呼び出しタイミングはキューイングの順序に影響しない。
   未登録関数への `&ExecUserFunc` 呼び出しは Engine 側でエラー扱いになる。
 
 ---

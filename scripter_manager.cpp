@@ -111,11 +111,11 @@ bool ScripterManager::start(const wstringi &configName, const wstringi &configPa
 
 
 // Expand ${VAR} placeholders in s.
-// ${YAMY_HOME} -> yamyHome; others -> GetEnvironmentVariableW().
+// ${NYAMY_HOME} -> nyamyHome; others -> GetEnvironmentVariableW().
 // Unknown vars are left as-is and appended to *unknownVars if provided.
 // After each expansion, if the result ends with '\' and the next input char is also '\',
 // one backslash is consumed to prevent double separators.
-static std::wstring expandVars(const std::wstring &s, const std::wstring &yamyHome,
+static std::wstring expandVars(const std::wstring &s, const std::wstring &nyamyHome,
                                std::vector<std::wstring> *unknownVars = nullptr)
 {
 	std::wstring result;
@@ -125,8 +125,8 @@ static std::wstring expandVars(const std::wstring &s, const std::wstring &yamyHo
 			size_t end = s.find(L'}', i + 2);
 			if (end == std::wstring::npos) { result += s[i++]; continue; }
 			std::wstring name = s.substr(i + 2, end - i - 2);
-			if (name == L"YAMY_HOME") {
-				result += yamyHome;
+			if (name == L"NYAMY_HOME") {
+				result += nyamyHome;
 			} else {
 				wchar_t buf[2048];
 				DWORD len = GetEnvironmentVariableW(name.c_str(), buf, 2048);
@@ -163,11 +163,11 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		m_quitSent = false;
 	}
 
-	// ctrl pipe:  yamy (write) -> scripter (read) via inherited handle in YS_CTRL env var
+	// ctrl pipe:  nyamy (write) -> scripter (read) via inherited handle in NYS_CTRL env var
 	HANDLE hCtrlRead  = INVALID_HANDLE_VALUE;
-	// data pipe:  scripter (write) -> yamy (read) via inherited handle in YS_CMD env var
+	// data pipe:  scripter (write) -> nyamy (read) via inherited handle in NYS_CMD env var
 	HANDLE hDataWrite = INVALID_HANDLE_VALUE;
-	// msg pipe:   scripter stdout+stderr (write) -> yamy (read), merged
+	// msg pipe:   scripter stdout+stderr (write) -> nyamy (read), merged
 	HANDLE hMsgWrite  = INVALID_HANDLE_VALUE;
 	// NUL device: used as scripter's stdin (reads return EOF immediately)
 	HANDLE hNul       = INVALID_HANDLE_VALUE;
@@ -195,14 +195,14 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		return false;
 	}
 
-	// yamy-side handles must not be inherited by the child
+	// nyamy-side handles must not be inherited by the child
 	SetHandleInformation(m_hCtrlWrite, HANDLE_FLAG_INHERIT, 0);
 	SetHandleInformation(m_hDataRead,  HANDLE_FLAG_INHERIT, 0);
 	SetHandleInformation(m_hMsgRead,   HANDLE_FLAG_INHERIT, 0);
 	SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
 	// hCtrlRead, hDataWrite, hMsgWrite are inherited (sa.bInheritHandle=TRUE)
 
-	// determine yamy's home directory (used for ${YAMY_HOME} and the default
+	// determine nyamy's home directory (used for ${NYAMY_HOME} and the default
 	// scripter path)
 	wchar_t exePath[GANA_MAX_PATH];
 	wchar_t exeDrive[GANA_MAX_PATH];
@@ -210,13 +210,13 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	GetModuleFileName(NULL, exePath, GANA_MAX_PATH);
 	_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH,
 	              NULL, 0, NULL, 0);
-	wstringi yamyHome = exeDrive;
-	yamyHome += exeDir;
+	wstringi nyamyHome = exeDrive;
+	nyamyHome += exeDir;
 
 	// The ini/registry value "cmdLine", if present, is the FULL command line
 	// (executable plus arguments) used to launch the scripter, so that any
 	// program speaking the scripter protocol can be substituted.  When absent,
-	// fall back to yamy-scripter.exe next to yamy.exe.
+	// fall back to nyamy-scripter.exe next to nyamy.exe.
 	wstringi iniCmdLine;
 	{
 		Registry reg(MAYU_REGISTRY_ROOT);
@@ -226,7 +226,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	std::wstring cmdLineStr;
 	if (!iniCmdLine.empty()) {
 		std::vector<std::wstring> unknownVars;
-		cmdLineStr = expandVars(iniCmdLine, yamyHome, &unknownVars);
+		cmdLineStr = expandVars(iniCmdLine, nyamyHome, &unknownVars);
 		for (const auto &uv : unknownVars) {
 			if (m_log) {
 				Acquire a(m_soLog, 0);
@@ -234,10 +234,10 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 			}
 		}
 	} else {
-		cmdLineStr = L"\"" + std::wstring((yamyHome + L"yamy-scripter.exe").c_str()) + L"\"";
+		cmdLineStr = L"\"" + std::wstring((nyamyHome + L"nyamy-scripter.exe").c_str()) + L"\"";
 	}
 
-	// build an environment block that includes YS_CTRL and YS_CMD
+	// build an environment block that includes NYS_CTRL and NYS_CMD
 	// so the child receives pipe handle values without polluting the parent environment
 	wchar_t ctrlVal[32], cmdVal[32];
 	swprintf_s(ctrlVal, L"%llu",
@@ -253,8 +253,8 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 			for (const wchar_t *p = value; *p; ++p) envBlock.push_back(*p);
 			envBlock.push_back(L'\0');
 		};
-		addVar(L"YS_CTRL", ctrlVal);
-		addVar(L"YS_CMD",  cmdVal);
+		addVar(L"NYS_CTRL", ctrlVal);
+		addVar(L"NYS_CMD",  cmdVal);
 
 		// append current process environment
 		wchar_t *cur = GetEnvironmentStringsW();
@@ -263,11 +263,11 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 				const wchar_t *entry = p;
 				while (*p) ++p;
 				++p;  // skip NUL
-				// skip any existing YS_CTRL/YS_CMD entries
-				wchar_t ysCtrlEq[] = L"YS_CTRL=";
-				wchar_t ysCmdEq[] = L"YS_CMD=";
-				bool skip = (wcsncmp(entry, ysCtrlEq, sizeof(ysCtrlEq) - 1) == 0 ||
-				             wcsncmp(entry, ysCmdEq, sizeof(ysCmdEq) - 1) == 0);
+				// skip any existing NYS_CTRL/NYS_CMD entries
+				wchar_t nysCtrlEq[] = L"NYS_CTRL=";
+				wchar_t nysCmdEq[] = L"NYS_CMD=";
+				bool skip = (wcsncmp(entry, nysCtrlEq, sizeof(nysCtrlEq) - 1) == 0 ||
+				             wcsncmp(entry, nysCmdEq, sizeof(nysCmdEq) - 1) == 0);
 				if (!skip) {
 					for (const wchar_t *q = entry; q < p; ++q) envBlock.push_back(*q);
 				}
