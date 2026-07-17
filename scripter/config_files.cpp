@@ -57,8 +57,7 @@ bool ConfigFiles::readFile(std::wstring *o_data, const wstringi &i_filename) con
 		fclose(fp);
 		return false;
 	}
-	buf[static_cast<size_t>(sbuf.st_size)] = 0;			// mbstowcs() requires null
-	// terminated string
+	buf[static_cast<size_t>(sbuf.st_size)] = 0;
 
 	//
 	if (buf[0] == 0xffU && buf[1] == 0xfeU &&
@@ -119,14 +118,23 @@ bool ConfigFiles::readFile(std::wstring *o_data, const wstringi &i_filename) con
 		// fall through to multibyte / ASCII
 	}
 
-	// try multibyte charset
-	size_t wsize = mbstowcs(NULL, reinterpret_cast<char *>(buf.data()), 0);
-	if (wsize != size_t(-1)) {
-		std::vector<wchar_t> wbuf(wsize);
-		mbstowcs(wbuf.data(), reinterpret_cast<char *>(buf.data()), wsize);
-		o_data->assign(wbuf.data(), wbuf.data() + wsize);
-		fclose(fp);
-		return true;
+	// try CP932 (Shift_JIS)
+	// The code page must be given explicitly: this process runs with the
+	// UTF-8 activeCodePage manifest, so CP_ACP and the CRT locale cannot
+	// select CP932.
+	{
+		const char *bytes = reinterpret_cast<const char *>(buf.data());
+		int size = static_cast<int>(sbuf.st_size);
+		int wlen = MultiByteToWideChar(932, MB_ERR_INVALID_CHARS,
+		                               bytes, size, NULL, 0);
+		if (wlen > 0) {
+			o_data->resize(wlen);
+			MultiByteToWideChar(932, MB_ERR_INVALID_CHARS,
+			                    bytes, size, &(*o_data)[0], wlen);
+			fclose(fp);
+			return true;
+		}
+		// fall through to ascii
 	}
 
 	// assume ascii
