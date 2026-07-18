@@ -156,7 +156,7 @@ static std::vector<std::pair<uint16_t, uint16_t>> g_scancodeMap;
 static bool g_scancodeMapLoaded = false;
 
 // Scan-code extension flag bits.  These mirror ScanCode::E0 / ScanCode::E1 in
-// keyboard.h (via KEYBOARD_INPUT_DATA in driver.h), which is exactly what
+// keyboard.h (via KEYBOARD_INPUT_DATA), which is exactly what
 // CmdScanCode.flags carries after MayuCompiler::compileScanCode.  Duplicated
 // here as small constants to avoid pulling the engine headers into the DLL.
 static const uint16_t kScanFlagE0 = 2;
