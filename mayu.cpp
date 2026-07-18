@@ -20,12 +20,11 @@
 #include "mayurc.h"
 #include "msgstream.h"
 #include "multithread.h"
-#include "registry.h"
+#include "inifile.h"
 #include "setting.h"
 #include "scripter_manager.h"
 #include "target.h"
 #include "windowstool.h"
-#include "fixscancodemap.h"
 #include "vk2tchar.h"
 #include <process.h>
 #include <time.h>
@@ -78,7 +77,6 @@ class Mayu
 	static const DWORD SESSION_DISCONNECTED = 1<<1;
 	static const DWORD SESSION_END_QUERIED = 1<<2;
 	DWORD m_sessionState;
-	std::unique_ptr<FixScancodeMap> m_fixScancodeMap;
 
 	bool m_isSettingDialogOpened;			/// is setting dialog opened ?
 
@@ -91,13 +89,8 @@ class Mayu
 	enum {
 		WM_APP_taskTrayNotify = WM_APP + 101,	///
 		WM_APP_msgStreamNotify = WM_APP + 102,	///
-		WM_APP_escapeNLSKeysFailed = WM_APP + 121,	///
 		WM_APP_scripterSettingReady = WM_APP + 120,	///< scripter generated Setting
 		ID_TaskTrayIcon = 1,			///
-	};
-
-	enum {
-		YAMY_TIMER_ESCAPE_NLS_KEYS = 0,	///
 	};
 
 private:
@@ -289,10 +282,6 @@ private:
 			case WM_CREATE:
 				This = reinterpret_cast<Mayu *>(
 						   reinterpret_cast<CREATESTRUCT *>(i_lParam)->lpCreateParams);
-				if (This->m_fixScancodeMap) {
-					This->m_fixScancodeMap->init(i_hwnd, WM_APP_escapeNLSKeysFailed);
-					This->m_fixScancodeMap->escape(true);
-				}
 				SetWindowLongPtr(i_hwnd, 0, (LONG_PTR)This);
 				return 0;
 			}
@@ -304,11 +293,6 @@ private:
 				return This->notifyHandler(cd);
 			}
 			case WM_QUERYENDSESSION:
-				if (!This->m_sessionState) {
-					if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
-						This->m_fixScancodeMap->escape(false);
-					}
-				}
 				This->m_sessionState |= Mayu::SESSION_END_QUERIED;
 				This->m_engine.prepairQuit();
 				PostQuitMessage(0);
@@ -330,44 +314,19 @@ private:
 #  define WTS_SESSION_LOCK                   0x7
 #  define WTS_SESSION_UNLOCK                 0x8
 #endif
-				/*
-					restore NLS keys when any bits of m_sessionState is on
-					and
-					escape NLS keys when all bits of m_sessionState cleared
-				*/
 				case WTS_CONSOLE_CONNECT:
 					This->m_sessionState &= ~Mayu::SESSION_DISCONNECTED;
-					if (!This->m_sessionState) {
-						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap->escape(true);
-						}
-					}
 					m = "WTS_CONSOLE_CONNECT";
 					break;
 				case WTS_CONSOLE_DISCONNECT:
-					if (!This->m_sessionState) {
-						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap->escape(false);
-						}
-					}
 					This->m_sessionState |= Mayu::SESSION_DISCONNECTED;
 					m = "WTS_CONSOLE_DISCONNECT";
 					break;
 				case WTS_REMOTE_CONNECT:
 					This->m_sessionState &= ~Mayu::SESSION_DISCONNECTED;
-					if (!This->m_sessionState) {
-						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap->escape(true);
-						}
-					}
 					m = "WTS_REMOTE_CONNECT";
 					break;
 				case WTS_REMOTE_DISCONNECT:
-					if (!This->m_sessionState) {
-						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap->escape(false);
-						}
-					}
 					This->m_sessionState |= Mayu::SESSION_DISCONNECTED;
 					m = "WTS_REMOTE_DISCONNECT";
 					break;
@@ -377,22 +336,13 @@ private:
 				case WTS_SESSION_LOGOFF:
 					m = "WTS_SESSION_LOGOFF";
 					break;
-				case WTS_SESSION_LOCK: {
-					if (!This->m_sessionState) {
-						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap->escape(false);
-						}
-					}
+				case WTS_SESSION_LOCK:
 					This->m_sessionState |= Mayu::SESSION_LOCKED;
 					m = "WTS_SESSION_LOCK";
 					break;
-			   }
 				case WTS_SESSION_UNLOCK: {
 					This->m_sessionState &= ~Mayu::SESSION_LOCKED;
 					if (!This->m_sessionState) {
-						if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
-							This->m_fixScancodeMap->escape(true);
-						}
 						if (This->m_engine.getIsEnabled()) {
 							This->m_engine.unlocked();
 						}
@@ -439,9 +389,9 @@ private:
 
 						// create reload menu
 						HMENU hMenuSubSub = GetSubMenu(hMenuSub, 1);
-						Registry reg(MAYU_REGISTRY_ROOT);
+						IniFile ini;
 						int mayuIndex;
-						reg.read(L".mayuIndex", &mayuIndex, 0);
+						ini.read(L".mayuIndex", &mayuIndex, 0);
 						while (DeleteMenu(hMenuSubSub, 0, MF_BYPOSITION))
 							;
 						wregex_stored getName(L"^([^;]*);");
@@ -449,7 +399,7 @@ private:
 							wchar_t buf[100];
 							std::swprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
 							wstringi dot_mayu;
-							if (!reg.read(buf, &dot_mayu))
+							if (!ini.read(buf, &dot_mayu))
 								break;
 							std::wsmatch what;
 							if (std::regex_search(dot_mayu, what, getName)) {
@@ -484,32 +434,6 @@ private:
 				return 0;
 			}
 
-			case WM_APP_escapeNLSKeysFailed:
-				if (i_lParam) {
-					int ret;
-
-					This->m_log << L"escape NLS keys done code=" << i_wParam << std::endl;
-					switch (i_wParam) {
-					case YAMY_SUCCESS:
-					case YAMY_ERROR_RETRY_INJECTION_SUCCESS:
-						// escape NLS keys success
-						break;
-					case YAMY_ERROR_TIMEOUT_INJECTION:
-						ret = This->errorDialogWithCode(IDS_escapeNlsKeysRetry, (int)i_wParam, MB_RETRYCANCEL | MB_ICONSTOP);
-						if (ret == IDRETRY) {
-							This->m_fixScancodeMap->escape(true);
-						}
-						break;
-					default:
-						This->errorDialogWithCode(IDS_escapeNlsKeysFailed, (int)i_wParam, MB_OK);
-						break;
-					}
-				} else {
-					This->m_log << L"restore NLS keys done with code=" << i_wParam << std::endl;
-				}
-				return 0;
-				break;
-
 			case WM_APP_scripterSettingReady: {
 				std::shared_ptr<Setting> *p = reinterpret_cast<std::shared_ptr<Setting>*>(i_lParam);
 				std::shared_ptr<Setting> newSetting = std::move(*p);
@@ -528,8 +452,8 @@ private:
 					switch (id) {
 					default:
 						if (ID_MENUITEM_reloadBegin <= id) {
-							Registry reg(MAYU_REGISTRY_ROOT);
-							reg.write(L".mayuIndex", id - ID_MENUITEM_reloadBegin);
+							IniFile ini;
+							ini.write(L".mayuIndex", id - ID_MENUITEM_reloadBegin);
 							This->load();
 						}
 						break;
@@ -616,9 +540,6 @@ private:
 					}
 					case ID_MENUITEM_disable:
 						This->m_engine.enable(!This->m_engine.getIsEnabled());
-						if (This->m_fixScancodeMap) {
-							This->m_fixScancodeMap->escape(This->m_engine.getIsEnabled());
-						}
 						This->showTasktrayIcon();
 						break;
 					case ID_MENUITEM_quit:
@@ -705,11 +626,6 @@ private:
 					wtsUnRegisterSessionNotification(i_hwnd);
 					This->m_usingSN = false;
 				}
-				if (!This->m_sessionState) {
-					if (This->m_fixScancodeMap && This->m_engine.getIsEnabled()) {
-						This->m_fixScancodeMap->escape(false);
-					}
-				}
 				return 0;
 
 			default:
@@ -726,9 +642,6 @@ private:
 					switch (static_cast<MayuIPCCommand>(i_wParam)) {
 					case MayuIPCCommand_Enable:
 						This->m_engine.enable(!!i_lParam);
-						if (This->m_fixScancodeMap) {
-							This->m_fixScancodeMap->escape(This->m_engine.getIsEnabled());
-						}
 						This->showTasktrayIcon();
 						if (i_lParam) {
 							Acquire a(&This->m_log, 1);
@@ -746,17 +659,17 @@ private:
 		return DefWindowProc(i_hwnd, i_message, i_wParam, i_lParam);
 	}
 
-	// Read the active config profile from the registry (or nyamy.ini).
+	// Read the active config profile from nyamy.ini.
 	// Returns false if no valid entry exists.
-	static bool readRegistryConfig(wstringi *o_name, wstringi *o_path, Symbols *o_symbols)
+	static bool readIniConfig(wstringi *o_name, wstringi *o_path, Symbols *o_symbols)
 	{
-		Registry reg(MAYU_REGISTRY_ROOT);
+		IniFile ini;
 		int index = 0;
-		reg.read(L".mayuIndex", &index, 0);
+		ini.read(L".mayuIndex", &index, 0);
 		wchar_t key[32];
 		_snwprintf(key, NUMBER_OF(key), L".mayu%d", index);
 		wstringi entry;
-		if (!reg.read(key, &entry))
+		if (!ini.read(key, &entry))
 			return false;
 		wregex_stored re(L"^([^;]*);([^;]*);(.*)$");
 		std::wsmatch m;
@@ -785,12 +698,12 @@ private:
 				initialSymbols.insert(__wargv[i] + 2);
 		}
 
-		// registry config: name, path, registry symbols merged into initialSymbols
+		// ini config: name, path, ini symbols merged into initialSymbols
 		wstringi configName, configPath;
 		{
-			Symbols registrySyms;
-			if (readRegistryConfig(&configName, &configPath, &registrySyms)) {
-				for (const auto &s : registrySyms)
+			Symbols iniSyms;
+			if (readIniConfig(&configName, &configPath, &iniSyms)) {
+				for (const auto &s : iniSyms)
 					initialSymbols.insert(s);
 			}
 		}
@@ -1056,11 +969,6 @@ public:
 			m_isSettingDialogOpened(false),
 			m_sessionState(0),
 			m_engine(m_log) {
-		Registry reg(MAYU_REGISTRY_ROOT);
-		int escapeNlsKeys = 0;
-		reg.read(L"escapeNLSKeys", &escapeNlsKeys, 0);
-		if (escapeNlsKeys)
-			m_fixScancodeMap = std::make_unique<FixScancodeMap>();
 		m_hNotifyMailslot = CreateMailslot(NOTIFY_MAILSLOT_NAME, 0, MAILSLOT_WAIT_FOREVER, (SECURITY_ATTRIBUTES *)NULL);
 		ASSERT(m_hNotifyMailslot != INVALID_HANDLE_VALUE);
 		int err;
@@ -1224,7 +1132,6 @@ public:
 		ReleaseMutex(m_hMutexYamyd);       // yamyd exits when it loses the mutex
 		if (m_scripter)
 			m_scripter->sendQuit();            // scripter: send quit + close stdin pipe
-		if (m_fixScancodeMap) m_fixScancodeMap->signalQuit(); // FixScancodeMap thread: signal via event
 
 		// --- Phase B+C: stop InputHandlers in parallel, then signal engine ---
 		// signalStop() waits for both InputHandlers (up to 3 s, in parallel),
@@ -1238,8 +1145,6 @@ public:
 		if (m_scripter)
 			n += m_scripter->collectHandles(handles + n, 6 - n);
 		handles[n++] = hEngineThread;
-		HANDLE hFsThread = m_fixScancodeMap ? m_fixScancodeMap->detachThread() : NULL;
-		if (hFsThread) handles[n++] = hFsThread;
 		if (n > 0)
 			WaitForMultipleObjects(n, handles, TRUE, 5000);
 
@@ -1249,7 +1154,6 @@ public:
 		if (m_scripter)
 			m_scripter->closeHandles();
 		m_engine.cleanupAfterStop(hEngineThread);
-		if (hFsThread) CloseHandle(hFsThread);
 
 		// ~ScripterManager() is now a no-op (handles already closed above)
 		m_scripter.reset();
@@ -1279,12 +1183,6 @@ public:
 		CHECK_TRUE( Shell_NotifyIcon(NIM_DELETE, &m_ni) );
 		CHECK_TRUE( DestroyIcon(m_tasktrayIcon[1]) );
 		CHECK_TRUE( DestroyIcon(m_tasktrayIcon[0]) );
-
-		if (!(m_sessionState & SESSION_END_QUERIED) && m_fixScancodeMap) {
-			DWORD_PTR result;
-			SendMessageTimeout(HWND_BROADCAST, WM_NULL, 0, 0, 0, 1000, &result);
-		}
-
 	}
 
 	/// message loop

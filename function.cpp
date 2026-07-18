@@ -8,7 +8,7 @@
 #include "mayu.h"
 #include "mayurc.h"
 #include "misc.h"
-#include "registry.h"
+#include "inifile.h"
 #include "vkeytable.h"
 #include "windowstool.h"
 #include <algorithm>
@@ -1140,21 +1140,21 @@ void Engine::funcLoadSetting(FunctionParam *i_param, const StrExprArg &i_name)
 	if (!i_param->m_isPressed)
 		return;
 	if (!i_name.eval().empty()) {
-		// set MAYU_REGISTRY_ROOT\.mayuIndex which name is same with i_name
-		Registry reg(MAYU_REGISTRY_ROOT);
+		// set .mayuIndex to the entry whose name is same with i_name
+		IniFile ini;
 
 		wregex_stored split(L"^([^;]*);([^;]*);(.*)$");
 		wstringi dot_mayu;
-		for (size_t i = 0; i < MAX_MAYU_REGISTRY_ENTRIES; ++ i) {
+		for (size_t i = 0; i < MAX_MAYU_INI_ENTRIES; ++ i) {
 			wchar_t buf[100];
 			_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", (int)i);
-			if (!reg.read(buf, &dot_mayu))
+			if (!ini.read(buf, &dot_mayu))
 				break;
 
 			std::wsmatch what;
 			if (std::regex_match(dot_mayu, what, split) &&
 					what.str(1) == i_name.eval()) {
-				reg.write(L".mayuIndex", (int)i);
+				ini.write(L".mayuIndex", (int)i);
 				goto success;
 			}
 		}

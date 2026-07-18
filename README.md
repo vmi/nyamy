@@ -36,6 +36,7 @@ NYamy における、Yamy私家版 0.031 からの主な変更点は以下の通
 - 文字列処理を UNICODE (wchar_t / std::wstring) に統一し、`_TCHAR` / `tstring` 抽象化を廃止しました。
 - 32bit版エンジンを削除し 64bit専用としました。(32bitアプリケーション用のフックDLLは維持)
 - 旧コンパイラ互換コード (Borland C++ / Cygwin / Watcom)、ThumbSense 対応、旧インストーラーなど未使用のコード・ファイルを削除しました。
+- NLSキーのエスケープ機能 (`escapeNLSKeys`) を削除しました。動作中にレジストリの Scancode Map を動的に書き換える実験的な機能でしたが、ログインセッション中での Scancode Map 変更反映を実現する方式が、危険を伴いかつ現行世代Windowsでは動作しない可能性が高いものであったためです。
 
 ### バグ修正・改善
 

@@ -6,7 +6,7 @@
 
 #include "mayu.h"
 #include "mayurc.h"
-#include "registry.h"
+#include "inifile.h"
 #include "stringtool.h"
 #include "windowstool.h"
 #include "setting.h"
@@ -23,7 +23,7 @@ class DlgSetting : public LayoutManager
 	HWND m_hwndMayuPaths;				///
 
 	///
-	Registry m_reg;
+	IniFile m_ini;
 
 	using Data = DlgEditSettingData;		///
 
@@ -95,8 +95,7 @@ public:
 	///
 	DlgSetting(HWND i_hwnd)
 			: LayoutManager(i_hwnd),
-			m_hwndMayuPaths(NULL),
-			m_reg(MAYU_REGISTRY_ROOT) {
+			m_hwndMayuPaths(NULL) {
 	}
 
 	/// WM_INITDIALOG
@@ -132,10 +131,10 @@ public:
 		wregex_stored split(L"^([^;]*);([^;]*);(.*)$");
 		wstringi dot_mayu;
 		int i;
-		for (i = 0; i < MAX_MAYU_REGISTRY_ENTRIES; ++ i) {
+		for (i = 0; i < MAX_MAYU_INI_ENTRIES; ++ i) {
 			wchar_t buf[100];
 			_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", i);
-			if (!m_reg.read(buf, &dot_mayu))
+			if (!m_ini.read(buf, &dot_mayu))
 				break;
 
 			std::wsmatch what;
@@ -158,7 +157,7 @@ public:
 
 		// set selection
 		int index;
-		m_reg.read(L".mayuIndex", &index, 0);
+		m_ini.read(L".mayuIndex", &index, 0);
 		setSelectedItem(index);
 
 		// set layout manager
@@ -288,18 +287,18 @@ public:
 				_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
 				Data data;
 				getItem(index, &data);
-				m_reg.write(buf, data.m_name + L";" +
+				m_ini.write(buf, data.m_name + L";" +
 							data.m_filename + L";" + data.m_symbols);
 			}
 			for (; ; ++ index) {
 				_snwprintf(buf, NUMBER_OF(buf), L".mayu%d", index);
-				if (!m_reg.remove(buf))
+				if (!m_ini.remove(buf))
 					break;
 			}
 			index = getSelectedItem();
 			if (index < 0)
 				index = 0;
-			m_reg.write(L".mayuIndex", index);
+			m_ini.write(L".mayuIndex", index);
 			EndDialog(m_hwnd, 1);
 			return TRUE;
 		}

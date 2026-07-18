@@ -9,7 +9,7 @@
 #include "cmd_stream_reader.h"
 #include "pipe_streambuf.h"
 #include "stringtool.h"
-#include "registry.h"
+#include "inifile.h"
 #include "mayu.h"
 
 #include <process.h>
@@ -213,14 +213,14 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	wstringi nyamyHome = exeDrive;
 	nyamyHome += exeDir;
 
-	// The ini/registry value "cmdLine", if present, is the FULL command line
+	// The ini value "cmdLine", if present, is the FULL command line
 	// (executable plus arguments) used to launch the scripter, so that any
 	// program speaking the scripter protocol can be substituted.  When absent,
 	// fall back to nyamy-scripter.exe next to nyamy.exe.
 	wstringi iniCmdLine;
 	{
-		Registry reg(MAYU_REGISTRY_ROOT);
-		reg.read(L"cmdLine", &iniCmdLine);
+		IniFile ini;
+		ini.read(L"cmdLine", &iniCmdLine);
 	}
 
 	std::wstring cmdLineStr;

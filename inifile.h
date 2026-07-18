@@ -1,0 +1,49 @@
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// inifile.h
+
+
+#ifndef _INIFILE_H
+#  define _INIFILE_H
+
+#  include "stringtool.h"
+#  include <vector>
+
+
+/// UTF-8 ini file access class (%LOCALAPPDATA%\NYamy\Config\nyamy.ini).
+/// On first use, a nyamy.ini placed next to the executable (if any) is
+/// copied there as the seed; afterwards only the LOCALAPPDATA copy is used.
+/// The file is read as UTF-8 (an optional BOM is skipped) and written as
+/// UTF-8 with BOM, CRLF line endings.  Values live under the [nyamy] section;
+/// comments (; or #), blank lines and unknown lines are preserved on write.
+class IniFile
+{
+	std::wstring m_path;				/// full path of nyamy.ini
+
+public:
+	///
+	IniFile();
+
+	/// read int
+	bool read(const std::wstring &i_name, int *o_value,
+			  int i_defaultValue = 0) const;
+	/// write int
+	bool write(const std::wstring &i_name, int i_value) const;
+
+	/// read std::wstring
+	bool read(const std::wstring &i_name, std::wstring *o_value,
+			  const std::wstring &i_defaultValue = L"") const;
+	/// write std::wstring
+	bool write(const std::wstring &i_name, const std::wstring &i_value) const;
+
+	/// read LOGFONT
+	bool read(const std::wstring &i_name, LOGFONT *o_value,
+			  const std::wstring &i_defaultStringValue) const;
+	/// write LOGFONT
+	bool write(const std::wstring &i_name, const LOGFONT &i_value) const;
+
+	/// remove the value; returns false if it did not exist
+	bool remove(const std::wstring &i_name) const;
+};
+
+
+#endif // !_INIFILE_H

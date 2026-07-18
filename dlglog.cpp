@@ -5,7 +5,7 @@
 #include "misc.h"
 #include "mayu.h"
 #include "mayurc.h"
-#include "registry.h"
+#include "inifile.h"
 #include "windowstool.h"
 #include "msgstream.h"
 #include "layoutmanager.h"
@@ -44,8 +44,7 @@ public:
 		setBigIcon(m_hwnd, IDI_ICON_mayu);
 
 		// set font
-		Registry::read(MAYU_REGISTRY_ROOT, L"logFont", &m_lf,
-					   loadString(IDS_logFont));
+		IniFile().read(L"logFont", &m_lf, loadString(IDS_logFont));
 		m_hfont = CreateFontIndirect(&m_lf);
 		SetWindowFont(m_hwndEdit, m_hfont, false);
 
@@ -132,7 +131,7 @@ public:
 				SetWindowFont(m_hwndEdit, hfontNew, true);
 				DeleteObject(m_hfont);
 				m_hfont = hfontNew;
-				Registry::write(MAYU_REGISTRY_ROOT, L"logFont", m_lf);
+				IniFile().write(L"logFont", m_lf);
 			}
 			return TRUE;
 		}

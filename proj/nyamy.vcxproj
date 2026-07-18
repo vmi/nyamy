@@ -105,14 +105,13 @@
     <ClCompile Include="..\dlgsetting.cpp" />
     <ClCompile Include="..\dlgversion.cpp" />
     <ClCompile Include="..\engine.cpp" />
-    <ClCompile Include="..\fixscancodemap.cpp" />
     <ClCompile Include="..\focus.cpp" />
     <ClCompile Include="..\function.cpp" />
     <ClCompile Include="..\keyboard.cpp" />
     <ClCompile Include="..\keymap.cpp" />
     <ClCompile Include="..\layoutmanager.cpp" />
+    <ClCompile Include="..\inifile.cpp" />
     <ClCompile Include="..\mayu.cpp" />
-    <ClCompile Include="..\registry.cpp" />
     <ClCompile Include="..\scripter_manager.cpp" />
     <ClCompile Include="..\setting_builder.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
@@ -133,7 +132,6 @@
     <ClInclude Include="..\dlgversion.h" />
     <ClInclude Include="..\engine.h" />
     <ClInclude Include="..\errormessage.h" />
-    <ClInclude Include="..\fixscancodemap.h" />
     <ClInclude Include="..\focus.h" />
     <ClInclude Include="..\function.h" />
     <ClInclude Include="..\functions.h" />
@@ -148,8 +146,8 @@
     <ClInclude Include="..\misc.h" />
     <ClInclude Include="..\pipe_streambuf.h" />
     <ClInclude Include="..\msgstream.h" />
+    <ClInclude Include="..\inifile.h" />
     <ClInclude Include="..\multithread.h" />
-    <ClInclude Include="..\registry.h" />
     <ClInclude Include="..\setting.h" />
     <ClInclude Include="..\cmd_stream.h" />
     <ClInclude Include="..\setting_builder.h" />

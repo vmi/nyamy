@@ -27,13 +27,12 @@
     <ClCompile Include="..\dlgsetting.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\dlgversion.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\engine.cpp"><Filter>Engine</Filter></ClCompile>
-    <ClCompile Include="..\fixscancodemap.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\focus.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\function.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\keyboard.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\keymap.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\layoutmanager.cpp"><Filter>Engine</Filter></ClCompile>
-    <ClCompile Include="..\registry.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\inifile.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\setting_builder.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\stringtool.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\target.cpp"><Filter>Engine</Filter></ClCompile>

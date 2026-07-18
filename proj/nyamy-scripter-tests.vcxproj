@@ -109,13 +109,12 @@
     <ClCompile Include="..\dlgsetting.cpp" />
     <ClCompile Include="..\dlgversion.cpp" />
     <ClCompile Include="..\engine.cpp" />
-    <ClCompile Include="..\fixscancodemap.cpp" />
     <ClCompile Include="..\focus.cpp" />
     <ClCompile Include="..\function.cpp" />
     <ClCompile Include="..\keyboard.cpp" />
     <ClCompile Include="..\keymap.cpp" />
+    <ClCompile Include="..\inifile.cpp" />
     <ClCompile Include="..\layoutmanager.cpp" />
-    <ClCompile Include="..\registry.cpp" />
     <ClCompile Include="..\setting_builder.cpp" />
     <ClCompile Include="..\stringtool.cpp" />
     <ClCompile Include="..\target.cpp" />

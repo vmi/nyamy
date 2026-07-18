@@ -42,9 +42,6 @@
     <ClCompile Include="..\engine.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="..\fixscancodemap.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="..\focus.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -63,7 +60,7 @@
     <ClCompile Include="..\mayu.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="..\registry.cpp">
+    <ClCompile Include="..\inifile.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="..\scripter_manager.cpp">
@@ -131,9 +128,6 @@
     <ClInclude Include="..\errormessage.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="..\fixscancodemap.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="..\focus.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -170,7 +164,7 @@
     <ClInclude Include="..\multithread.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="..\registry.h">
+    <ClInclude Include="..\inifile.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="..\setting.h">
