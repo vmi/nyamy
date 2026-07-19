@@ -181,7 +181,6 @@
   <ItemGroup>
     <Image Include="..\r\mayu.ico" />
     <Image Include="..\r\mayudisabled.ico" />
-    <Image Include="..\r\mayufile.ico" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\r\target.cur" />

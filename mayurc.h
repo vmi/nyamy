@@ -4,25 +4,11 @@
 //
 #define IDS_mayu                        1
 #define IDS_mayuAlreadyExists           2
-#define IDS_cannotOpenDevice            3
-#define IDS_driverNotInstalled          4
-#define IDS_executedInRemoteDesktop     5
 #define IDS_unexpectedError             6
 #define IDS_openMayu                    10
 #define IDS_openMayuFilter              11
 #define IDS_helpFilename                12
-#define IDS_mayuFile                    13
-#define IDS_mayuShellOpen               14
-#define IDS_readFromHomeDirectory       15
 #define IDS_logFont                     16
-#define IDS_109Emacs                    17
-#define IDS_104on109Emacs               18
-#define IDS_109                         19
-#define IDS_104on109                    20
-#define IDS_104Emacs                    21
-#define IDS_109on104Emacs               22
-#define IDS_104                         23
-#define IDS_109on104                    24
 #define IDS_mayuPathName                25
 #define IDS_mayuPath                    26
 #define IDS_mayuSymbols                 27
@@ -37,7 +23,6 @@
 #define IDD_DIALOG_setting              105
 #define IDD_DIALOG_version              106
 #define IDI_ICON_mayu                   107
-#define IDI_ICON_mayu_file              108
 #define IDI_ICON_mayu_disabled          109
 #define IDR_MENU_tasktray               110
 #define IDC_BUTTON_add                  1001
@@ -64,8 +49,6 @@
 #define IDC_STATIC_mayuPaths            1022
 #define IDC_STATIC_symbols              1023
 #define IDC_STATIC_symbolsComment       1024
-#define IDC_STATIC_url                  1025
-#define IDC_STATIC_version              1026
 #define IDC_EDIT_builtBy                1027
 #define IDC_STATIC_mayuIcon             1028
 #define ID_MENUITEM_quit                40001
