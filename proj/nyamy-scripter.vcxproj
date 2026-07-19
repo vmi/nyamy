@@ -122,6 +122,9 @@
   <ItemGroup>
     <Manifest Include="..\scripter\mruby_main.manifest" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\version_nyamy_scripter.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

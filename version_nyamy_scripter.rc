@@ -1,0 +1,9 @@
+// Version resource for nyamy-scripter.exe (mruby scripter executable).
+#include <winresrc.h>
+
+#define NYAMY_VER_FILEDESCRIPTION	"NYamy mruby scripter"
+#define NYAMY_VER_INTERNALNAME		"nyamy-scripter"
+#define NYAMY_VER_ORIGINALFILENAME	"nyamy-scripter.exe"
+#define NYAMY_VER_FILETYPE			VFT_APP
+
+#include "version.rc2"

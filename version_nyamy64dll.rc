@@ -1,0 +1,9 @@
+// Version resource for nyamy64.dll (64-bit keyboard hook DLL).
+#include <winresrc.h>
+
+#define NYAMY_VER_FILEDESCRIPTION	"NYamy keyboard hook DLL (64-bit)"
+#define NYAMY_VER_INTERNALNAME		"nyamy64"
+#define NYAMY_VER_ORIGINALFILENAME	"nyamy64.dll"
+#define NYAMY_VER_FILETYPE			VFT_DLL
+
+#include "version.rc2"

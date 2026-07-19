@@ -1,0 +1,39 @@
+// version.rc2 - shared VERSIONINFO resource body.
+// Included from per-binary version_*.rc wrappers, which must define:
+//	NYAMY_VER_FILEDESCRIPTION, NYAMY_VER_INTERNALNAME,
+//	NYAMY_VER_ORIGINALFILENAME, NYAMY_VER_FILETYPE
+// proj/nyamy.props injects via rc.exe /d:
+//	NYAMY_VER_STRING (unquoted full version, may include a pre-release tag)
+//	NYAMY_VER_NUMERIC (comma-separated numeric part, e.g. 1,0,0)
+// NYAMY_VER_STRING is passed unquoted because quotes do not survive the
+// rc.exe command line reliably; stringize it here instead.
+
+#define NYAMY_VER_STR2(x)	#x
+#define NYAMY_VER_STR(x)	NYAMY_VER_STR2(x)
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION NYAMY_VER_NUMERIC,0
+PRODUCTVERSION NYAMY_VER_NUMERIC,0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0x0L
+FILEOS VOS_NT_WINDOWS32
+FILETYPE NYAMY_VER_FILETYPE
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "040904b0"
+		BEGIN
+			VALUE "ProductName", "NYamy"
+			VALUE "ProductVersion", NYAMY_VER_STR(NYAMY_VER_STRING)
+			VALUE "FileVersion", NYAMY_VER_STR(NYAMY_VER_STRING)
+			VALUE "FileDescription", NYAMY_VER_FILEDESCRIPTION
+			VALUE "InternalName", NYAMY_VER_INTERNALNAME
+			VALUE "OriginalFilename", NYAMY_VER_ORIGINALFILENAME
+		END
+	END
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x409, 1200
+	END
+END

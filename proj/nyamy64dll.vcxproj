@@ -106,6 +106,9 @@
     <ClInclude Include="..\misc.h" />
     <ClInclude Include="..\stringtool.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\version_nyamy64dll.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

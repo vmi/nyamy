@@ -1,0 +1,9 @@
+// Version resource for nyamy32.dll (32-bit keyboard hook DLL).
+#include <winresrc.h>
+
+#define NYAMY_VER_FILEDESCRIPTION	"NYamy keyboard hook DLL (32-bit)"
+#define NYAMY_VER_INTERNALNAME		"nyamy32"
+#define NYAMY_VER_ORIGINALFILENAME	"nyamy32.dll"
+#define NYAMY_VER_FILETYPE			VFT_DLL
+
+#include "version.rc2"

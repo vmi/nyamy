@@ -159,6 +159,7 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\mayu.rc" />
+    <ResourceCompile Include="..\version_nyamy.rc" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="makefunc.vcxproj">

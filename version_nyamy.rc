@@ -1,0 +1,9 @@
+// Version resource for nyamy.exe (64-bit main executable).
+#include <winresrc.h>
+
+#define NYAMY_VER_FILEDESCRIPTION	"NYamy keyboard remapper"
+#define NYAMY_VER_INTERNALNAME		"nyamy"
+#define NYAMY_VER_ORIGINALFILENAME	"nyamy.exe"
+#define NYAMY_VER_FILETYPE			VFT_APP
+
+#include "version.rc2"

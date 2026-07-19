@@ -1,0 +1,9 @@
+// Version resource for nyamyd32 (32-bit helper process, no extension).
+#include <winresrc.h>
+
+#define NYAMY_VER_FILEDESCRIPTION	"NYamy 32-bit helper process"
+#define NYAMY_VER_INTERNALNAME		"nyamyd32"
+#define NYAMY_VER_ORIGINALFILENAME	"nyamyd32"
+#define NYAMY_VER_FILETYPE			VFT_APP
+
+#include "version.rc2"
