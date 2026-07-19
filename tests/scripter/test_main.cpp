@@ -71,6 +71,7 @@ void reportFirstDiff(const std::wstring &a, const std::wstring &b)
 
 struct Combo {
 	const char *name;
+	bool workaround;   // additionally load workaround.mayu / workaround.mayu.rb
 	std::vector<const wchar_t *> symbols;
 };
 
@@ -95,16 +96,38 @@ int main()
 	std::string exeDirU8 = wideToUtf8(exeDir);
 	std::string rbScript    = exeDirU8 + "\\dot.mayu.rb";
 	std::string viaMayuPath = exeDirU8 + "\\__via_mayu__.rb";
+	std::string wkRbPath    = exeDirU8 + "\\__wk_via_rb__.rb";
+	std::string wkMayuPath  = exeDirU8 + "\\__wk_via_mayu__.rb";
 
-	// Generate the .mayu loader script.
+	// Generate the loader scripts.  workaround.* is not included from dot.*,
+	// so chain it behind the dot configuration.  The .mayu reference uses a
+	// wrapper .mayu (single compile) because `define`d symbols do not
+	// propagate between two separate `load "*.mayu"` calls.
 	writeUtf8File(exeDir + L"\\__via_mayu__.rb", L"load \"dot.mayu\"\n");
+	writeUtf8File(exeDir + L"\\__wk_all__.mayu",
+	              L"include \"dot.mayu\"\ninclude \"workaround.mayu\"\n");
+	writeUtf8File(exeDir + L"\\__wk_via_mayu__.rb",
+	              L"load \"__wk_all__.mayu\"\n");
+	writeUtf8File(exeDir + L"\\__wk_via_rb__.rb",
+	              L"load \"dot.mayu.rb\"\nload \"workaround.mayu.rb\"\n");
 
 	const Combo combos[] = {
-		{ "USE104",                                   { L"USE104" } },
-		{ "USE104 + USE109on104",                     { L"USE104", L"USE109on104" } },
-		{ "USE109",                                   { L"USE109" } },
-		{ "USE109 + USE104on109",                     { L"USE109", L"USE104on109" } },
-		{ "USE109 + USE104on109 + USEdefault",        { L"USE109", L"USE104on109", L"USEdefault" } },
+		{ "USE104",                                   false,
+		  { L"USE104" } },
+		{ "USE104 + USE109on104",                     false,
+		  { L"USE104", L"USE109on104" } },
+		{ "USE109",                                   false,
+		  { L"USE109" } },
+		{ "USE109 + USE104on109",                     false,
+		  { L"USE109", L"USE104on109" } },
+		{ "USE109 + USE104on109 + USEdefault",        false,
+		  { L"USE109", L"USE104on109", L"USEdefault" } },
+		{ "USE104 + workaround",                      true,
+		  { L"USE104" } },
+		{ "USE109 + USEdefault + MAP-ESCAPE-TO-META + workaround", true,
+		  { L"USE109", L"USEdefault", L"MAP-ESCAPE-TO-META" } },
+		{ "USE109 + USE104on109 + USEdefault + workaround", true,
+		  { L"USE109", L"USE104on109", L"USEdefault" } },
 	};
 
 	int failures = 0;
@@ -117,8 +140,10 @@ int main()
 		printf("[%d] %s ... ", idx, combo.name);
 		fflush(stdout);
 
-		std::shared_ptr<Setting> a = buildSetting(viaMayuPath, syms); // .mayu
-		std::shared_ptr<Setting> b = buildSetting(rbScript, syms);    // .mayu.rb
+		std::shared_ptr<Setting> a = buildSetting(
+			combo.workaround ? wkMayuPath : viaMayuPath, syms);  // .mayu
+		std::shared_ptr<Setting> b = buildSetting(
+			combo.workaround ? wkRbPath : rbScript, syms);       // .mayu.rb
 
 		if (!a || !b) {
 			printf("FAIL (load failed: %s%s)\n",
