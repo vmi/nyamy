@@ -35,7 +35,8 @@ if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
 }
 
-$pkgFile = "nyamy-$Version.zip"
+$suffix = if ($Configuration -eq "Debug") { "-debug" } else { "" }
+$pkgFile = "nyamy-$Version$suffix.zip"
 $pkgPath = Join-Path $targetDir $pkgFile
 
 # Remove existing zip
@@ -45,16 +46,17 @@ if (Test-Path $pkgPath) {
 
 $files = @(
     "nyamy.ini",
-    "104.mayu",
-    "109.mayu",
-    "default.mayu",
-    "emacsedit.mayu",
-    "104on109.mayu",
-    "109on104.mayu",
-    "dot.mayu",
-    "workaround.mayu",
+    "104.mayu.rb",
+    "109.mayu.rb",
+    "default.mayu.rb",
+    "emacsedit.mayu.rb",
+    "104on109.mayu.rb",
+    "109on104.mayu.rb",
+    "dot.mayu.rb",
+    "workaround.mayu.rb",
     "workaround.reg",
-    "readme.txt",
+    "README.md",
+    "LICENSE.txt",
     "nyamy.exe",
     "nyamy32.dll",
     "nyamyd32",

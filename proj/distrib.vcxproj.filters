@@ -15,31 +15,28 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\104.mayu">
+    <CustomBuild Include="..\104.mayu.rb">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\104on109.mayu">
+    <CustomBuild Include="..\104on109.mayu.rb">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\109.mayu">
+    <CustomBuild Include="..\109.mayu.rb">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\109on104.mayu">
+    <CustomBuild Include="..\109on104.mayu.rb">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\default.mayu">
+    <CustomBuild Include="..\default.mayu.rb">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\dot.mayu">
+    <CustomBuild Include="..\dot.mayu.rb">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\emacsedit.mayu">
+    <CustomBuild Include="..\emacsedit.mayu.rb">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\readme.txt">
-      <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\workaround.mayu">
+    <CustomBuild Include="..\workaround.mayu.rb">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
     <CustomBuild Include="..\workaround.reg">
@@ -48,10 +45,18 @@
     <CustomBuild Include="..\nyamy.ini">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\README.md">
+      <Filter>リソース ファイル</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\tools\makedistrib.ps1">
       <Filter>リソース ファイル</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\LICENSE.txt">
+      <Filter>リソース ファイル</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>
