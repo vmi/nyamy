@@ -10,3 +10,7 @@ Makefile	eol=lf
 
 /scripter/mruby-dist/** eol=lf
 /scripter/mruby-dist/**/*.lib binary
+
+# Run following command for git diff.
+# git config diff.rcdiff.textconv ./tools/rcconv.sh
+*.rc binary diff=rcdiff
