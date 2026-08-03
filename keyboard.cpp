@@ -177,8 +177,6 @@ std::wostream &operator<<(std::wostream &i_ost, Modifier::Type i_type)
 		L"Minimized",
 		L"MdiMaximized",
 		L"MdiMinimized",
-		L"Touchpad",
-		L"TouchpadSticky",
 		L"Mod0",
 		L"Mod1",
 		L"Mod2",

@@ -1,0 +1,16 @@
+NYamy %s
+  %s
+
+Copyright (C) 2026, IWAMURO Motonori <vmi@nifty.com>
+
+built by %s
+  %s
+  %s
+
+  %s
+
+This program derived from
+- MADO TSUKAI NO YUUTSU (窓使いの憂鬱)
+  Copyright (c) 1999-2005, TAGA Nayuta <nayuta@users.sourceforge.net>
+- Yet Another Mado tsukai no Yuutsu (YAMY)
+  Copyright (c) 2009, KOBAYASHI Yoshiaki <gimy@users.sourceforge.jp>
