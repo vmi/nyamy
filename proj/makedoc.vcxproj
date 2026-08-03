@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Regenerates doc\README-ja.html from doc\src\manual-ja\*.md.
+
+       This project is deliberately NOT built as part of the solution: the
+       generated HTML is committed, so an ordinary C++ build needs neither
+       Python nor Python-Markdown.  nyamy.sln registers it with ActiveCfg but
+       without Build.0, which excludes it from "Build Solution" while leaving
+       "Build" on its context menu working.  Tick it in Configuration Manager
+       to opt into building it every time.
+
+       Prerequisites: Python 3.10+ and  py -m pip install -r tools\requirements.txt  -->
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{89B73A41-31DE-4480-A574-2C8806F66E8B}</ProjectGuid>
+    <RootNamespace>makedoc</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="nyamy.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="nyamy.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>12.0.30501.0</_ProjectFileVersion>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+  </ItemDefinitionGroup>
+  <!-- Editing any of these re-runs the build. -->
+  <ItemGroup>
+    <DocSource Include="..\doc\src\manual-ja\*.md" />
+    <DocSource Include="..\doc\src\style.css" />
+    <DocSource Include="..\doc\HISTORY-ja.md" />
+    <DocSource Include="..\README.md" />
+    <DocSource Include="..\README-ymgw.md" />
+    <DocSource Include="..\tools\ps1exec.cmd" />
+    <DocSource Include="..\tools\makedoc.ps1" />
+    <DocSource Include="..\tools\makedoc.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\doc\src\template.html">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">makedoc: generating doc\README-ja.html from doc\src</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\tools\ps1exec.cmd ..\tools\makedoc.ps1 ..\doc\src ..\doc
+</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">@(DocSource);%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\doc\README-ja.html;..\doc\style.css;..\doc\HISTORY-ja.html;..\doc\README-nyamy.html;..\doc\README-ymgw.html;%(Outputs)</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">makedoc: generating doc\README-ja.html from doc\src</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\tools\ps1exec.cmd ..\tools\makedoc.ps1 ..\doc\src ..\doc
+</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">@(DocSource);%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\doc\README-ja.html;..\doc\style.css;..\doc\HISTORY-ja.html;..\doc\README-nyamy.html;..\doc\README-ymgw.html;%(Outputs)</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\doc\src\manual-ja\00-front.md" />
+    <None Include="..\doc\src\manual-ja\01-abstract.md" />
+    <None Include="..\doc\src\manual-ja\02-install.md" />
+    <None Include="..\doc\src\manual-ja\03-uninstall.md" />
+    <None Include="..\doc\src\manual-ja\04-menu.md" />
+    <None Include="..\doc\src\manual-ja\05-tutorial.md" />
+    <None Include="..\doc\src\manual-ja\06-faq.md" />
+    <None Include="..\doc\src\manual-ja\07-customize.md" />
+    <None Include="..\doc\src\manual-ja\08-security.md" />
+    <None Include="..\doc\src\manual-ja\09-bugs.md" />
+    <None Include="..\doc\src\manual-ja\10-related-work.md" />
+    <None Include="..\doc\src\manual-ja\11-references.md" />
+    <None Include="..\doc\src\manual-ja\12-copyright.md" />
+    <None Include="..\doc\src\manual-ja\13-support.md" />
+    <None Include="..\doc\src\manual-ja\14-acknowledgements.md" />
+    <None Include="..\doc\src\manual-ja\15-history.md" />
+    <None Include="..\doc\src\manual-ja\16-appendix.md" />
+    <None Include="..\doc\src\style.css" />
+    <None Include="..\tools\makedoc.ps1" />
+    <None Include="..\tools\makedoc.py" />
+    <None Include="..\tools\requirements.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="tools/makedoc.py">
+<link rel="stylesheet" type="text/css" href="style.css">
+<title>{{title}}</title>
+<script>
+// Sidebar width: drag the divider, double-click it to go back to the default.
+// The width is restored here in <head> so the page never paints at the wrong
+// size first.  Without JavaScript the CSS default in style.css simply stands.
+(function () {
+	var KEY = "nyamy-doc-nav-width";
+	var root = document.documentElement;
+
+	function px(v) { return parseFloat(v) || 0; }
+
+	function clamp(w) {
+		var min = 12 * px(getComputedStyle(root).fontSize);
+		return Math.max(min, Math.min(w, window.innerWidth * 0.5));
+	}
+
+	function apply(w) { root.style.setProperty("--nav-width", clamp(w) + "px"); }
+
+	try {
+		var saved = localStorage.getItem(KEY);
+		if (saved) { apply(px(saved)); }
+	} catch (e) { /* private mode: fall back to the CSS default */ }
+
+	document.addEventListener("DOMContentLoaded", function () {
+		var bar = document.getElementById("nav-resizer");
+		var nav = document.getElementById("contents");
+		if (!bar || !nav) { return; }
+
+		function width() { return nav.getBoundingClientRect().width; }
+
+		function save() {
+			try { localStorage.setItem(KEY, width()); } catch (e) { /* ignore */ }
+		}
+
+		bar.addEventListener("pointerdown", function (ev) {
+			if (getComputedStyle(bar).display === "none") { return; }
+			bar.setPointerCapture(ev.pointerId);
+			bar.classList.add("dragging");
+			ev.preventDefault();
+		});
+
+		bar.addEventListener("pointermove", function (ev) {
+			if (!bar.classList.contains("dragging")) { return; }
+			apply(ev.clientX - nav.getBoundingClientRect().left);
+		});
+
+		function stop(ev) {
+			if (!bar.classList.contains("dragging")) { return; }
+			bar.classList.remove("dragging");
+			try { bar.releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+			save();
+		}
+		bar.addEventListener("pointerup", stop);
+		bar.addEventListener("pointercancel", stop);
+
+		bar.addEventListener("dblclick", function () {
+			root.style.removeProperty("--nav-width");
+			try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+		});
+
+		bar.addEventListener("keydown", function (ev) {
+			var step = ev.key === "ArrowLeft" ? -16
+				: ev.key === "ArrowRight" ? 16 : 0;
+			if (!step) { return; }
+			apply(width() + step);
+			save();
+			ev.preventDefault();
+		});
+	});
+})();
+</script>
+</head>
+<body class="manual">
+<!-- DO NOT EDIT.
+     This file is generated from doc/src/manual-ja/*.md by tools/makedoc.py.
+     Edit the Markdown sources and rebuild:
+       tools\ps1exec.cmd tools\makedoc.ps1 doc\src doc
+-->
+<input type="checkbox" id="nav-toggle" hidden>
+<label for="nav-toggle" id="nav-button" title="目次">&#9776;</label>
+
+<nav id="contents">
+<div class="contents-head"><a href="{{home}}">{{home_label}}</a></div>
+{{toc}}
+</nav>
+
+<div id="nav-resizer" role="separator" aria-orientation="vertical"
+     aria-label="目次の幅" tabindex="0"
+     title="ドラッグで目次の幅を変更 / ダブルクリックで既定に戻す"></div>
+
+<main id="top">
+{{content}}
+</main>
+
+</body>
+</html>

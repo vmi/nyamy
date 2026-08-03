@@ -1,0 +1,482 @@
+/* NYamy manual stylesheet.
+ *
+ * Derived from the original README.css of 窓使いの憂鬱.  The old sheet styled
+ * a <dl>/<dt class="h1">/<dd class="d1"> tree inside a frameset; this one
+ * styles real headings on a single page, but keeps the original palette:
+ * black chapter bars, #7a96df subsection bars, #a00 code, keycap <kbd>.
+ */
+
+/* --- general ------------------------------------------------------------ */
+
+:root {
+  --fg: #000;
+  --bg: #fff;
+  --accent: #7a96df;
+  --code: #a00;
+  --rule: #aaa;
+  --soft: #eef;
+  --nav-width: 22em;
+}
+
+/* No scroll-behavior: smooth here.  On a document this long a jump from the
+ * table of contents to a far-away chapter animates for seconds. */
+
+body {
+  color: var(--fg);
+  background-color: var(--bg);
+  font-family: Arial, "Yu Gothic UI", "Meiryo", sans-serif;
+  font-size: medium;
+  line-height: 1.7;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+a {
+  color: #14e;
+}
+
+a:hover, a:active {
+  background-color: #ffa;
+}
+
+img {
+  border-width: 0;
+  max-width: 100%;
+  height: auto;
+}
+
+code {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 95%;
+  color: var(--code);
+}
+
+a code {
+  color: inherit;
+}
+
+em {
+  color: var(--fg);
+  font-style: normal;
+  font-weight: bold;
+}
+
+/* Metavariables (the old ⟨…⟩ placeholders) only ever appear inside code
+ * spans; unlike Japanese emphasis they keep the italic, and stay black so
+ * they stand apart from the red literal code around them. */
+code em {
+  font-style: italic;
+  color: var(--fg);
+}
+
+a code em {
+  color: inherit;  /* keep cross-reference links one colour */
+}
+
+strong {
+  font-weight: bold;
+}
+
+kbd {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 90%;
+  color: var(--fg);
+  background-color: #ccc;
+  border: 3px outset #fff;
+  border-radius: 3px;
+  padding: 0 3px;
+  margin: 0 2px;
+  white-space: nowrap;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 2em 0;
+}
+
+/* --- sidebar ------------------------------------------------------------ */
+
+#nav-toggle,
+#nav-button {
+  display: none;
+}
+
+/* The original contents pane was banded, not black all over: chapters sat on
+ * black, their sections on white behind a 3px rule, and the level below that
+ * on #eef with disc bullets.  The generated table of contents is nested <ul>s
+ * inside div.toc, so the depth of the nesting stands in for those classes. */
+
+#contents {
+  flex: 0 0 var(--nav-width);
+  width: var(--nav-width);
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-size: smaller;
+  line-height: 1.5;
+  padding-bottom: 2em;
+}
+
+#contents .contents-head {
+  font-weight: bold;
+  padding: .8em 1em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: #000;
+  color: #fff;
+  border-bottom: 3px solid var(--rule);
+}
+
+#contents .contents-head a {
+  color: #fff;
+}
+
+#contents a {
+  text-decoration: none;
+  display: block;
+  padding: .2em 1em;
+}
+
+#contents ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* chapter (was .contents .section) */
+#contents .toc > ul > li > a {
+  background-color: #000;
+  color: #fff;
+  font-weight: bold;
+}
+
+#contents .toc > ul > li > a:hover,
+#contents .toc > ul > li > a:active {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+/* section (was .contents .subsection) */
+#contents .toc > ul > li > ul {
+  background-color: var(--bg);
+  border-top: 3px solid var(--rule);
+  padding: .5ex 0;
+}
+
+#contents .toc > ul > li > ul > li > a {
+  color: var(--fg);
+  padding-left: 2em;
+}
+
+/* subsection (was .contents .subsubsection) */
+#contents .toc > ul > li > ul > li > ul {
+  background-color: var(--soft);
+  border-top: none;
+  padding: .5ex 0;
+}
+
+#contents .toc > ul > li > ul > li > ul > li {
+  list-style: disc;
+  margin-left: 3.4em;
+}
+
+#contents .toc > ul > li > ul > li > ul > li > a {
+  display: inline-block;
+  padding: 0 .3em;
+}
+
+#contents .toc ul ul a:hover,
+#contents .toc ul ul a:active {
+  color: var(--fg);
+  background-color: #ffa;
+  text-decoration: underline;
+}
+
+/* --- width handle ------------------------------------------------------- */
+
+#nav-resizer {
+  flex: 0 0 6px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  cursor: col-resize;
+  background-color: var(--rule);
+  opacity: .3;
+  touch-action: none;
+}
+
+#nav-resizer:hover,
+#nav-resizer:focus-visible,
+#nav-resizer.dragging {
+  background-color: var(--accent);
+  opacity: 1;
+  outline: none;
+}
+
+/* --- main column -------------------------------------------------------- */
+
+main {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 62em;
+  padding: 0 2.5em 8em 2.5em;
+  box-sizing: border-box;
+}
+
+main > h1 {
+  text-align: center;
+  font-size: 1.7em;
+  margin: 1em 0 .2em 0;
+}
+
+/* chapter — the old .manual .h1 */
+h2 {
+  font-size: 1.25em;
+  font-weight: bold;
+  background-color: #000;
+  color: #fff;
+  border-bottom: 3px solid var(--rule);
+  padding: .3em .5em;
+  margin: 2.5em -.5em 1em -.5em;
+  scroll-margin-top: .5em;
+}
+
+/* section — the old .manual .h2 */
+h3 {
+  font-size: 1.1em;
+  font-weight: bold;
+  margin: 2em 0 .6em 0;
+  padding-bottom: .2em;
+  border-bottom: 1px solid var(--rule);
+  scroll-margin-top: .5em;
+}
+
+/* subsection — the old .manual .h3 */
+h4 {
+  font-size: 1em;
+  font-weight: bold;
+  background-color: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  padding: .15em .6em;
+  margin: 1.8em 0 .6em 0;
+  scroll-margin-top: .5em;
+}
+
+/* the old .manual .h4 */
+h5 {
+  font-size: 1em;
+  font-weight: bold;
+  margin: 1.4em 0 .4em 0;
+  scroll-margin-top: .5em;
+}
+
+/* Headings that carry a background must not keep the red code colour: in the
+ * &FUNCTION reference the whole heading is a code span, and #a00 on #7a96df is
+ * unreadable.  The original manual showed the function name in bold white and
+ * its arguments in black, which is what these two rules restore. */
+h2 code, h4 code {
+  color: inherit;
+}
+
+h4 em {
+  color: #000;
+}
+
+p {
+  margin: 1em 0;
+  text-align: justify;
+}
+
+ul, ol {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+li {
+  margin: .25em 0;
+}
+
+blockquote {
+  margin: 1em 2em;
+  padding: .5em 1em;
+  background-color: var(--soft);
+  border-left: 4px solid var(--accent);
+}
+
+/* --- definition lists (&FUNCTION reference, menu items) ----------------- */
+
+dl {
+  margin: 1em 0;
+}
+
+dt {
+  font-weight: bold;
+  margin-top: 1em;
+}
+
+dd {
+  margin: .3em 0 .3em 2em;
+}
+
+/* --- syntax sample blocks (the old p.sample) ---------------------------- */
+
+pre.sample {
+  font-family: "Consolas", "Courier New", monospace;
+  color: var(--code);
+  background-color: var(--bg);
+  border: 1px solid var(--code);
+  padding: .6em 1em;
+  margin: 1em 0 1em 4pt;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+pre.sample code {
+  color: inherit;
+  font-size: 100%;
+}
+
+pre.sample em {
+  color: var(--fg);  /* metavariables in black, as the original did */
+  font-style: italic;
+  font-weight: bold;
+}
+
+/* --- other code blocks -------------------------------------------------- */
+
+pre {
+  background-color: var(--soft);
+  padding: .6em 1em;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+pre code {
+  color: var(--fg);
+}
+
+/* --- tables ------------------------------------------------------------- */
+
+table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 95%;
+}
+
+th, td {
+  border: 1px solid #000;
+  padding: .2em .6em;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background-color: var(--accent);
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* --- inline markers ----------------------------------------------------- */
+
+.bug {
+  font-weight: bold;
+  color: #f00;
+}
+
+.menu-item {
+  background-color: var(--bg);
+  border: 1px solid #000;
+  padding: 2px .5em;
+  margin: 0 .25em;
+  font-family: "Yu Gothic UI", "MS UI Gothic", sans-serif;
+  white-space: nowrap;
+}
+
+/* --- narrow screens ----------------------------------------------------- */
+
+@media (max-width: 900px) {
+  #nav-button {
+    display: block;
+    position: fixed;
+    top: .5em;
+    left: .5em;
+    z-index: 20;
+    background-color: #000;
+    color: #fff;
+    border-radius: 3px;
+    padding: .1em .5em;
+    font-size: 1.4em;
+    line-height: 1.2;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  #contents {
+    position: fixed;
+    z-index: 10;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    max-height: none;
+    transform: translateX(-100%);
+    transition: transform .2s ease-out;
+    border-right: 1px solid var(--rule);
+    box-shadow: 0 0 1em rgba(0, 0, 0, .5);
+  }
+
+  #nav-toggle:checked ~ #contents {
+    transform: translateX(0);
+  }
+
+  /* The sidebar slides over the text here, so there is nothing to resize. */
+  #nav-resizer {
+    display: none;
+  }
+
+  main {
+    padding: 3em 1.2em 6em 1.2em;
+  }
+
+  h2 {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* --- print -------------------------------------------------------------- */
+
+@media print {
+  #contents, #nav-button, #nav-resizer {
+    display: none;
+  }
+
+  body {
+    display: block;
+  }
+
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  h2, h3, h4, h5 {
+    break-after: avoid;
+  }
+
+  pre, table, img {
+    break-inside: avoid;
+  }
+}

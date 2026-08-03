@@ -56,6 +56,8 @@ $files = @(
     "workaround.mayu.rb",
     "workaround.reg",
     "README.md",
+    # doc\README.html (rendered from README.md) links to this one.
+    "README-yamy.txt",
     "LICENSE.txt",
     "nyamy.exe",
     "nyamy32.dll",
@@ -64,7 +66,10 @@ $files = @(
     "nyamy-scripter.exe",
     "nyamy-scripter.dll",
     "nyamy-scripter.lib",
-    "nyamy_scripter.h"
+    "nyamy_scripter.h",
+    # Directory: Compress-Archive keeps the folder itself, so the manual lands
+    # in the zip as doc\README-ja.html -- the path IDS_helpFilename expects.
+    "doc"
 )
 
 $filesToArchive = @()

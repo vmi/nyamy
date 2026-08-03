@@ -1,0 +1,1422 @@
+## 7. customize {#CUSTOMIZE}
+
+付属の `.mayu` ([`dot.mayu`](../dot.mayu)) を利用すれば、エディットコントロールで Emacs 風の操作ができるようになりますが、`.mayu` をカスタマイズすることによって、Windows を自分の好きなキーバインディングで利用することができるようになります。
+
+`.mayu` は[ホームディレクトリ](#HOME)から検索されます。
+
+`.mayu` は上から下へ読まれていき、重複する記述があれば、より下に書かれているものが有効になります。コメントは `#` ではじめます。アルファベットの大文字と小文字は区別されません。詳しい文法は [`syntax.txt`](syntax.txt) を参照してください。
+
+この章を読む前に、[`contrib/mayu-settings.txt`](../contrib/mayu-settings.txt) を読んで付属の設定ファイルについて理解を深めておくことをお勧めします。
+
+### i. キー割り当ての変更 {#key}
+
+キー割り当てを変更するには、以下のように記述をします。
+
+```mayu
+key ⟨KEY⟩ = ⟨KEY⟩ や ⟨FUNCTION⟩ …
+```
+
+`=` より左の `⟨KEY⟩` をキーボードで押すと、Windows へは `=` より右の `⟨KEY⟩` が順番に入力されます。また、右に `⟨FUNCTION⟩` が書かれている場合はウィンドウの最大化や移動などの機能が実行されます。
+
+`⟨KEY⟩` は[キーボード定義](#keyboard)で定義されるもので、デフォルトでは [`109.mayu`](../109.mayu) 又は [`104.mayu`](../104.mayu) で定義されている `⟨KEY⟩` が使用できます。
+
+#### モディファイヤの指定 {#modifier}
+
+`⟨KEY⟩` の前に以下のような記号を付けることによって、コントロールキーなどの状態を表現できます。また、これらをモディファイヤと呼ぶことにします。
+
+- `C-` は、[[Control]] が押されていることを表します。
+- `M-` か `A-` は、[[Alt]] が押されていることを表します。
+- `S-` は、[[Shift]] が押されていることを表します。
+- `NL-` は、[[NumLock]] がロック状態であることを表します。
+- `CL-` は、[[CapsLock]] がロック状態であることを表します。
+- `SL-` は、[[ScrollLock]] がロック状態であることを表します。
+- `KL-` は、[[カナ]] がロック状態であることを表します。  
+  ([オプション (`KL-`)](#def_option_KL)をよく読んでください)  
+  109 キーボードなら、[[Control]] + [[Shift]] + [[ひらがな]]。  
+  104 キーボードなら、[[Control]] + [[Shift]] + [[CapsLock]]。
+- `IL-` は、IME が on になっていることを表します
+- `IC-` は、IME で変換中であることを表します
+- `MAX-` は、ウィンドウが最大化されていることを表します。
+- `MIN-` は、ウィンドウが最小化されていることを表します。
+- `MMAX-` は、MDI 子ウィンドウが最大化されていることを表します。
+- `MMIN-` は、MDI 子ウィンドウが最小化されていることを表します。
+
+以下のように記述すると、[[Control]] + [[A]] を押した時に、Windows へは [[HOME]] キーが入力されます。
+
+```mayu
+key C-A = HOME
+```
+
+#### モディファイヤキーの無視 {#ignoreModifier}
+
+上記の例では左側に `C-A` と記述していますが、この記述では、ロックキーなどは押されていても押されてなくても良いと記述していることになります。たとえば、[[CapsLock]] を押したあとで [[Control]] + [[A]] を押しても、押さずに [[Control]] + [[A]] を押しても、Windows へは [[Home]] が入力されます。
+
+特定のモディファイヤの状態を無視したい場合は、モディファイヤに "`*`" をつけます。逆にモディファイヤが必ず押されていなければならない場合は付けません。またモディファイヤが必ず離されていなければならない場合は "`~`" を付けます。たとえば、
+
+```mayu
+key *S-F9 = &WindowMinimize
+```
+
+このように記述すると、[[F9]] 又は [[Shift]] + [[F9]] でウィンドウを最小化することができますが、例えば、[[Control]] + [[F9]] ではできません。
+
+デフォルトでは、暗黙に `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-~IC-*MAX-*MIN-*MMAX-*MMIN-*T-*TS-` が指定されていることになっていますが、[変更](#defaultModifier)できます。
+
+また、[[Shift]] は必ず押されていてほしいがほかのモディファイヤはどうでもいいという場合は、
+
+```mayu
+key S-*F9 = &WindowMinimize
+```
+
+というように "`*`" をキーの直前に記述します。"`~`" についても同様です。
+
+#### 入力されたキーと同じモディファイヤの指定 {#inputModifier}
+
+`=` より右側でのモディファイヤの指定の方法です。
+
+```mayu
+key *S-A = C-*S-B
+```
+
+例えばこのように記述した場合、[[Shift]] + [[A]] を押すと、Windows へは [[Shift]] + [[Control]] + [[B]] が入力されます。[[A]] を押すと、Windows へは [[Control]] + [[B]] が入力されます。
+
+つまり、`=` の右側で `*` で指定されたモディファイヤは、キーボードで実際に入力したモディファイヤと同じになるように設定されます。
+
+したがって、[[A]] を [[B]] と入れ替えたい場合は、
+
+```mayu
+key *A = *B
+
+key *B = *A
+```
+
+となります。
+
+#### キーを押す/離す {#keyUpDown}
+
+`⟨KEY⟩` の前にモディファイヤと同じように `D-` と `U-` を付けることができます。これは、それぞれキーの押すことと離すことに対応しています。デフォルトでは `*D-*U-` が指定されています。例えば、
+
+```mayu
+key A = B C
+```
+
+という記述は、
+
+```mayu
+key *U-*D-A = D-B U-B D-C U-C
+```
+
+と同じであり、さらに次のものとも同じになります。キーリピートが起こった場合は、`~U-D-A` が何度も実行され、キーを離したときに `U-~D-A` が実行されます。
+
+```mayu
+key ~U-D-A = D-B U-B D-C
+
+key U-~D-A = U-C
+```
+
+#### キーリピートした {#keyRepeat}
+
+`=` より左の `⟨KEY⟩` の前にモディファイヤと同じように `R-` を付けることができます。これは、キーリピートが発生したことを表します。デフォルトでは `*R-` が指定されています。例えば、
+
+```mayu
+key A = B
+
+key R-A = C
+```
+
+という記述をすると、[[A]] を押しつづけると、
+
+```mayu
+BCCCCCCCCCCCCCCCCCCCCC
+```
+
+と入力されます。とてもややこしいのであまり使わないようにしましょう。
+
+#### デフォルトモディファイヤの変更 {#defaultModifier}
+
+デフォルトでは、左側のキーには `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-~IC-*MAX-*MIN-*MMAX-*MMIN-*T-*TS-` が指定されていますが、これを変更することができます。例えば、
+
+```mayu
+key *IC- =
+```
+
+と記述すると、この文以降のデフォルトモディファイヤは `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-*IC-*MAX-*MIN-*MMAX-*MMIN-*T-*TS-` となります。
+
+デフォルトモディファイヤの変更を複数行うときには、例えば、
+
+```mayu
+key L0-*IC-~C- =
+```
+
+のようにしなければなりません。以下のように指定するのは間違いです。最後のものしか有効になりません。
+
+```mayu
+key L0- =
+
+key *IC- =
+
+key ~C- = # この行しか有効にならない
+```
+
+### ii. キーマップ定義 {#keymap}
+
+「窓使いの憂鬱」には、キーマップという概念があります。キーマップにカスタマイズしたいキー情報を書き込んでゆき、ウィンドウごとにキーマップを使い分けます。キーマップを定義するには、以下のどれかの文を書いてからキーを設定します。
+
+```mayu
+keymap ⟨キーマップ名⟩
+
+keymap2 ⟨キーマップ名⟩
+
+window ⟨キーマップ名⟩ ⟨ウィンドウクラス名⟩
+
+window ⟨キーマップ名⟩ ( ⟨ウィンドウクラス名⟩ && ⟨ウィンドウタイトル名⟩ )
+
+window ⟨キーマップ名⟩ ( ⟨ウィンドウクラス名⟩ || ⟨ウィンドウタイトル名⟩ )
+```
+
+例えば、メモ帳で [[Control]] + [[Z]] を押すと最小化されるが、メモ帳以外のエディットコントロールで [[Control]] + [[Z]] を押すと単なる [[Z]] キーと同じになるという指定がしたい場合は、
+
+```mayu
+window EditControl /:Edit$/ : Global
+
+key C-Z = Z
+
+window Notpad /Notepad:Edit$/ : Global
+
+key C-Z = &WindowMinimize
+```
+
+と記述します。ここで `/Notepad:Edit$/` はメモ帳の上にあるエディットコントロールの`⟨ウィンドウクラス名⟩`を表しています。`⟨ウィンドウクラス名⟩`は正規表現で記述します。`: Global` は`⟨親キーマップ⟩`を指定しています。
+
+#### ウィンドウクラス/タイトル名 {#windowClass}
+
+Windows の全てのウィンドウは、何らかのウィンドウクラスに属しています。例えば、メモ帳のウィンドウクラス名は `Notepad` で、エディットコントロールのウィンドウクラス名は `Edit` です。
+
+「窓使いの憂鬱」は、どのウィンドウでどのキーを押したらどんな動作をするか、ということを区別するために`⟨ウィンドウクラス名⟩`と`⟨ウィンドウタイトル名⟩`を用いています。そのために、「窓使いの憂鬱」ではウィンドウの重なりの状態を "`:`" で繋げて表現します。例えば、メモ帳の上のエディットコントロールの`⟨ウィンドウクラス名⟩`ならば、
+
+```mayu
+C:\WINDOWS\system32\notepad.exe:Notepad:Edit
+```
+
+と表現します。ただし、`⟨ウィンドウクラス名⟩`の一番最初にはそのアプリケーションのパス名を付けています。
+
+`window` 文には、この`⟨ウィンドウクラス名⟩`と`⟨ウィンドウタイトル名⟩`を記述することができますが、`⟨ウィンドウクラス名⟩`全てを書く必要はなく、正規表現で省略することができます。
+
+例えば、`/:Edit$/` は全てのエディットコントロールの`⟨ウィンドウクラス名⟩`を表しますし、`/:#32770.*:Edit$/` ならば、ダイアログボックス上にある全てのエディットコントロールの`⟨ウィンドウクラス名⟩`を表します (`#32770` はダイアログボックスのウィンドウクラス名)。
+
+個々のウィンドウの`⟨ウィンドウクラス名⟩`と`⟨ウィンドウタイトル名⟩`を調べるには、タスクトレイメニュー[調査(I)...](#menu-i)の「ウィンドウの調査」、または`⟨FUNCTION⟩` [`&WindowIdentify`](#function_WindowIdentify) を利用してください。
+
+`⟨ウィンドウクラス名⟩`と`⟨ウィンドウタイトル名⟩`の両方を記述する場合は、括弧で囲みその間を `&&` か `||` で区切ります。`&&` の場合は、両方にマッチするようなウィンドウを表し、`||` の場合はどちらか一方にマッチするようなウィンドウを表します。
+
+#### 正規表現について {#regexp}
+
+`⟨ウィンドウクラス名⟩`と`⟨ウィンドウタイトル名⟩`には正規表現が使用できます。正規表現は `/.../` で囲むか、`\m@...@`で囲みます (ただし`@`はどんな文字でも良いです)。
+
+正規表現エンジンには [Boost.Regex](http://www.boost.org/libs/regex/doc/index.html) を使用しています。このエンジンでは [Perl で使用できる正規表現](http://www.kt.rim.or.jp/~kbk/perl5.005/perlre.html)がほぼカバーされています。よく使いそうなものを挙げておきます。
+
+- "`|`" Alternation
+- "`*`" Match 0 or more times
+- "`+`" Match 1 or more times
+- "`?`" Match 1 or 0 times
+- "`.`" Match any character
+- "`^`" Match the beginning of the string
+- "`$`" Match the end of the string
+- "`\b`" Match a word boundary
+- "`\B`" Match a non word boundary
+- "`\w`" Match a word character (`[0-9a-z_]`)
+- "`\W`" Match a non word character
+- "`\s`" Match a whitespace character
+- "`\S`" Match a non-whitespace character
+- "`\d`" Match a digit character
+- "`\D`" Match a non-digit character
+- "`(`" "`)`" Grouping
+- "`[`" "`]`" Character class
+- より詳しくは [Boost.Regex: Regular Expression Syntax](http://www.boost.org/libs/regex/doc/syntax.html)を見てください。
+
+#### 親キーマップ {#parentKeymap}
+
+親キーマップとは、現在のキーマップに適切なキー割り当てが定義されていない場合に、キーを捜しに行くキーマップです。"`:`" の後ろに*親キーマップ名*を書きます。例えば、
+
+```mayu
+keymap sub : Global
+
+key	C-A = &WindowMinimize
+
+window EditControl /:Edit$/ : sub
+
+key	C-A = &KeymapParent
+```
+
+と記述した場合、エディットコントロールで [[Control]] + [[A]] を入力すると、ウィンドウは最小化されます。つまり、[`&KeymapParent`](#function_KeymapParent) を記述することで親キーマップで定義されたキーを利用することができるのです。もし、*親キーマップ名*が指定されていなければ [`&Default`](#function_Default) 扱いとなり、ウィンドウへキーがそのまま入力されます。
+
+#### デフォルトキー {#defaultKey}
+
+`keymap`、`window`、`keymap2` には、最後にキーを羅列することによってデフォルトキーを定義することができます。例えば、
+
+```mayu
+window EditControl /:Edit$/ : Global = A
+
+key *B = *C
+```
+
+と記述すると、[[B]] を入力すると [[C]] を入力したことになるが、[[B]] 以外のキーを入力すると、[[A]] を入力したことになります。また、デフォルトキーを指定しなかった場合のデフォルトキーは、`keymap` と `window` の場合は [`&KeymapParent`](#function_KeymapParent) で、`keymap2` の場合は [`&Undefined`](#function_Undefined) になります。
+
+#### 二段階キーマップ {#keymap2}
+
+`keymap2` はデフォルトキーが [`&Undefined`](#function_Undefined) になってるようなキーマップで、主に [`&Prefix`](#function_Prefix) を利用して 2 ストロークキーを記述する時に使用します。
+
+#### 初期キーマップ {#initialKeymap}
+
+`.mayu` の一番最初の行には、
+
+```mayu
+window Global ( // || // ) = &OtherWindowClass
+```
+
+という行が隠れていると考えて下さい。つまり、`.mayu` で何もキーマップを指定せずに書き始めると、*キーマップ名* `Global` のキーマップに対するキー定義になるということです。そして、`Global` キーマップのデフォルトキーは [`&OtherWindowClass`](#function_OtherWindowClass) が設定されています。
+
+#### 矛盾したキーマップの指定 {#conflictKeymap}
+
+同じキーマップに対する `keymap` や `window` や `keymap2` は何度でも指定できますが、矛盾する指定をしてはいけません。例えば、
+
+```mayu
+keymap Amap : Global
+
+...
+
+keymap Bmap : Amap
+
+...
+
+keymap Amap : Global
+
+...
+```
+
+という指定は問題ありませんが、
+
+```mayu
+keymap Amap : Global
+
+...
+
+keymap Bmap : Amap
+
+...
+
+keymap Amap : Bmap	# 矛盾
+
+...
+```
+
+という指定はしてはいけません。この場合、`keymap Amap : Bmap` のかわりに `keymap Amap : Global` が指定されたものとみなされます。エラーは出ません。
+
+#### `window` に複数該当する場合 {#matchManyClasses}
+
+例えば、
+
+```mayu
+window EditControl /:Edit$/ : Global
+
+key A = A space E D I T enter
+
+key B = B space E D I T enter
+
+window Notepad /:Notepad/ : Global
+
+key A = A space N O T E P A D enter
+
+key C = C space N O T E P A D enter
+```
+
+という記述をしたとします。ここで、「メモ帳」を立ち上げると、メモ帳の`⟨ウィンドウクラス名⟩`は
+
+```mayu
+C:\WINDOWS\system32\notepad.exe:Notepad:Edit
+```
+
+となっているので、`/:Edit$/` と `/:Notepad/` は両方共もメモ帳の`⟨ウィンドウクラス名⟩`に該当します。この時、[[A]] を入力すると、メモ帳には「`a notepad`」と表示されます。これは、重複する記述があれば、より下に書かれているものが有効になるからです。しかし、[[B]] を入力した場合は、重複していないので、メモ帳には「`b edit`」と表示されることになります。
+
+[[B]] を入力した場合に、内部で行われる処理は以下のようになります。
+
+1. まず`⟨ウィンドウクラス名⟩`は `/:Notepad/` に該当しますが、キー割り当てがないので、`window` のデフォルトキーである `&KeymapParent` が採用されます。
+2. `&KeymapParent` は*親キーマップ*の参照なので、`Global` キーマップを参照します。
+3. そうすると、`Global` キーマップでも [[B]] の割り当てがないので、`Global` キーマップのデフォルトキーである、`&OtherWindowClass` が採用されます。
+4. `&OtherWindowClass` が採用されると、まず、他に該当する`⟨ウィンドウクラス名⟩`がないかどうか探します。もしなければ、`&Default` 扱いとなります。この場合は `/:Edit$/` に該当します。
+5. `/:Edit$/` に該当したので、`/:Edit$/` の [[B]] が採用されます。したがって、「b edit」と表示されることとなります。
+
+#### キーマップが影響する定義 {#perKeymapDefinition}
+
+以下の単語で始まる定義は、キーマップ毎に定義できます。
+
+- `key ...` [キー割り当ての変更](#key)
+- `event ...` [イベント定義](#event)
+- `mod ...` [モディファイヤキー割り当ての変更](#mod)
+
+以下の単語で始まる定義は、キーマップ毎に定義することはできません。
+
+- `def ...` [キーボード定義](#keyboard)
+- `keyseq ...` [キーシーケンス定義](#keyseq)
+
+### iii. モディファイヤキー割り当ての変更 {#mod}
+
+```mayu
+mod ⟨モディファイヤキー名⟩ = ⟨キー名⟩ …
+
+mod ⟨モディファイヤキー名⟩ += ⟨キー名⟩ …
+
+mod ⟨モディファイヤキー名⟩ -= ⟨キー名⟩ …
+```
+
+最初の 3 つは、*キー名*で指定したキーをモディファイヤキーにしたり (`=`) 追加したり (`+=`) 削除したり (`-=`) します。各キーマップ毎に割り当てます。明示的に割り当てない場合は、親キーマップから引き継がれます。例えば、
+
+```mayu
+mod shift += 無変換
+```
+
+は、[[無変換]] キーを shift モディファイヤキーにします。従って、
+
+```mayu
+key S-A = X
+```
+
+という記述があった場合に、[[無変換]] + [[A]] を押すと [[X]] を入力したことになります。正確には、[[無変換押す]] [[X押す]] [[X離す]] [[無変換離す]] というキーが Windows へ入力されます。これでは都合が悪いということは多いと思われるので、
+
+```mayu
+key *無変換 = *LShift
+```
+
+として [[無変換]] キーを押すと [[LShift]] が入力されるように割り当てます。そうすれば、Windows へは [[LShift押す]] [[LShift離す]] [[X押す]] [[X離す]] というキーが入力されます。
+
+*モディファイヤキー名*には、`shift`, `alt` (`meta`, `menu`), `control` (`ctrl`), `windows` (`win`), `mod0`〜`mod9` が記述できます。括弧の中の名前も使用できます。
+
+`mod0`〜`mod9` は「窓使いの憂鬱」の中でのみ有効なモディファイヤで、例えば以下のように使用します。
+
+```mayu
+mod mod0 = Up
+
+key M0-Left = Left Up
+```
+
+このように割り当てると、[[↑]] を押しながら [[←]] を押すとカーソルが左斜め上へ移動することになります。
+
+#### 真のモディファイヤ {#trueModifier}
+
+モディファイヤにしたいキーの前に "`!`" を付けると、*真のモディファイヤ*になります。例えば、
+
+```mayu
+mod shift += !無変換
+
+key 無変換 = Y
+
+key S-A = X
+```
+
+と記述した場合、[[無変換]] + [[A]] を押すと [[X押す]] [[X離す]] というキーが Windows へ入力されます。Windows からは、[[無変換]] キーが押されたということは分かりませんし、[[Y]] も Windows へ入力されることはありません。つまり、真のモディファイヤに定義されているキーや `⟨FUNCTION⟩` などは実行されません。
+
+以下のような行を記述すると、
+
+```mayu
+mod !⟨モディファイヤキー名⟩
+```
+
+その*モディファイヤキー名*に割り当てられているモディファイヤを全て*真のモディファイヤ*に変更します。
+
+#### One Shot モディファイヤ (SandS) {#oneShotModifier}
+
+(一般的には SandS と呼ばれている機能です。Space and Shift の略です。)
+
+モディファイヤにしたいキーの前に "`!!`" を付けると、*One Shot モディファイヤ*になります。たとえば、
+
+```mayu
+mod shift = !!LShift
+
+key S-A = X
+
+key S-LShift = Y
+```
+
+と記述した場合、[[LShift]] を押してすぐ離した場合は、Windows へは、[[Y]] が入力されますが、[[LShift]] + [[A]] を入力した場合は、[[X]] のみが Windows へ入力されます。
+
+以下のような行を記述すると、
+
+```mayu
+mod !!⟨モディファイヤキー名⟩
+```
+
+その*モディファイヤキー名*に割り当てられているモディファイヤを全て*One Shot モディファイヤ*に変更します。
+
+#### One Shot (キーリピート有) {#oneShotRepeatableModifier}
+
+*One Shot モディファイヤ*は通常キーリピートしませんが、"`!!!`" を付けると、キーリピートをするようになります。たとえば、
+
+```mayu
+mod shift = !!!Up
+```
+
+とすると、[[↑]] を押しながら何か別のキー (例えば [[A]]) を押すと [[Shift]] + [[A]] と同じことになりますが、[[↑]] を押しっぱなしにすると [[↑]] がキーリピートして、カーソルが上へ動くということになります。
+
+キーリピートが開始するまでの時間を[オプション (`delay-of !!!`)](#def_option_delay_of_oneShotRepeatableModifier) で設定できます。
+
+#### ロックキー {#lock}
+
+「窓使いの憂鬱」には、「窓使いの憂鬱」の中でのみ有効なロックキーが存在します。これらはキーのモディファイヤとして `L0-`〜`L9-` を書くことができ、[`&Toggle`](#function_Toggle) を使うことによりトグルさせることができます。例えば、
+
+```mayu
+key ひらがな = &Toggle(Lock0)
+
+key L0-A = B
+```
+
+と記述すると、[[ひらがな]] キーがトグル状態になっているときに [[A]] を押すと Windows へは [[B]] が入力されます。
+
+### iv. キーシーケンス定義 {#keyseq}
+
+```mayu
+keyseq $⟨キーシーケンス名⟩ = ⟨KEY⟩ や ⟨FUNCTION⟩ …
+```
+
+`keyseq` を使うことで、一連のキー入力に対して名前を付けることができます。例えば、
+
+```mayu
+keyseq $Right2Times = Right Right
+
+key C-F = $Right2Times
+```
+
+とすると、[[Control]] + [[F]] で右に二つカーソルを進めることができます。又、
+
+```mayu
+key C-F = Right Right
+```
+
+は、`$Right2Times` という名前が定義されないこと以外は、先の例と同じになります。
+
+### v. イベント定義 {#event}
+
+```mayu
+event ⟨EVENT⟩ = ⟨KEY⟩ や ⟨FUNCTION⟩ …
+```
+
+あるイベントが起こったときに `⟨KEY⟩` や `⟨FUNCTION⟩` を実行します。イベントはキーマップ毎に定義され、親キーマップにイベントが定義されていてもそれは無視されます。
+
+`⟨EVENT⟩` には以下のものが指定できます。
+
+- `prefixed`: [`&Prefix`](#function_Prefix) によってキーマップが指定された時。
+- `before-key-down`: キーが押さた時。
+- `after-key-up`: キーが離された後。
+
+### vi. キーボード定義 {#keyboard}
+
+デフォルトのキーボード定義は [`109.mayu`](../109.mayu) 又は [`104.mayu`](../104.mayu) に書かれています。
+
+#### キー定義 {#def_key}
+
+キーボードの物理的なキーを定義します。
+
+```mayu
+def key ⟨キー名⟩… = ⟨スキャンコード⟩…
+```
+
+キーが発生する`⟨スキャンコード⟩`を記述していきます。`⟨スキャンコード⟩`は数字で書き、`E0-` や `E1-` という拡張キーフラグをつけることができます。又、
+
+```mayu
+def key Pause = E1-0x1d 0x45
+```
+
+このように一連の*スキャンコード*を発生させるキーにはスキャンコードを書き並べます。
+
+#### モディファイヤ定義 {#def_mod}
+
+キーボードの物理的なモディファイヤキーを定義します。
+
+```mayu
+def mod ⟨モディファイヤ名⟩ = ⟨キー名⟩…
+```
+
+`⟨モディファイヤ名⟩`には、`shift`, `alt` (`meta`, `menu`), `control` (`ctrl`), `windows` (`win`) が記述できます。括弧の中の名前も使用できます。
+
+#### 同期定義 {#def_sync}
+
+`&Sync` に使用する`⟨スキャンコード⟩`を定義します。
+
+```mayu
+def sync = ⟨スキャンコード⟩…
+```
+
+`&Sync` が実行されるとき、「窓使いの憂鬱」はこの`⟨スキャンコード⟩`を Windows に送ります。そして、各ウィンドウがこのキーが入力されたことを「窓使いの憂鬱」へ連絡してくるまで処理を中断します。このようにして同期をとるので、この`⟨スキャンコード⟩`が不正に設定されていると、同期がとれず「窓使いの憂鬱」が 5 秒ほど固まります (つまり 5 秒ほど何も入力できなくなります)。
+
+#### 別名定義 {#def_alias}
+
+キーの別名を定義します。
+
+```mayu
+def alias ⟨別名⟩ = ⟨キー名⟩
+```
+
+別名が既存のキー名と同じだった場合は、別名のほうが優先されます。
+
+#### 代用定義 {#def_subst}
+
+あるキーを別のキーとして代用します。
+
+```mayu
+def subst ⟨KEY⟩ = ⟨KEY⟩ や ⟨キーシーケンス⟩ …
+```
+
+キーが入力されると、まずこの代用定義によって入力されたキーが置き換えられます。その後、[キー割り当ての変更](#key)に従って変換されます。
+
+```mayu
+def subst A = B
+
+key B = C
+```
+
+上記の例では、[[A]] を入力すると、まず代用定義で [[B]] が押されたことになって、[[B]] が入力された場合は [[C]] が最終的に Windows へ入力されるので、結局 [[A]] を押すと [[C]] が押されたことになります。
+
+代用定義は、キーマップでキーが変更されるより前に実行されます。例えば、109 キーボード上で 104 キーボードや Dvorak のエミュレートをしたいときに使用します。
+
+`=` の左右は[キー割り当ての変更](#key)のものと同じものが指定でき意味も同じになりますが、右側は先頭が `⟨FUNCTION⟩` ではなく `⟨KEY⟩` でなければならず、先頭の `⟨KEY⟩` しか意味を持ちません。
+
+以下色々な例。
+
+```mayu
+def subst A = C-B
+
+key *B = S-*C
+```
+
+上記の例では [[A]] を入力すると、最終的に [[Shift]] + [[C]] が Windows へ出力されます。
+
+```mayu
+def subst A = B C D $Hoge &Toggle(Lock0)
+```
+
+上記の例では [[A]] を入力すると、[[B]] が Windows へ出力されます。`C D $Hoge &Toggle(Lock0)` は無視されます。
+
+```mayu
+keyseq $COLON = ~S-*Colon
+
+def subst S-*Semicolon = $COLON
+```
+
+上記の例では [[Shift]] + [[;]] を入力すると、[[:]] になり、[[Control]] + [[Shift]] + [[;]] を入力すると、[[Control]] + [[:]] になります。
+
+#### オプション (`KL-`) {#def_option_KL}
+
+カナロック `KL-` を正しく設定するようにします。
+
+```mayu
+def option KL- = enable
+```
+
+このオプションを設定しない場合、特定の場合にカナロックの状態が正しく取得できません。
+
+このオプションを設定すれば、カナロックの状態は正しく取得できますが、IME で文字列を入力中未確定のまま別のウィンドウへフォーカスを切り替え、元のウィンドウへフォーカスを戻した時に、IME に入力中だった文字列は失われます。
+
+109 キーボードで [[Alt]] + [[ひらがな]] を使用するカナロックにはうまく対応できませんでした。普段 [[Alt]] + [[ひらがな]] を使用している人は、
+
+```mayu
+keymap Global
+
+key *IC-*IL-A-ひらがな = C-S-ひらがな
+```
+
+という設定をして代わりに[[Control]] + [[Shift]] + [[ひらがな]] が使用されるようにしてください。
+
+また、IME の機能の「日本語入力と連動してカナロックをon/offする」という設定にしている場合もカナロックの状態を正しく取得という報告があります。その場合は IME を on/off にするキーに、同時にカナロックもしてくれるように設定すると良いでしょう。
+
+参考: [IME2000:かな/ローマ字入力を切り替える方法](http://support.microsoft.com/default.aspx?scid=kb;ja;415068)
+
+> 1. [ログウインドウ](#menu-l)を表示して、「□詳細(<u>D</u>)」をチェックしておきます。
+> 2. 「メモ帳」を 2 つ起動し左右に並べます。
+> 3. 左のメモ帳でカナをロックして何文字か入力してください。  
+>    109 キーボードなら、[[Control]] + [[Shift]] + [[ひらがな]]。  
+>    104 キーボードなら、[[Control]] + [[Shift]] + [[CapsLock]]。  
+>    (左のメモ帳には半角カタカナが表示されます)
+> 4. 右のメモ帳に何文字が入力してください。  
+>    (右のメモ帳には半角カタカナが表示されます)
+> 5. IME をオンにしてローマ字入力にして右のメモ帳に何文字か入力してください。
+> 6. 左のメモ帳に何文字か入力してください。  
+>    (左のメモ帳には半角カタカナが表示されます)
+> 7. ここで、[ログウインドウ](#menu-l)を見ると `KL-` が付いていません。
+> 
+> カナロックの状態は、IME がオンの時とオフの時で、べつべつに記憶されているようです。
+> 
+> しかし、IME がオンのウィンドウから IME がオフのウィンドウへフォーカスが移ったときに、カナロックの状態は正しく反映されないようです。
+> 
+> その後 IME をオンオフするタイミングで、カナロックの状態が正しく反映されます。
+> 
+> そこで、このオプションを設定すると、フォーカスが変化した時に IME オンオフを自動的に行い、カナロック状態を反映します。
+
+#### オプション (`delay-of !!!`) {#def_option_delay_of_oneShotRepeatableModifier}
+
+[キーリピート有 One Shot (`!!!`)](#oneShotRepeatableModifier) のキーリピートが始まるまでの時間を指定します。
+
+```mayu
+def option delay-of !!! = ⟨DELAY⟩
+```
+
+最初の `⟨DELAY⟩` 回のキーリピートを無視するようにします。
+
+デフォルトでは `⟨DELAY⟩` は 0 です。
+
+### vii. ファイル読み込み {#include}
+
+```mayu
+include ⟨ファイル名⟩
+```
+
+と書くことによって、その行に*ファイル名* [文字列](#string)で示されるファイルを挿入することができます。*ファイル名*は[ホームディレクトリ](#HOME)から検索されます。
+
+#### ホームディレクトリ {#HOME}
+
+ホームディレクトリは、
+
+- 設定(S)... で指定したファイルのあるディレクトリ
+- `%HOME%`
+- `%HOMEDRIVE%%HOMEPATH%`
+- `%USERPROFILE%`
+- `mayu.exe` のカレントディレクトリ
+- `mayu.exe` のある場所
+
+のどれかになります。上から順番に検索されます。
+
+### viii. 条件分岐 {#cond}
+
+シンボルを定義して、そのシンボルによって条件分岐させることができます。
+
+```mayu
+define ⟨シンボル⟩
+
+if ( ⟨シンボル⟩ )
+
+〜
+
+else
+
+〜
+
+endif
+```
+
+例えば次のように記述すると、
+
+```mayu
+if ( SwapAB )
+
+key *A = *B
+
+key *B = *A
+
+endif
+```
+
+`SwapAB` というシンボルが `define` されている場合に、[[A]] と [[B]] を入れ替えます。
+
+「[設定(<u>S</u>)...](#menu-s)」で `-Dシンボル名` を書くことでシンボルを定義することができます。
+
+### ix. `⟨FUNCTION⟩` リファレンス {#function}
+
+#### `&ClipboardCopy(⟨text⟩)` {#function_ClipboardCopy}
+
+`⟨text⟩` [文字列](#string)をクリップボードへコピーします。
+
+#### `&ClipboardUpcaseWord`, `&ClipboardDowncaseWord` {#function_ClipboardUpcaseDowncaseWord}
+
+それぞれ、クリップボードの中身の文字を大文字化又は小文字化します。
+
+#### `&Default` {#function_Default}
+
+入力されたキーをそのまま Windows へ入力します。そのため、「窓使いの憂鬱」を起動してない時と同じ動作が期待できます。
+
+#### `&DescribeBindings` {#function_DescribeBindings}
+
+`&DescribeBindings` は、現在のキーマップでどのようなキー操作をするとどのような動作が起こるかを表示します。が、表示形式がいまいち分かりにくいのでどうしようか思案中。
+
+#### `&DirectSSTP(/⟨name⟩/, ⟨protocol⟩ ⟨[⟩, ⟨header ...]⟩)` {#function_DirectSSTP}
+
+[Direct](http://sakura.mikage.to/directsstp.html) [SSTP](http://sakura.mikage.to/sstp.html) プロトコルをしゃべります。
+
+`⟨/name/⟩` にマッチする名前のゴーストへリクエストを Direct SSTP を使用して送ります。
+
+`⟨protocol⟩` [文字列](#string) を省略すると `NOTIFY SSTP/1.1` になります。
+
+`⟨header⟩` [文字列](#string) にカンマで区切ってヘッダを書き並べます。`Sender` ヘッダを省略すると「窓使いの憂鬱」の名前が挿入されます。`HWnd` ヘッダと `Charset` ヘッダは「窓使いの憂鬱」が適切に指定するので引数として指定してはいけません。
+
+選択肢などを表示しても答えを受け取ることはできませんが、「窓使いの憂鬱」はゴーストから返事を 5 秒間待ちます。
+
+例:
+
+```mayu
+key F12 = \
+
+&DirectSSTP(/カレン/, \
+
+"SEND SSTP/1.2", \
+
+"Script: " \
+
+"\\1こんにちわ" \
+
+"\\_w[1000]\\0\\s3カレンのこと呼んだ？" \
+
+"\\_w[1000]\\1＞みんな" \
+
+"\\_w[1000]\\0\\s4\\n\\n……。" \
+
+"\\e" ) \
+
+&DirectSSTP(/双葉/, \
+
+"SEND SSTP/1.2", \
+
+"Sender: まゆ", \
+
+"Script: " \
+
+"\\_w[1000]\\0よばれてますよただきちさん。" \
+
+"\\_w[1000]\\1きにするな。" \
+
+"\\e" )
+```
+
+#### `&EditNextModifier(⟨モディファイヤ⟩)` {#function_EditNextModifier}
+
+次にユーザーがキーを入力した時に、`⟨モディファイヤ⟩` が押されていることにします。例えば、
+
+```mayu
+key ESC = &EditNextModifier(M-)
+```
+
+とすると、[[Alt]] + [[X]] などを [[ESCAPE]] [[X]] などで代用することが可能になります。
+
+#### `&EmacsEditKillLinePred`, `&EmacsEditKillLineFunc` {#function_EmacsEditKillLine}
+
+エディットコントロールで emacs の kill-line のような機能を実現します。使い方は [`emacsedit.mayu`](../emacsedit.mayu) を参照のこと。
+
+kill-line は非常にややこしい処理をしています。
+
+まず、`C-k` の期待される動作は、
+
+**(C-k-1)** カーソルが行末にある場合、クリップボードに改行を追加してテキストからは改行を削除する。
+
+**(C-k-2)** カーソルが行末以外の場合、行末までをクリップボードに追加して行末までのテキストを削除。
+
+です。「窓使いの憂鬱」での定義は、[`emacsedit.mayu`](../emacsedit.mayu) では、
+
+```mayu
+keyseq $EmacsEdit/kill-line = \
+
+&EmacsEditKillLineFunc S-End C-X &Sync \
+
+&EmacsEditKillLinePred((Delete), (Return Left))
+```
+
+こうなってるはずです。
+
+[`&EmacsEditKillLineFunc`](#function_EmacsEditKillLine) は初回だけ、クリップボードの中身をクリアします。初回でない場合は、クリップボードの中身を「窓使いの憂鬱」内部に保存 **(※)** します。
+
+その後 `S-End C-X` で行末までを選択し「切り取り」ます。ここで、クリップボードに行末までがコピーされたわけですが、クリップボードの中身には幾つか可能性があります。
+
+EDIT コントロールの場合
+
+**(EDIT-1)** カーソルが行末にあると、「」(からっぽ)
+
+**(EDIT-2)** カーソルが行末以外だと、「行末までの文字列」
+
+です。IE の中のエディットボックスの場合、
+
+**(IE-1)** カーソルが行末にあると、「改行」
+
+**(IE-2)** カーソルが行末以外だと、「行末までの文字列＋改行」
+
+です。
+
+[`&EmacsEditKillLinePred`](#function_EmacsEditKillLine) は、クリップボードの中身を調べて、
+
+**(EDIT-1)** の場合は、<strong>※</strong>で保存したデータに「改行」を追加してクリップボードへ書き戻します。その後、第一引数、つまり `Delete` を実行します。
+
+**(EDIT-2)** の場合は、<strong>※</strong>で保存したデータに「行末までの文字列」を追加してクリップボードへ書き戻します。
+
+**(IE-1)** の場合は、<strong>※</strong>で保存したデータに「改行」を追加してクリップボードへ書き戻します。
+
+**(IE-2)** の場合は、<strong>※</strong>で保存したデータに「行末までの文字列(改行は除く)」を追加してクリップボードへ書き戻します。その後、第二引数、つまり `Return Left` を実行します。
+
+このように動作することで **(EDIT-1)** と **(IE-1)** は **(C-k-1)** 相当、**(EDIT-2)** と **(IE-2)** は **(C-k-2)** 相当になります。
+
+#### `&HelpMessage(⟨title⟩, ⟨message⟩)` {#function_HelpMessage}
+
+IE5.0 以降が入っていれば、タスクトレイ付近にメッセージを表示します。`⟨title⟩` [文字列](#string) と `⟨message⟩` [文字列](#string) を省略すると、表示されているメッセージを消します。
+
+#### `&HelpVariable(⟨title⟩)` {#function_HelpVariable}
+
+IE5.0 が入っていれば、タスクトレイ付近に [`&Variable`](#function_Variable) で設定された値が `⟨title⟩` [文字列](#string) と共にを表示されます。
+
+#### `&Ignore` {#function_Ignore}
+
+なにも起こりません。
+
+#### `&InvestigateCommand` {#function_InvestigateCommand}
+
+ウィンドウへ送られてくる `WM_COMMAND` と `WM_SYSCOMMAND` を調べログに出力します。トグルになっていますので、調査が終わったらもう一度この `⟨FUNCTION⟩` を実行してください。さもないとアプリケーションの実行速度が遅くなる可能性があります。ログの出力は [`&PostMessage`](#function_PostMessage) で使用することが出来ます。
+
+#### `&Keymap(⟨キーマップ名⟩)` {#function_Keymap}
+
+別のキーマップのキーを指定します。例えば、
+
+```mayu
+keymap sub : Global
+
+key	C-A = &WindowMinimize
+
+window EditControl /:Edit$/ : Global
+
+key	C-A = &Keymap(sub)
+```
+
+というように利用します。この場合、エディットコントロールで [[Control]] + [[A]] を入力すると、最小化されます。あまり実用的な機能はないかもしれません。ループしないように気をつけて利用してください。
+
+#### `&KeymapParent` {#function_KeymapParent}
+
+[親キーマップ](#parentKeymap)参照。
+
+#### `&KeymapPrevPrefix` {#function_KeymapPrevPrefix}
+
+現在のキーマップ (仮に `CURRENT` という名前とする) が二段階キーマップの場合、[`&Prefix`](#function_Prefix)`(CURRENT)` を実行したキーマップで定義されているキーを指定します。引数が無いと 1 段階前のキーマップになりますが、引数に数字を書くとその段階数前のキーマップになります。たとえば、
+
+```mayu
+keymap E
+
+key A = &KeymapPrevPrefix(2)
+
+keymap D
+
+key X = &Prefix(E)
+
+key A = D
+
+keymap C
+
+key X = &Prefix(D)
+
+key A = C
+
+key Y = &Prefix(E)
+
+keymap B
+
+key X = &Prefix(C)
+
+key A = B
+
+keymap Global
+
+key X = &Prefix(B)
+
+key A = A
+```
+
+ここで [[X]] [[X]] [[X]] [[X]] [[A]] と入力すると [[C]] が、[[X]] [[X]] [[Y]] [[A]] と入力すると [[B]] が入力されます。
+
+#### `&KeymapWindow` {#function_KeymapWindow}
+
+現在のウィンドウに定義されたキーマップのキーを入力します。プレフィックスキーの入力中に使用すると便利です。例えば
+
+```mayu
+keymap2 NotepadC-X
+
+key	A = &KeymapWindow
+
+window Notepad /:Notepad:Edit$/ : Global
+
+key	C-X = &Prefix(NotepadC-X)
+
+key	A = T E S T
+```
+
+この場合、メモ帳で [[Control]] + [[X]] を押した後に [[A]] を入力すると、`&KeymapWindow` は `Nodepad` キーマップに定義されているキーを入力しようとします。従って、`TEST` が入力されます。
+
+#### `&LoadSetting(⟨設定名⟩)` {#function_LoadSetting}
+
+設定ファイルを再読み込みします。`⟨設定名⟩` [文字列](#string) は「設定(I)...」で設定した「名前」で、再読み込みする設定を指定します。`⟨設定名⟩`を省略すると現在の設定を再読み込みします。
+
+#### `&MayuDialog(⟨dialog⟩, ⟨show_command⟩)` {#function_MayuDialog}
+
+「窓使いの憂鬱」のダイアログボックスを表示したり隠したりします。`⟨dialog⟩` には `Investigate` と `Log` が指定できます。それぞれ「調査」ダイアログと「ログ」ダイアログです。`⟨show_command⟩` には、`HIDE`, `SHOW`, `SHOWNA` などが指定できます。
+
+#### `&MouseHook(⟨type⟩, ⟨parameter⟩)` {#function_MouseHook}
+
+マウスイベントをフックし `⟨type⟩` で指定されるアクションに変換します。 `⟨parameter⟩` は整数値で `⟨type⟩` 毎に意味が異なります。指定できる `⟨type⟩` は以下の通りです。
+
+- `None` \[初期値\]変換しません。 `⟨parameter⟩` は無視されます。他の `⟨type⟩` から元に戻す場合にはこの値を指定します。
+- `Wheel` マウスの垂直方向の移動をホイールの回転に変換します。この間マウスカーソルは動きません。 `⟨parameter⟩` は変換の際の倍率で、正と負では逆回転となります。
+- `WindowMove` マウスの移動をウィンドウの移動に変換します。この間マウスカーソルは動きます。 `⟨parameter⟩` は移動するウィンドウの指定で、 `1` はアクティブウィンドウ、 `2` はマウスカーソル位置のウィンドウを意味します。また符号を負にすると対応する MDI 子ウィンドウを移動します。
+
+#### `&MouseMove(⟨dx⟩, ⟨dy⟩)` {#function_MouseMove}
+
+マウスカーソルを水平に `⟨dx⟩`、垂直に `⟨dy⟩` 移動します。
+
+#### `&MouseWheel(⟨delta⟩)` {#function_MouseWheel}
+
+ホイールを回します。`⟨delta⟩` を `-120` にするとホイールを手前に 1 単位まわしたことになります。逆に `120` にするとホイールを奥へ 1 単位まわしたことになります。
+
+#### `&OtherWindowClass` {#function_OtherWindowClass}
+
+[`window` に複数該当する場合](#matchManyClasses)参照。
+
+#### `&PlugIn(⟨DLLNAME⟩, ⟨FUNCNAME⟩, ⟨FUNCPARAM⟩, ⟨runAsThread⟩)` {#function_PlugIn}
+
+プラグインを実行します。`mayu.exe` のあるディレクトリの中の `Plugins` というディレクトリにプラグイン DLL を置いておくとそのプラグインの中の関数を「窓使いの憂鬱」から直接呼ぶことが出来ます。
+
+`⟨DLLNAME⟩` はプラグイン DLL 名です。`Plugins\⟨DLLNAME⟩.dll` が使用されます。
+
+`⟨FUNCNAME⟩` は DLL 中の関数名です。DLL は、以下の関数のうちのどれか実装していなければなりません。この引数は省略することができます。省略すると空文字列になります。
+
+```mayu
+void WINAPI mayu⟨FUNCNAME⟩W(const wchar_t *⟨FUNCPARAM⟩);
+
+void WINAPI mayu⟨FUNCNAME⟩A(const char *⟨FUNCPARAM⟩);
+
+void WINAPI mayu⟨FUNCNAME⟩(const char *⟨FUNCPARAM⟩);
+
+void WINAPI ⟨FUNCNAME⟩(const char *⟨FUNCPARAM⟩);
+```
+
+`⟨FUNCPARAM⟩` は DLL の関数を呼び出すときに渡される引数です。省略すると空文字列 (`NULL` ではない) になります。
+
+`⟨runAsThread⟩` に `true` を指定すると指定の関数をスレッドの中で実行します。省略すると `false` が指定されたことになります。
+
+#### `&PostMessage(⟨window⟩, ⟨message⟩, ⟨wParam⟩, ⟨lParam⟩)` {#function_PostMessage}
+
+ウィンドウへメッセージを送ることができます。高度な機能なので完全に理解してから利用してください。
+
+```mayu
+keyseq $WM_CUT = &PostMessage(ToItself, 0x0300, 0, 0)
+
+window EditControl /:Edit$/ : Global
+
+key C-W = $WM_CUT
+```
+
+と書くと、一部のウィンドウで [[Control]] + [[W]] でカットできるようになります。
+
+`⟨window⟩` には、メッセージを送る先のウィンドウを指定します。以下の種類があります。
+
+- `ToItself` はそのウィンドウ自身へ。
+- `ToMainWindow` は最も親のウィンドウへ。
+- `ToOverlappedWindow` は子でない最初のウィンドウへ。
+- `ToParentWindow` は親ウィンドウへ。
+- `⟨正の数⟩` は `1`:親ウィンドウ、`2`:親の親、`3`:親の親の親…
+
+どのようなメッセージを送ればよいかは Spy++ などで調べられますが、`WM_COMMAND` と `WM_SYSCOMMAND` については [`&InvestigateCommand`](#function_InvestigateCommand) で調べることもできます。
+
+#### `&Prefix(⟨キーマップ名⟩, ⟨ignore_modifiers⟩)` {#function_Prefix}
+
+プレフィックスキーを指定します。例えば、
+
+```mayu
+keymap2 NotepadC-X
+
+key	C-C = &WindowClose
+
+window Notepad /:Notepad:Edit$/ : Global
+
+key	C-X = &Prefix(NotepadC-X)
+```
+
+というように記述しておくと、メモ帳で [[Control]] + [[X]] [[Control]] + [[C]] と続けて入力するとメモ帳を終了することができます。
+
+`⟨ignore_modifiers⟩` は省略可能な引数で `true` か `false` を指定します。省略すると `true` が指定されたとみなされます。`true` が指定された場合、`⟨キーマップ名⟩` で指示されるキーマップは
+
+```mayu
+mod !shift !alt !control !windows \
+
+!mod0 !mod1 !mod2 !mod3 !mod4 \
+
+!mod5 !mod6 !mod7 !mod8 !mod9
+```
+
+が指定されたものとして扱われます。つまり、全てのモディファイヤが[真のモディファイヤ](#trueModifier)として扱われるようになります。
+
+[`keymap2`](#keymap2) を利用しているときには、デフォルトキーが [`&Undefined`](#function_Undefined) になっているので、モディファイヤを入力した時にもベルが鳴るはずですが、このように `true` を指定しておけば鳴らなくなります。([`mod`](#mod) を参照)
+
+`false` を指定すれば、2 ストローク目にモディファイヤキーそのものを使用することができる可能性がありますが、通常はそのような使用方法はしないと思われます。また、さまざまな問題により `false` の指定にはバグがありますので使用はオススメしません。
+
+> 1. キーの押す・離す、が順番に来ない場合 例えば [[Control]] + [[X]] [[Control]] + [[L]] という入力をユーザーがした場合、`D-C-X U-C-X D-C-L U-C-L` という順序で入力されるのが正しいのですが、[[X]] は左手、[[L]] は右手で入力するため、 `D-C-X D-C-L U-C-X U-C-L` という順序で入力されてしまうことがしばしばあります。 ですから、現在の実装では [`&Prefix`](#function_Prefix) はキーダウン (`D-`) 部分でしか正しく動作しないようになっています。入力されるキーの順序が入れ替わるため、`U-` 部分で [`&Prefix`](#function_Prefix) が動作してしまうとおかしなことになるからです。(現在は中途半端に動作しているので、バグかもしれません。要調査)
+> 2. キーリピート キーリピートは、キーダウン (`D-`) がたくさん入力されたあとに、キーアップ (`U-`) が一度だけ入力されます。この場合に [`&Prefix`](#function_Prefix) がどのように動作すべきかは自明ではありません。
+> 3. モディファイヤキーのキーマップ `false` を指定した時に [[Control]] + [[X]] [[F]] と入力したとします。`D-C-Control D-C-X U-C-X U-Control D-F U-F` このような順序でキーが入力されますが、`U-Control` はどのキーマップで解釈されるべきでしょうか？ 現在は、[`&Prefix`](#function_Prefix) 先のキーマップで解釈されていますが、モディファイヤを真のモディファイヤへ自動的に変換するため、`U-Control` は何の機能ももたないので、うまく動作しているように見えます。ですが、本来ならば元のキーマップで解釈されるべきなのでこれはバグなのですが、修正する予定はありません。
+
+#### `&Recenter` {#function_Recenter}
+
+エディットコントロールかリッチエディットコントロールでのみ動作し、カレットの位置を縦方向の中央に移動させます。
+
+#### `&Repeat(⟨キーシーケンス⟩, ⟨最大回数⟩)` {#function_Repeat}
+
+[`&Variable`](#function_Variable) で設定した回数だけ `⟨キーシーケンス⟩` を実行します。ただし、実行しすぎると危険なので*最大回数*を指定できます。*最大回数*は省略することができ、その場合 10 回が最大になります。
+
+```mayu
+key A = &Variable(0, 10) &Repeat((X))
+```
+
+上の例では、[[A]] を押すと、[[X]] が 10 回入力されます
+
+#### `&SetImeStatus(⟨status⟩)` {#function_SetImeStatus}
+
+IME の ON/OFF を切り替えます。`⟨status⟩` は `on`, `off`, `toggle` のいずれかで、省略時は `toggle` として扱われます。
+
+MS-IME2002/2003 と一部のアプリケーション (例えば MS Word2002/2003) の組み合わせでは「詳細なテキストサービス」を無効にしない限り機能しません。
+
+#### `&SetImeString(⟨text⟩)` {#function_SetImeString}
+
+IME を経由して `⟨text⟩` [文字列](#string) を入力します。
+
+Windows2000/XP のみで機能します。
+
+#### `&ShellExecute(⟨operation⟩, ⟨file⟩, ⟨parameters⟩, ⟨directory⟩, ⟨show_command⟩)` {#function_ShellExecute}
+
+プログラムを実行します。
+
+- `⟨operation⟩` [文字列](#string) にはファイルに対してどのような操作をするかを指示し、通常 `open` を指定します。
+- `⟨file⟩` [文字列](#string) にはファイルか実行ファイルを書きます。
+- `⟨parameters⟩` [文字列](#string) には `⟨file⟩` に実行ファイルを書いたときにオプションを記述します。
+- `⟨directory⟩` [文字列](#string) は作業ディレクトリを指定します。
+- `⟨show_command⟩` には `ShowNormal` を指定します。
+
+コントロールパネルを開く例:
+
+```mayu
+key M-B = &ShellExecute("open", "C:\\WINDOWS\\system32\\Control.exe",,, ShowNormal)
+```
+
+システムのプロパティを開く例:
+
+```mayu
+key M-C = &ShellExecute("open", "C:/WINDOWS/system32/Control.exe", "sysdm.cpl",, ShowNormal)
+```
+
+インターネットエクスプローラで「窓使いの憂鬱」のホームページを開く例:
+
+```mayu
+key M-I = &ShellExecute("open", "C:\\Program Files\\Internet Explorer\\iexplore.exe\", "http://mayu.sourceforge.net",, ShowNormal)
+
+key M-H = &ShellExecute("open", "http://mayu.sourceforge.net",,, ShowNormal)
+```
+
+`flourish.mid` を演奏する例:
+
+```mayu
+key M-R = &ShellExecute("play", "C:\\WINDOWS\\Media\\flourish.mid",,, ShowNormal)
+```
+
+#### `&Sync` {#function_Sync}
+
+基本的に、Windows へのキー入力と `⟨FUNCTION⟩` は非同期に実行されます。つまりキー入力と `⟨FUNCTION⟩` の実行順序は不明です。例えば、
+
+```mayu
+key C-A = A &WindowMinimize
+```
+
+このように記述して [[Control]] + [[A]] を入力すると、Windows へ `A` が入力されるのが先か、`&WindowMinimize` が実行されるのが先かは不明です。そこで、以下のように記述すればちゃんと順序が守られることを保証できます。
+
+```mayu
+key C-A = A &Sync &WindowMinimize
+```
+
+また、`⟨FUNCTION⟩` には[モディファイヤ](#modifier)を指定することが可能ですが、`⟨FUNCTION⟩` とモディファイヤキー入力が非同期に実行されるため通常は意味がありません。しかし、`&Sync` を使えばモディファイヤキーの指定に意味が出てきます。
+
+```mayu
+window Explorer /Explorer\.exe/ : Global
+
+key C-S-Z = &Sync &WindowMaximize # ウィンドウの最大化
+
+key C-A-Z = C-&Sync *&WindowMaximize # ウィンドウの全画面化
+```
+
+前者の指定では、ウィンドウを最大化するときに [[Control]] と [[Shift]] が入力されていないようにしています。後者では、[[Control]] は入力されるが、[[Alt]] は入力されていないようにします。
+
+[`def sync`](#def_sync) 参照。
+
+#### `&Toggle(Lock⟨N⟩)` {#function_Toggle}
+
+ロックキーをトグルします。`&Toggle(Lock0)`〜`&Toggle(Lock9)` が利用できます。引数の最後に `on`, `off` を追加すると、ロックキーを強制的にオンにしたりオフにしたりできます。
+
+#### `&Undefined` {#function_Undefined}
+
+キーに何も割り当てられていないことにします。もしそのキーが押されると、ベルが鳴ります。
+
+#### `&VK(⟨virtual_key⟩)` {#function_VK}
+
+仮想キーを Windows へ入力します。仮想キーには、物理的なキーボードから入力できないキーも存在しますのでそのようなキーの入力に使用します。仮想キーを調べるには、タスクトレイメニュー[調査(I)...](#menu-i)の「仮想キーの調査」を利用します。例えば、
+
+```mayu
+key 変換 = &VK(F13)
+```
+
+と記述すると [[変換]] キーを押すと [[F13]] を入力できます。又、`E-` を付けると拡張キーを表し、`D-` はキーを押す、`U-` はキーを離すことを表します。
+
+`⟨virtual_key⟩` に `LButton`、`MButton`、`RButton`、`XButton1`、`XButton2` を指定することによって、マウスのボタンをシミュレートすることができます。
+
+この `⟨FUNCTION⟩` を利用するときは、必ず最後にキーを離していることを確認してください (つまり最後に `&VK(U-F13)` などを書いておく)。さもないと、そのキーが押されっぱなしになります。
+
+#### `&Variable(⟨mag⟩, ⟨inc⟩)` {#function_Variable}
+
+内部変数を `⟨mag⟩` 倍してから `⟨inc⟩` を加えます。この変数は、[`&Repeat`](#function_Repeat) と [`&HelpVariable`](#function_HelpVariable) で使用されます。
+
+#### `&Wait(⟨milli_second⟩)` {#function_Wait}
+
+`⟨milli_second⟩` ミリ秒だけ実行を中断します。その間はキーを入力することはできません。最大 5 秒待つことができます。
+
+#### `&WindowClingToLeft`, `&WindowClingToRight`, `&WindowClingToTop`, `&WindowClingToBottom`, {#function_WindowCling}
+
+ウィンドウを、それぞれの辺が画面のそれぞれの辺にくっつくように移動させます。引数に `MDI` を指定すると、MDI 子ウィンドウを操作します。
+
+- `&WindowClingToTop` は [`&WindowMoveTo(N, 0, 0)`](#function_WindowMoveTo)と同じ。
+- `&WindowClingToRight` は [`&WindowMoveTo(E, 0, 0)`](#function_WindowMoveTo) と同じ。
+- `&WindowClingToLeft` は [`&WindowMoveTo(W, 0, 0)`](#function_WindowMoveTo) と同じ。
+- `&WindowClingToBottom` は [`&WindowMoveTo(S, 0, 0)`](#function_WindowMoveTo) と同じ。
+
+#### `&WindowClose` {#function_WindowClose}
+
+ウィンドウを閉じます。引数に `MDI` を指定すると、MDI 子ウィンドウを操作します。
+
+#### `&WindowIdentify` {#function_WindowIdentify}
+
+ウィンドウのウィンドウクラス名とタイトルを調べログに出力します。又、各種ウィンドウの位置と大きさも出力します。
+
+#### `&WindowMinimize`, `&WindowMaximize`, `&WindowHMaximize`, `&WindowVMaximize` {#function_WindowMaxMinHVMax}
+
+それぞれ、ウィンドウを最小化、最大化、横方向に最大化、縦方向に最大化します。引数に `MDI` を指定すると、MDI 子ウィンドウを操作します。
+
+#### `&WindowMonitor(⟨monitor⟩, ⟨adjust_position⟩, ⟨adjust_size⟩)` {#function_WindowMonitor}
+
+ウィンドウをモニタ `⟨monitor⟩` へ移動します。[`&WindowMonitorTo(primary, ⟨monitor⟩, ⟨adjust_position⟩, ⟨adjust_size⟩)`](#function_WindowMonitorTo) と同じ動作をします。
+
+#### `&WindowMonitorTo(⟨from⟩, ⟨monitor⟩, ⟨adjust_position⟩, ⟨adjust_size⟩)` {#function_WindowMonitorTo}
+
+ウィンドウを `⟨from⟩` を基準としてモニタ `⟨monitor⟩` へ移動します。`⟨from⟩` には、次のものが指定できます。
+
+- `primary` : プライマリモニタを基準とします
+- `current` : 現在ウィンドウがあるモニタを基準とします
+
+`⟨monitor⟩` には、数字が指定できます。`0` が基準となるモニタ、正の数は `1`: 次のモニタ、`2`: 次の次のモニタ…、負の数は `-1`: 前のモニタ、`-2`: 前の前のモニタ…、を意味します。
+
+`⟨adjust_position⟩` は省略可能な引数で `true` か `false` を指定します。省略すると `true` が指定されたとみなされます。`true` が指定された場合、移動先がモニタからはみ出すときにできる限りモニタ内におさまる位置へ移動します。
+
+`⟨adjust_size⟩` は省略可能な引数で `true` か `false` を指定します。省略すると `false` が指定されたとみなされます。`⟨adjust_position⟩` が `true` の場合のみ有効です。`true` が指定された場合、移動先がモニタからはみ出すときにモニタ内におさまるようウィンドウの大きさを調整します。
+
+#### `&WindowMove(⟨dx⟩, ⟨dy⟩)` {#function_WindowMove}
+
+ウインドウを水平方向に `⟨dx⟩`、垂直方向に `⟨dy⟩` 移動します。`MDI` を引数の最後に追加指定すると、MDI 子ウィンドウを操作します。`&WindowMoveTo(C, ⟨dx⟩, ⟨dy⟩)` と同じ動作をします。
+
+#### `&WindowMoveTo(⟨gravity⟩, ⟨dx⟩, ⟨dy⟩)` {#function_WindowMoveTo}
+
+基準位置から相対的にウインドウを水平方向に `⟨dx⟩`、垂直方向に `⟨dy⟩` 移動します。`MDI` を引数の最後に追加指定すると、MDI 子ウィンドウを操作します。`⟨gravity⟩` には、次のものが指定できます。
+
+- `C` : 現在位置からの相対位置に移動します。
+- `N` : 上下方向はデスクトップの上からの相対位置、左右方向は現在位置からの相対位置に移動します。
+- `E` : 上下方向は現在位置からの相対位置、左右方向はデスクトップの右からの相対位置に移動します。
+- `W` : 上下方向は現在位置からの相対位置、左右方向はデスクトップの左からの相対位置に移動します。
+- `S` : 上下方向はデスクトップの下からの相対位置、左右方向は現在位置からの相対位置に移動します。
+- `NE` : デスクトップ右上からの相対位置に移動。
+- `NW` : デスクトップ左上からの相対位置に移動。
+- `SE` : デスクトップ右下からの相対位置に移動。
+- `SW` : デスクトップ左下からの相対位置に移動。
+
+また、他の移動 `⟨FUNCTION⟩` とは以下のような関係があります。
+
+- `&WindowMoveTo(C, ⟨dx⟩, ⟨dy⟩)` は [`&WindowMove(⟨dx⟩, ⟨dy⟩)`](#function_WindowMove) と同じ。
+- `&WindowMoveTo(N, 0, 0)` は [`&WindowClingToTop`](#function_WindowCling) と同じ。
+- `&WindowMoveTo(E, 0, 0)` は [`&WindowClingToRight`](#function_WindowCling) と同じ。
+- `&WindowMoveTo(W, 0, 0)` は [`&WindowClingToLeft`](#function_WindowCling) と同じ。
+- `&WindowMoveTo(S, 0, 0)` は [`&WindowClingToBottom`](#function_WindowCling) と同じ。
+
+#### `&WindowMoveVisibly` {#function_WindowMoveVisibly}
+
+ウィンドウ全体が画面に表示されるような位置へウィンドウを移動します。引数に `MDI` を指定すると、MDI 子ウィンドウを操作します。
+
+#### `&WindowRedraw` {#function_WindowRedraw}
+
+ウィンドウを強制的に再描画させます。
+
+#### `&WindowResizeTo(⟨width⟩, ⟨height⟩)` {#function_WindowResizeTo}
+
+ウインドウの大きさを幅 `⟨width⟩`、高さ `⟨height⟩` に変更します。`0` を指定すると現在の大きさに、負の値を指定するとデスクトップの大きさより指定したピクセル数だけ小さい大きさになります。`MDI` を引数の最後に追加指定すると、MDI 子ウィンドウを操作します。
+
+#### `&WindowRaise`, `&WindowLower` {#function_WindowRiseLower}
+
+それぞれ、ウィンドウを一番上、一番下へ移動します。引数に `MDI` を指定すると、MDI 子ウィンドウを操作します。
+
+#### `&WindowSetAlpha(⟨alpha⟩)` {#function_WindowSetAlpha}
+
+ウィンドウを半透明化、又は半透明化解除します。トグルになっています。`⟨alpha⟩` は半透明の度合いを表し、`0` で透明、`100` で不透明になります。`-1` を指定すると、この `⟨FUNCTION⟩` で半透明化されたウィンドウを全て不透明状態に戻します。
+
+#### `&WindowToggleTopMost` {#function_WindowToggleTopMost}
+
+ウィンドウの最前面フラグをトグルします。
+
+#### 引数置換 {#arg_subst}
+
+引数として `$` で始まるキーワードを指定することにより `⟨FUNCTION⟩` に以下の内容を渡すことができます。\[\]内はそのキーワードを指定できる引数の型です。値の取り出しは `⟨FUNCTION⟩` の実行時に行われます。
+
+- `$Clipboard`: \[文字列\] クリップボードの中身
+- `$WindowClassName`: \[文字列\] フォーカスされているウィンドウのクラス名
+- `$WindowTitleName`: \[文字列\] フォーカスされているウィンドウのタイトル名
+
+クリップボード内の文字列を URL としてブラウザで開く例:
+
+```mayu
+key M-C-O = &ShellExecute("open", $Clipboard,,, ShowNormal)
+```
+
+フォーカスされているウィンドウのクラス名やタイトル名をクリップボードにコピーする例:
+
+```mayu
+key M-C-C = &ClipboardCopy($WindowClassName)
+
+key M-C-T = &ClipboardCopy($WindowTitleName)
+```
+
+#### 文字列 {#string}
+
+文字列が記述できる箇所には `"文字列"` と記述することができますが、`\` という文字は、その次にくる文字と組み合わせて特殊な文字を表します。
+
+- `\a` (U+0007) ベル文字
+- `\e` (U+001b) ESC 文字
+- `\f` (U+000c) 改頁文字
+- `\n` (U+000a) 改行文字
+- `\r` (U+000d) 復帰文字
+- `\t` (U+0009) タブ文字
+- `\v` (U+000b) 垂直タブ文字
+- `\'` 「`'`」
+- `\"` 「`"`」
+- `\\` 「`\`」
+- `\c⟨X⟩` コントロール文字一般。`^⟨X⟩`
+- `\x⟨XXXX⟩` (U+*XXXX*) 16 進数で表現した UNICODE 文字。*X* は 0〜9 と a〜f。
+- `\0⟨XXXX⟩` 8 進数で表現した UNICODE 文字。*X* は 0〜7。
+- 上記に当てはまらない `\⟨X⟩` は *X* という文字そのもの。
+
+### x. ビルド {#compile}
+
+#### 必要なもの {#compile_tool}
+
+Visual C++ を所有していない場合、マイクロソフトから無償で提供されているコンパイラを利用することでビルド可能です。
+
+##### Visual C++
+
+商用の Visual C++ 6.0 SP5 以降、又はマイクロソフトから無償で提供されている [Visual C++ Toolkit 2003](http://www.microsoft.com/downloads/details.aspx?FamilyID=272be09d-40bb-49fd-9cb0-4bfa122fa91b&DisplayLang=en) をダウンロードして使用することが可能です。
+
+##### Platform SDK
+
+Windows XP に対応したものが必要です。MSDN で配布されていますし、マイクロソフトのから無償で提供されている [XPSP2 PSDK](http://www.microsoft.com/msdownload/platformsdk/sdkupdate/XPSP2FULLInstall.htm) を利用することもできます。
+
+##### (Visual C++ Toolkit 2003 を利用する場合のみ) .NET Framework SDK Version 1.1
+
+Visual C++ Toolkit 2003 のパッケージには nmake と cvtres が含まれていないので、[.NET Framework SDK Version 1.1](http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-4070-9F41-A333C6B9181D&displaylang=ja) をインストール(無償)する必要があります。
+
+`C:\Program Files\Microsoft.NET\SDK\v1.1\Bin\nmake.exe` と `C:\WINDOWS\Microsoft.NET\Framework\v1.1.4322\cvtres.exe` を Visual C++ Toolkit 2003 の `bin/` ディレクトリへコピーします。(`cvtres.exe` は必ず `link.exe` と同じディレクトリに置いてください。`nmake.exe` はパスが通っていれば使用可能です。)
+
+商用パッケージの Visual C++ には最初から含まれているので、入れる必要はありません。
+
+##### DDK
+
+デバイスドライバをビルドする場合のみ必要になります。MSDN で配布されていますし、マイクロソフトの[サイト](http://www.microsoft.com/whdc/ddk/winddk.mspx)から注文することもできます。
+
+##### 正規表現ライブラリ
+
+[Boost.Regex](http://www.boost.org/libs/regex/doc/index.html) が必要です。[Boost ライブラリ](http://www.boost.org/) に同梱されています。現在、「窓使いの憂鬱」のビルドが確認されている Boost のバージョンは 1.32.0 のみです。
+
+##### Perl
+
+いくつかの作業の為に Perl が必要です。[Cygwin](http://www.cygwin.com/) の perl 又は [ActivePerl](http://www.activestate.com/Products/ActivePerl/) をインストールしてください。
+
+##### bash, cvs, fileutils, sed, tar
+
+配布パッケージを作成するためにのみ [Cygwin](http://www.cygwin.com/) の bash, fileutils, sed, tar が必要です。また、cvs は Cygwin のものを使用することをおすすめします。さもないと改行コードの違いによるトラブルが起こるかもしれません。mayu のソースの改行コードはすべて LF のみになっています。
+
+#### ソースの展開 {#compile_source}
+
+##### ソースの展開
+
+SourfeForge の [Download](http://sourceforge.net/project/showfiles.php?group_id=5403) から、ソースファイルをダウンロードします。ソースファイルの展開には Cygwin の tar を使うのが良いでしょう。
+
+##### cvs による取り寄せ
+
+SourfeForge から cvs を使用して取り寄せることにより現在開発中で次のバージョンとなるはずのソースを入手することが出来ます。
+
+```mayu
+cvs -z 3 -d :pserver:anonymous@cvs1.sourceforge.net:/cvsroot/mayu checkout mayu
+```
+
+##### ディレクトリ構成
+
+上記のどちらかの方法で「窓使いの憂鬱」本体のソースコードを展開後、Boost を展開します。最終的なディレクトリ構成が以下のようになるように展開してください。
+
+./  
+`|`  
+`+---`boost\_1\_??\_?/ ... Boost の展開により作成される  
+`|   |`  
+`|   +---`boost/ ... Boost の展開により作成される  
+`|   |   |`  
+`|   |   +---`detail/ ...  
+`|   |   +---`re\_detail/ ...  
+`|   |`  
+`|   +---`libs/ ... Boost の展開により作成される  
+`|       |`  
+`|       +---`regex/ ...  
+`|       +---`timer/ ...  
+`|`  
+`+---`mayu-3.??/ ... 「窓使いの憂鬱」本体ソース  
+`|`  
+`+---`contrib/ ...  
+`+---`d/ ...  
+`+---`r/ ...  
+`+---`s/ ...  
+`+---`tools/ ...  
+
+#### ビルド {#compile_build}
+
+##### Visual C++ の場合
+
+まず、いくつかの環境変数を設定します。
+
+`vcvars32.bat` を利用すると設定してくれるはずですが、以下の環境変数の設定が必要になります。
+
+- `PATH` … コンパイラと nmake にパスを通します。
+- `INCLUDE` … コンパイラと PSDK の include ディレクトリパスを設定します。
+- `LIB` … コンパイラと PSDK の lib ディレクトリパスを設定します。
+- `MSVCDIR` … Visual C++ Toolkit 2003 を使用する場合は設定されていないので、環境変数 `VCTOOLKITINSTALLDIR` と同じ内容に設定します。
+
+次にコンパイルを行います。
+
+Visual C++ Toolkit 2003 の場合は、以下のようにします。
+
+```mayu
+mayu-3.??> nmake MAYU_VC=vct
+```
+
+Visual C++ 7.1 の場合は、以下のようにします。
+
+```mayu
+mayu-3.??> nmake MAYU_VC=vc71
+```
+
+Visual C++ 7.0 の場合は、以下のようにします。
+
+```mayu
+mayu-3.??> nmake MAYU_VC=vc7
+```
+
+Visual C++ 6.0 の場合は、以下のようにします。
+
+```mayu
+mayu-3.??> nmake MAYU_VC=vc6
+```
+
+`out$(MAYU_VC)_winnt/`, `out$(MAYU_VC)_winnt_debug/` の各ディレクトリに実行ファイルが作成されます。
+
+`d/` ディレクトリ以下にはドライバのソースが入っているので、必要なら適当にコンパイルしてください。
+
+---
+
+Visual C++ Toolkit 2003 を使用する場合は、`libcpmtd.lib` が提供されていないため、デバッグバージョンの mayu はビルドできません。

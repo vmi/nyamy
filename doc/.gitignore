@@ -1,0 +1,8 @@
+# makedoc generated files (see proj/makedoc.vcxproj).
+# Content is not finalized yet; regenerate locally via the makedoc project
+# and commit the outputs once the documentation is settled.
+/README-ja.html
+/README-nyamy.html
+/README-ymgw.html
+/HISTORY-ja.html
+/style.css
