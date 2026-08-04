@@ -818,6 +818,13 @@ DllExport int uninstallMessageHook()
 		UnhookWindowsHookEx(s_hookDataArch->m_hHookCallWndProc);
 	s_hookDataArch->m_hHookCallWndProc = NULL;
 	g.m_hwndTaskTray = 0;
+
+	// Windows unloads a global-hook DLL from each injected process only
+	// when that process next retrieves a message.  Idle GUI processes
+	// would otherwise keep this DLL mapped indefinitely, blocking
+	// relink of the DLL file.  Wake every GUI thread with a harmless
+	// WM_NULL so the DLL gets unloaded promptly.
+	SendNotifyMessage(HWND_BROADCAST, WM_NULL, 0, 0);
 	return 0;
 }
 
