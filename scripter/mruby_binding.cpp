@@ -146,7 +146,7 @@ static std::string resolveRbPath(mrb_state *mrb, const std::string &path)
 	mrb_raisef(mrb, E_RUNTIME_ERROR,
 		"file not found in $LOAD_PATH: %s (searched: %s)",
 		path.c_str(), searched.c_str());
-	return std::string();	// not reached
+	// not reached
 }
 
 // Evaluate the .rb file at the canonical absolute path via instance_eval
@@ -226,7 +226,7 @@ static int resolveRhs(mrb_state *mrb, mrb_value rhs)
 
 	mrb_raise(mrb, E_TYPE_ERROR,
 		"rhs must be a String, Symbol, or NYamy::KeySeq");
-	return -1;
+	// not reached
 }
 
 // Build a NYsStrs* from an mrb Array of strings or a single string value.
