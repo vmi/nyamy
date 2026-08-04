@@ -177,14 +177,22 @@ public:
 
 
 #  ifndef _HOOK_CPP
-extern DllImport HookData *g_hookData;
-extern DllImport int installMessageHook(HWND i_hwndTaskTray);
-extern DllImport int uninstallMessageHook();
-extern DllImport int installKeyboardHook(INPUT_DETOUR i_keyboardDetour, Engine *i_engine, bool i_install);
-extern DllImport int installMouseHook(INPUT_DETOUR i_mouseDetour, Engine *i_engine, bool i_install);
-extern DllImport bool notify(void *data, size_t sizeof_data);
-extern DllImport void notifyLockState();
-extern DllImport void emergencyUnhookAll();
+// hook_stub.cpp's DllExport definitions are linked into this same binary
+// (unit tests), not a separate DLL; a dllimport decl here would make the
+// linker warn LNK4217 about importing a locally defined symbol.
+#    ifdef HOOK_STATIC_LINK
+#      define HookDllImport
+#    else
+#      define HookDllImport DllImport
+#    endif // HOOK_STATIC_LINK
+extern HookDllImport HookData *g_hookData;
+extern HookDllImport int installMessageHook(HWND i_hwndTaskTray);
+extern HookDllImport int uninstallMessageHook();
+extern HookDllImport int installKeyboardHook(INPUT_DETOUR i_keyboardDetour, Engine *i_engine, bool i_install);
+extern HookDllImport int installMouseHook(INPUT_DETOUR i_mouseDetour, Engine *i_engine, bool i_install);
+extern HookDllImport bool notify(void *data, size_t sizeof_data);
+extern HookDllImport void notifyLockState();
+extern HookDllImport void emergencyUnhookAll();
 #  endif // !_HOOK_CPP
 
 
