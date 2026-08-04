@@ -200,6 +200,149 @@ hr {
   text-decoration: underline;
 }
 
+/* --- sidebar toolbar (template.html unhides .toc-tools) ------------------ */
+
+.toc-tools {
+  margin-top: .6em;
+  font-weight: normal;
+}
+
+.toc-search {
+  position: relative;
+}
+
+#toc-filter {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #1a1a1a;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 3px;
+  padding: .25em 1.8em .25em .5em;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+#toc-filter::placeholder {
+  color: #888;
+}
+
+#toc-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* the ✕ button next to it does this job */
+#toc-filter::-webkit-search-cancel-button {
+  display: none;
+}
+
+#toc-filter-clear {
+  position: absolute;
+  right: .15em;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  color: #aaa;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0 .35em;
+}
+
+#toc-filter-clear:hover {
+  color: #fff;
+}
+
+.toc-buttons {
+  display: flex;
+  gap: .4em;
+  margin-top: .4em;
+}
+
+.toc-buttons button {
+  flex: 1 1 0;
+  background: none;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 3px;
+  padding: .15em 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: smaller;
+}
+
+.toc-buttons button:hover {
+  color: #fff;
+  border-color: #999;
+}
+
+/* --- sidebar folding and filtering --------------------------------------- */
+
+#contents .toc li.branch {
+  position: relative;
+}
+
+/* ▸ sits on the row, left of the title, and turns when the branch is open */
+.toc-toggle {
+  position: absolute;
+  top: 0;
+  width: 1.1em;
+  height: 1.9em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: inherit;
+  line-height: 1;
+}
+
+.toc-toggle::before {
+  content: "▸";
+  transition: transform .1s ease-out;
+}
+
+#contents .toc li.branch:not(.closed) > .toc-toggle::before {
+  transform: rotate(90deg);
+}
+
+#contents .toc > ul > li.branch > .toc-toggle {
+  left: .1em;
+  color: #fff;
+}
+
+/* the marker must follow the chapter row out of its black band on hover */
+#contents .toc > ul > li.branch:has(> a:hover) > .toc-toggle,
+#contents .toc > ul > li.branch:has(> a:active) > .toc-toggle {
+  color: var(--fg);
+}
+
+#contents .toc > ul > li > ul > li.branch > .toc-toggle {
+  left: .8em;
+  color: var(--fg);
+}
+
+#contents .toc li.branch.closed > ul {
+  display: none;
+}
+
+/* While filtering, only hits, their ancestors and their descendants are
+ * shown, and the closed state is ignored so that every hit is reachable. */
+#contents.filtering .toc li {
+  display: none;
+}
+
+#contents.filtering .toc li.show {
+  display: list-item;
+}
+
+#contents.filtering .toc li.branch.closed > ul {
+  display: block;
+}
+
 /* --- width handle ------------------------------------------------------- */
 
 #nav-resizer {

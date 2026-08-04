@@ -76,6 +76,152 @@
 	});
 })();
 </script>
+<script>
+// Table of contents: fold chapters and sections, and filter titles as you
+// type.  The set of closed items is saved per page.  Without JavaScript the
+// toolbar keeps its hidden attribute and the list simply stays expanded.
+(function () {
+	document.addEventListener("DOMContentLoaded", function () {
+		var nav = document.getElementById("contents");
+		var toc = nav ? nav.querySelector(".toc") : null;
+		var tools = nav ? nav.querySelector(".toc-tools") : null;
+		if (!toc || !tools) { return; }
+
+		var KEY = "nyamy-doc-toc-closed:" + location.pathname;
+
+		function childAnchor(li) {
+			for (var n = li.firstElementChild; n; n = n.nextElementSibling) {
+				if (n.tagName === "A") { return n; }
+			}
+			return null;
+		}
+
+		function childList(li) {
+			for (var n = li.firstElementChild; n; n = n.nextElementSibling) {
+				if (n.tagName === "UL") { return n; }
+			}
+			return null;
+		}
+
+		function itemId(li) {
+			var a = childAnchor(li);
+			return a ? a.getAttribute("href") : null;
+		}
+
+		var all = toc.getElementsByTagName("li");
+		var branches = [];
+		for (var i = 0; i < all.length; i++) {
+			if (childList(all[i])) { branches.push(all[i]); }
+		}
+
+		var closedSet = {};
+		try {
+			var saved = JSON.parse(localStorage.getItem(KEY) || "[]");
+			for (var i = 0; i < saved.length; i++) { closedSet[saved[i]] = true; }
+		} catch (e) { /* first visit or private mode: everything stays open */ }
+
+		function save() {
+			var ids = [];
+			for (var i = 0; i < branches.length; i++) {
+				if (branches[i].classList.contains("closed")) {
+					var id = itemId(branches[i]);
+					if (id) { ids.push(id); }
+				}
+			}
+			try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch (e) { /* ignore */ }
+		}
+
+		function setClosed(li, closed) {
+			li.classList.toggle("closed", closed);
+			var b = li.firstElementChild;	// the toggle was inserted first
+			if (b && b.className === "toc-toggle") {
+				b.setAttribute("aria-expanded", closed ? "false" : "true");
+			}
+		}
+
+		for (var i = 0; i < branches.length; i++) {
+			(function (li) {
+				var b = document.createElement("button");
+				b.type = "button";
+				b.className = "toc-toggle";
+				b.setAttribute("aria-label", "開閉");
+				li.classList.add("branch");
+				li.insertBefore(b, li.firstChild);
+				setClosed(li, !!closedSet[itemId(li)]);
+				b.addEventListener("click", function () {
+					setClosed(li, !li.classList.contains("closed"));
+					save();
+				});
+				var a = childAnchor(li);
+				if (a) {
+					a.addEventListener("click", function () {
+						// jumping into a chapter also reveals what is inside
+						setClosed(li, false);
+						save();
+					});
+				}
+			})(branches[i]);
+		}
+
+		document.getElementById("toc-expand")
+			.addEventListener("click", function () {
+				for (var i = 0; i < branches.length; i++) {
+					setClosed(branches[i], false);
+				}
+				save();
+			});
+		document.getElementById("toc-collapse")
+			.addEventListener("click", function () {
+				for (var i = 0; i < branches.length; i++) {
+					setClosed(branches[i], true);
+				}
+				save();
+			});
+
+		var input = document.getElementById("toc-filter");
+		var clear = document.getElementById("toc-filter-clear");
+
+		function applyFilter() {
+			var q = input.value.trim().toLowerCase();
+			for (var i = 0; i < all.length; i++) {
+				all[i].classList.remove("show");
+			}
+			if (!q) { nav.classList.remove("filtering"); return; }
+			nav.classList.add("filtering");
+			for (var i = 0; i < all.length; i++) {
+				var a = childAnchor(all[i]);
+				if (!a || a.textContent.toLowerCase().indexOf(q) < 0) { continue; }
+				// a hit keeps itself, its ancestors and its descendants visible
+				all[i].classList.add("show");
+				for (var p = all[i].parentElement; p && p !== toc; p = p.parentElement) {
+					if (p.tagName === "LI") { p.classList.add("show"); }
+				}
+				var sub = all[i].getElementsByTagName("li");
+				for (var j = 0; j < sub.length; j++) {
+					sub[j].classList.add("show");
+				}
+			}
+		}
+
+		function clearFilter() {
+			input.value = "";
+			applyFilter();
+			input.focus();
+		}
+
+		input.addEventListener("input", applyFilter);
+		clear.addEventListener("click", clearFilter);
+		input.addEventListener("keydown", function (ev) {
+			if (ev.key === "Escape" && input.value) {
+				clearFilter();
+				ev.stopPropagation();
+			}
+		});
+
+		tools.removeAttribute("hidden");
+	});
+})();
+</script>
 </head>
 <body class="manual">
 <!-- DO NOT EDIT.
@@ -87,7 +233,19 @@
 <label for="nav-toggle" id="nav-button" title="目次">&#9776;</label>
 
 <nav id="contents">
-<div class="contents-head"><a href="{{home}}">{{home_label}}</a></div>
+<div class="contents-head">
+<a href="{{home}}">{{home_label}}</a>
+<div class="toc-tools" hidden>
+<div class="toc-search">
+<input type="search" id="toc-filter" placeholder="目次を検索" autocomplete="off" aria-label="目次を検索">
+<button type="button" id="toc-filter-clear" title="クリア" aria-label="検索をクリア">✕</button>
+</div>
+<div class="toc-buttons">
+<button type="button" id="toc-expand">全て開く</button>
+<button type="button" id="toc-collapse">全て閉じる</button>
+</div>
+</div>
+</div>
 {{toc}}
 </nav>
 
