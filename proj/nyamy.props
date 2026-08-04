@@ -6,8 +6,6 @@
     <VERSION>0.9.0</VERSION>
     <VERSION_NUMERIC_DOTTED>$(VERSION.Split('-')[0])</VERSION_NUMERIC_DOTTED>
     <VERSION_NUMERIC>$(VERSION_NUMERIC_DOTTED.Replace('.',','))</VERSION_NUMERIC>
-    <BOOST_MAJOR>1_82</BOOST_MAJOR>
-    <BOOST_MINOR>0</BOOST_MINOR>
   </PropertyGroup>
   <PropertyGroup>
     <_ProjectFileVersion>12.0.30501.0</_ProjectFileVersion>
@@ -23,21 +21,12 @@
       <PreprocessorDefinitions>NYAMY_VER_STRING=$(VERSION);NYAMY_VER_NUMERIC=$(VERSION_NUMERIC);%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <AdditionalLibraryDirectories>ext_lib$(CPUBIT)\$(ConfigurationName)\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <BuildMacro Include="VERSION">
       <Value>$(VERSION)</Value>
-      <EnvironmentVariable>true</EnvironmentVariable>
-    </BuildMacro>
-    <BuildMacro Include="BOOST_MAJOR">
-      <Value>$(BOOST_MAJOR)</Value>
-      <EnvironmentVariable>true</EnvironmentVariable>
-    </BuildMacro>
-    <BuildMacro Include="BOOST_MINOR">
-      <Value>$(BOOST_MINOR)</Value>
       <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
   </ItemGroup>
