@@ -81,25 +81,21 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\doc\src\manual-ja\00-front.md" />
-    <None Include="..\doc\src\manual-ja\01-abstract.md" />
-    <None Include="..\doc\src\manual-ja\02-install.md" />
-    <None Include="..\doc\src\manual-ja\03-uninstall.md" />
-    <None Include="..\doc\src\manual-ja\04-menu.md" />
-    <None Include="..\doc\src\manual-ja\05-tutorial.md" />
-    <None Include="..\doc\src\manual-ja\06-faq.md" />
-    <None Include="..\doc\src\manual-ja\07-customize.md" />
-    <None Include="..\doc\src\manual-ja\08-security.md" />
-    <None Include="..\doc\src\manual-ja\09-bugs.md" />
-    <None Include="..\doc\src\manual-ja\10-related-work.md" />
-    <None Include="..\doc\src\manual-ja\11-references.md" />
-    <None Include="..\doc\src\manual-ja\12-copyright.md" />
-    <None Include="..\doc\src\manual-ja\13-support.md" />
-    <None Include="..\doc\src\manual-ja\14-acknowledgements.md" />
-    <None Include="..\doc\src\manual-ja\15-history.md" />
-    <None Include="..\doc\src\manual-ja\16-appendix.md" />
+    <None Include="..\doc\src\manual-ja\01-install.md" />
+    <None Include="..\doc\src\manual-ja\02-uninstall.md" />
+    <None Include="..\doc\src\manual-ja\03-menu.md" />
+    <None Include="..\doc\src\manual-ja\04-tutorial.md" />
+    <None Include="..\doc\src\manual-ja\05-customize.md" />
+    <None Include="..\doc\src\manual-ja\06-ruby-dsl.md" />
+    <None Include="..\doc\src\manual-ja\07-related-work.md" />
+    <None Include="..\doc\src\manual-ja\08-history.md" />
+    <None Include="..\doc\src\manual-ja\09-copyright.md" />
+    <None Include="..\doc\src\manual-ja\10-acknowledgements.md" />
+    <None Include="..\doc\src\manual-ja\11-appendix.md" />
     <None Include="..\doc\src\style.css" />
     <None Include="..\tools\makedoc.ps1" />
     <None Include="..\tools\makedoc.py" />
+    <None Include="..\tools\renumdoc.py" />
     <None Include="..\tools\requirements.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

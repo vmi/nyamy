@@ -1,4 +1,4 @@
-## 15. history {#HISTORY}
+## 8. history {#HISTORY}
 
 「窓使いの憂鬱」3.30 までの変更履歴は [HISTORY-ja.md](HISTORY-ja.md) に収録しています。
 

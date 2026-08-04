@@ -139,6 +139,12 @@ hr {
   color: #fff;
 }
 
+#contents .contents-head a:hover,
+#contents .contents-head a:active {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
 #contents a {
   text-decoration: none;
   display: block;

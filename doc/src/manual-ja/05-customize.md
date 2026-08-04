@@ -1,12 +1,17 @@
-## 7. customize {#CUSTOMIZE}
+## 5. customize {#CUSTOMIZE}
 
-付属の `.mayu` ([`dot.mayu`](../dot.mayu)) を利用すれば、エディットコントロールで Emacs 風の操作ができるようになりますが、`.mayu` をカスタマイズすることによって、Windows を自分の好きなキーバインディングで利用することができるようになります。
+付属のサンプル設定 ([`dot.mayu.rb`](../dot.mayu.rb)) を利用すれば、エディットコントロールで Emacs 風の操作ができるようになりますが、設定ファイルをカスタマイズすることによって、Windows を自分の好きなキーバインディングで利用することができるようになります。
 
-`.mayu` は[ホームディレクトリ](#HOME)から検索されます。
+NYamy の設定ファイルには 2 つの形式があります。
+
+- **`.mayu.rb` 形式** — mruby による Ruby DSL。NYamy の標準の形式で、付属のサンプル設定もこの形式です。[Ruby DSL](#RUBYDSL) の章を参照してください。
+- **`.mayu` 形式** — 「窓使いの憂鬱」以来の伝統的なテキスト形式。`.mayu.rb` から `load` で取り込むこともできます。
+
+この章では、キー・モディファイヤ・キーマップなどの概念と各機能を、`.mayu` 形式の文法で説明します。ここで説明する概念はどちらの形式でも共通で、Ruby DSL での対応する書き方は [Ruby DSL](#RUBYDSL) の章にまとめてあります。
+
+設定ファイルは[ホームディレクトリ](#HOME)から検索されます。
 
 `.mayu` は上から下へ読まれていき、重複する記述があれば、より下に書かれているものが有効になります。コメントは `#` ではじめます。アルファベットの大文字と小文字は区別されません。詳しい文法は [`syntax.txt`](syntax.txt) を参照してください。
-
-この章を読む前に、[`contrib/mayu-settings.txt`](../contrib/mayu-settings.txt) を読んで付属の設定ファイルについて理解を深めておくことをお勧めします。
 
 ### i. キー割り当ての変更 {#key}
 
@@ -18,7 +23,7 @@ key ⟨KEY⟩ = ⟨KEY⟩ や ⟨FUNCTION⟩ …
 
 `=` より左の `⟨KEY⟩` をキーボードで押すと、Windows へは `=` より右の `⟨KEY⟩` が順番に入力されます。また、右に `⟨FUNCTION⟩` が書かれている場合はウィンドウの最大化や移動などの機能が実行されます。
 
-`⟨KEY⟩` は[キーボード定義](#keyboard)で定義されるもので、デフォルトでは [`109.mayu`](../109.mayu) 又は [`104.mayu`](../104.mayu) で定義されている `⟨KEY⟩` が使用できます。
+`⟨KEY⟩` は[キーボード定義](#keyboard)で定義されるもので、デフォルトでは [`109.mayu.rb`](../109.mayu.rb) 又は [`104.mayu.rb`](../104.mayu.rb) で定義されている `⟨KEY⟩` が使用できます。
 
 #### モディファイヤの指定 {#modifier}
 
@@ -59,7 +64,7 @@ key *S-F9 = &WindowMinimize
 
 このように記述すると、[[F9]] 又は [[Shift]] + [[F9]] でウィンドウを最小化することができますが、例えば、[[Control]] + [[F9]] ではできません。
 
-デフォルトでは、暗黙に `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-~IC-*MAX-*MIN-*MMAX-*MMIN-*T-*TS-` が指定されていることになっていますが、[変更](#defaultModifier)できます。
+デフォルトでは、暗黙に `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-~IC-*MAX-*MIN-*MMAX-*MMIN-` が指定されていることになっていますが、[変更](#defaultModifier)できます。
 
 また、[[Shift]] は必ず押されていてほしいがほかのモディファイヤはどうでもいいという場合は、
 
@@ -133,13 +138,13 @@ BCCCCCCCCCCCCCCCCCCCCC
 
 #### デフォルトモディファイヤの変更 {#defaultModifier}
 
-デフォルトでは、左側のキーには `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-~IC-*MAX-*MIN-*MMAX-*MMIN-*T-*TS-` が指定されていますが、これを変更することができます。例えば、
+デフォルトでは、左側のキーには `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-~IC-*MAX-*MIN-*MMAX-*MMIN-` が指定されていますが、これを変更することができます。例えば、
 
 ```mayu
 key *IC- =
 ```
 
-と記述すると、この文以降のデフォルトモディファイヤは `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-*IC-*MAX-*MIN-*MMAX-*MMIN-*T-*TS-` となります。
+と記述すると、この文以降のデフォルトモディファイヤは `~C-~M-~S-*NL-*CL-*SL-*KL-*IL-*IC-*MAX-*MIN-*MMAX-*MMIN-` となります。
 
 デフォルトモディファイヤの変更を複数行うときには、例えば、
 
@@ -159,7 +164,7 @@ key ~C- = # この行しか有効にならない
 
 ### ii. キーマップ定義 {#keymap}
 
-「窓使いの憂鬱」には、キーマップという概念があります。キーマップにカスタマイズしたいキー情報を書き込んでゆき、ウィンドウごとにキーマップを使い分けます。キーマップを定義するには、以下のどれかの文を書いてからキーを設定します。
+NYamyには、キーマップという概念があります。キーマップにカスタマイズしたいキー情報を書き込んでゆき、ウィンドウごとにキーマップを使い分けます。キーマップを定義するには、以下のどれかの文を書いてからキーを設定します。
 
 ```mayu
 keymap ⟨キーマップ名⟩
@@ -191,7 +196,7 @@ key C-Z = &WindowMinimize
 
 Windows の全てのウィンドウは、何らかのウィンドウクラスに属しています。例えば、メモ帳のウィンドウクラス名は `Notepad` で、エディットコントロールのウィンドウクラス名は `Edit` です。
 
-「窓使いの憂鬱」は、どのウィンドウでどのキーを押したらどんな動作をするか、ということを区別するために`⟨ウィンドウクラス名⟩`と`⟨ウィンドウタイトル名⟩`を用いています。そのために、「窓使いの憂鬱」ではウィンドウの重なりの状態を "`:`" で繋げて表現します。例えば、メモ帳の上のエディットコントロールの`⟨ウィンドウクラス名⟩`ならば、
+NYamyは、どのウィンドウでどのキーを押したらどんな動作をするか、ということを区別するために`⟨ウィンドウクラス名⟩`と`⟨ウィンドウタイトル名⟩`を用いています。そのために、NYamyではウィンドウの重なりの状態を "`:`" で繋げて表現します。例えば、メモ帳の上のエディットコントロールの`⟨ウィンドウクラス名⟩`ならば、
 
 ```mayu
 C:\WINDOWS\system32\notepad.exe:Notepad:Edit
@@ -211,7 +216,7 @@ C:\WINDOWS\system32\notepad.exe:Notepad:Edit
 
 `⟨ウィンドウクラス名⟩`と`⟨ウィンドウタイトル名⟩`には正規表現が使用できます。正規表現は `/.../` で囲むか、`\m@...@`で囲みます (ただし`@`はどんな文字でも良いです)。
 
-正規表現エンジンには [Boost.Regex](http://www.boost.org/libs/regex/doc/index.html) を使用しています。このエンジンでは [Perl で使用できる正規表現](http://www.kt.rim.or.jp/~kbk/perl5.005/perlre.html)がほぼカバーされています。よく使いそうなものを挙げておきます。
+正規表現エンジンには C++ 標準ライブラリの `std::wregex` (ECMAScript 文法) を使用しています。マッチの際、大文字と小文字は常に区別されません。よく使いそうなものを挙げておきます。
 
 - "`|`" Alternation
 - "`*`" Match 0 or more times
@@ -230,7 +235,7 @@ C:\WINDOWS\system32\notepad.exe:Notepad:Edit
 - "`\D`" Match a non-digit character
 - "`(`" "`)`" Grouping
 - "`[`" "`]`" Character class
-- より詳しくは [Boost.Regex: Regular Expression Syntax](http://www.boost.org/libs/regex/doc/syntax.html)を見てください。
+- より詳しくは ECMAScript (JavaScript) の正規表現のリファレンスを参照してください。文法はほぼ共通です。
 
 #### 親キーマップ {#parentKeymap}
 
@@ -389,7 +394,7 @@ key *無変換 = *LShift
 
 *モディファイヤキー名*には、`shift`, `alt` (`meta`, `menu`), `control` (`ctrl`), `windows` (`win`), `mod0`〜`mod9` が記述できます。括弧の中の名前も使用できます。
 
-`mod0`〜`mod9` は「窓使いの憂鬱」の中でのみ有効なモディファイヤで、例えば以下のように使用します。
+`mod0`〜`mod9` はNYamyの中でのみ有効なモディファイヤで、例えば以下のように使用します。
 
 ```mayu
 mod mod0 = Up
@@ -459,7 +464,7 @@ mod shift = !!!Up
 
 #### ロックキー {#lock}
 
-「窓使いの憂鬱」には、「窓使いの憂鬱」の中でのみ有効なロックキーが存在します。これらはキーのモディファイヤとして `L0-`〜`L9-` を書くことができ、[`&Toggle`](#function_Toggle) を使うことによりトグルさせることができます。例えば、
+NYamyには、NYamyの中でのみ有効なロックキーが存在します。これらはキーのモディファイヤとして `L0-`〜`L9-` を書くことができ、[`&Toggle`](#function_Toggle) を使うことによりトグルさせることができます。例えば、
 
 ```mayu
 key ひらがな = &Toggle(Lock0)
@@ -507,7 +512,7 @@ event ⟨EVENT⟩ = ⟨KEY⟩ や ⟨FUNCTION⟩ …
 
 ### vi. キーボード定義 {#keyboard}
 
-デフォルトのキーボード定義は [`109.mayu`](../109.mayu) 又は [`104.mayu`](../104.mayu) に書かれています。
+デフォルトのキーボード定義は [`109.mayu.rb`](../109.mayu.rb) 又は [`104.mayu.rb`](../104.mayu.rb) に書かれています。
 
 #### キー定義 {#def_key}
 
@@ -543,7 +548,7 @@ def mod ⟨モディファイヤ名⟩ = ⟨キー名⟩…
 def sync = ⟨スキャンコード⟩…
 ```
 
-`&Sync` が実行されるとき、「窓使いの憂鬱」はこの`⟨スキャンコード⟩`を Windows に送ります。そして、各ウィンドウがこのキーが入力されたことを「窓使いの憂鬱」へ連絡してくるまで処理を中断します。このようにして同期をとるので、この`⟨スキャンコード⟩`が不正に設定されていると、同期がとれず「窓使いの憂鬱」が 5 秒ほど固まります (つまり 5 秒ほど何も入力できなくなります)。
+`&Sync` が実行されるとき、NYamyはこの`⟨スキャンコード⟩`を Windows に送ります。そして、各ウィンドウがこのキーが入力されたことをNYamyへ連絡してくるまで処理を中断します。このようにして同期をとるので、この`⟨スキャンコード⟩`が不正に設定されていると、同期がとれずNYamyが 5 秒ほど固まります (つまり 5 秒ほど何も入力できなくなります)。
 
 #### 別名定義 {#def_alias}
 
@@ -623,9 +628,7 @@ key *IC-*IL-A-ひらがな = C-S-ひらがな
 
 という設定をして代わりに[[Control]] + [[Shift]] + [[ひらがな]] が使用されるようにしてください。
 
-また、IME の機能の「日本語入力と連動してカナロックをon/offする」という設定にしている場合もカナロックの状態を正しく取得という報告があります。その場合は IME を on/off にするキーに、同時にカナロックもしてくれるように設定すると良いでしょう。
-
-参考: [IME2000:かな/ローマ字入力を切り替える方法](http://support.microsoft.com/default.aspx?scid=kb;ja;415068)
+また、IME の機能の「日本語入力と連動してカナロックをon/offする」という設定にしている場合もカナロックの状態を正しく取得できないという報告があります。その場合は IME を on/off にするキーに、同時にカナロックもしてくれるように設定すると良いでしょう。
 
 > 1. [ログウインドウ](#menu-l)を表示して、「□詳細(<u>D</u>)」をチェックしておきます。
 > 2. 「メモ帳」を 2 つ起動し左右に並べます。
@@ -666,20 +669,23 @@ def option delay-of !!! = ⟨DELAY⟩
 include ⟨ファイル名⟩
 ```
 
-と書くことによって、その行に*ファイル名* [文字列](#string)で示されるファイルを挿入することができます。*ファイル名*は[ホームディレクトリ](#HOME)から検索されます。
+と書くことによって、その行に*ファイル名* [文字列](#string)で示されるファイルを挿入することができます。*ファイル名*は[ホームディレクトリ](#HOME)から検索されます。(`.mayu.rb` からのファイル読み込みには [`load` / `require`](#dsl_load) を使用します)
 
 #### ホームディレクトリ {#HOME}
 
-ホームディレクトリは、
+ホームディレクトリは、以下のフォルダです。上から順番に検索されます。
 
-- 設定(S)... で指定したファイルのあるディレクトリ
-- `%HOME%`
-- `%HOMEDRIVE%%HOMEPATH%`
-- `%USERPROFILE%`
-- `mayu.exe` のカレントディレクトリ
-- `mayu.exe` のある場所
+- `%USERPROFILE%\.config\nyamy`
+- `%LOCALAPPDATA%\NYamy\Config`
+- `nyamy.exe` のあるフォルダ
 
-のどれかになります。上から順番に検索されます。
+自分用の設定ファイルは `%USERPROFILE%\.config\nyamy` に置くことをお勧めします。
+
+なお、`.mayu.rb` の `load` / `require` は、上記に加えて実行中のスクリプトのあるフォルダを最優先で検索します。
+
+#### 設定ファイルの文字コード {#encoding}
+
+設定ファイルの文字コードは UTF-8 (BOM の有無は不問) を推奨します。`.mayu` 形式については、UTF-16 および CP932 (Shift_JIS) のファイルも読み込むことができます。
 
 ### viii. 条件分岐 {#cond}
 
@@ -717,6 +723,14 @@ endif
 
 ### ix. `⟨FUNCTION⟩` リファレンス {#function}
 
+#### `&CancelPrefix` {#function_CancelPrefix}
+
+[`&Prefix`](#function_Prefix) によるプレフィックス状態を取り消します。2 ストロークキーの 1 ストローク目を押した後に、キャンセル用のキーに割り当てて使用します。
+
+#### `&ClipboardChangeCase(⟨do_upcase⟩)` {#function_ClipboardChangeCase}
+
+クリップボードの中身の文字を大文字化又は小文字化します。`⟨do_upcase⟩` に `true` を指定すると大文字化、`false` を指定すると小文字化します。[`&ClipboardUpcaseWord`](#function_ClipboardUpcaseDowncaseWord) / [`&ClipboardDowncaseWord`](#function_ClipboardUpcaseDowncaseWord) はそれぞれ `&ClipboardChangeCase(true)` / `&ClipboardChangeCase(false)` と同じです。
+
 #### `&ClipboardCopy(⟨text⟩)` {#function_ClipboardCopy}
 
 `⟨text⟩` [文字列](#string)をクリップボードへコピーします。
@@ -727,7 +741,7 @@ endif
 
 #### `&Default` {#function_Default}
 
-入力されたキーをそのまま Windows へ入力します。そのため、「窓使いの憂鬱」を起動してない時と同じ動作が期待できます。
+入力されたキーをそのまま Windows へ入力します。そのため、NYamyを起動してない時と同じ動作が期待できます。
 
 #### `&DescribeBindings` {#function_DescribeBindings}
 
@@ -741,9 +755,9 @@ endif
 
 `⟨protocol⟩` [文字列](#string) を省略すると `NOTIFY SSTP/1.1` になります。
 
-`⟨header⟩` [文字列](#string) にカンマで区切ってヘッダを書き並べます。`Sender` ヘッダを省略すると「窓使いの憂鬱」の名前が挿入されます。`HWnd` ヘッダと `Charset` ヘッダは「窓使いの憂鬱」が適切に指定するので引数として指定してはいけません。
+`⟨header⟩` [文字列](#string) にカンマで区切ってヘッダを書き並べます。`Sender` ヘッダを省略するとNYamyの名前が挿入されます。`HWnd` ヘッダと `Charset` ヘッダはNYamyが適切に指定するので引数として指定してはいけません。
 
-選択肢などを表示しても答えを受け取ることはできませんが、「窓使いの憂鬱」はゴーストから返事を 5 秒間待ちます。
+選択肢などを表示しても答えを受け取ることはできませんが、NYamyはゴーストから返事を 5 秒間待ちます。
 
 例:
 
@@ -793,7 +807,7 @@ key ESC = &EditNextModifier(M-)
 
 #### `&EmacsEditKillLinePred`, `&EmacsEditKillLineFunc` {#function_EmacsEditKillLine}
 
-エディットコントロールで emacs の kill-line のような機能を実現します。使い方は [`emacsedit.mayu`](../emacsedit.mayu) を参照のこと。
+エディットコントロールで emacs の kill-line のような機能を実現します。使い方は [`emacsedit.mayu.rb`](../emacsedit.mayu.rb) を参照のこと。
 
 kill-line は非常にややこしい処理をしています。
 
@@ -803,7 +817,7 @@ kill-line は非常にややこしい処理をしています。
 
 **(C-k-2)** カーソルが行末以外の場合、行末までをクリップボードに追加して行末までのテキストを削除。
 
-です。「窓使いの憂鬱」での定義は、[`emacsedit.mayu`](../emacsedit.mayu) では、
+です。NYamy での定義は、`.mayu` 形式で書くと以下のようになります。([`emacsedit.mayu.rb`](../emacsedit.mayu.rb) では同じ内容を Ruby DSL で記述しています)
 
 ```mayu
 keyseq $EmacsEdit/kill-line = \
@@ -815,7 +829,7 @@ keyseq $EmacsEdit/kill-line = \
 
 こうなってるはずです。
 
-[`&EmacsEditKillLineFunc`](#function_EmacsEditKillLine) は初回だけ、クリップボードの中身をクリアします。初回でない場合は、クリップボードの中身を「窓使いの憂鬱」内部に保存 **(※)** します。
+[`&EmacsEditKillLineFunc`](#function_EmacsEditKillLine) は初回だけ、クリップボードの中身をクリアします。初回でない場合は、クリップボードの中身をNYamy内部に保存 **(※)** します。
 
 その後 `S-End C-X` で行末までを選択し「切り取り」ます。ここで、クリップボードに行末までがコピーされたわけですが、クリップボードの中身には幾つか可能性があります。
 
@@ -845,13 +859,25 @@ EDIT コントロールの場合
 
 このように動作することで **(EDIT-1)** と **(IE-1)** は **(C-k-1)** 相当、**(EDIT-2)** と **(IE-2)** は **(C-k-2)** 相当になります。
 
+#### `&ExecUserFunc(⟨関数名⟩, ⟨引数⟩ …)` {#function_ExecUserFunc}
+
+[Ruby DSL の `deffunc`](#dsl_deffunc) で登録したユーザー定義関数を実行します。`⟨引数⟩` はそのまま Ruby のブロックへ渡されます。
+
+```mayu
+key C-F1 = &ExecUserFunc(NotifyTime)
+
+key C-F2 = &ExecUserFunc(ShowMsg, "hello")
+```
+
+トリガーとなったキーやフォーカス中のウィンドウの情報も関数側へ引き継がれます。詳しくは[ユーザー定義関数](#dsl_deffunc)を参照してください。
+
 #### `&HelpMessage(⟨title⟩, ⟨message⟩)` {#function_HelpMessage}
 
-IE5.0 以降が入っていれば、タスクトレイ付近にメッセージを表示します。`⟨title⟩` [文字列](#string) と `⟨message⟩` [文字列](#string) を省略すると、表示されているメッセージを消します。
+タスクトレイ付近にメッセージを表示します。`⟨title⟩` [文字列](#string) と `⟨message⟩` [文字列](#string) を省略すると、表示されているメッセージを消します。
 
 #### `&HelpVariable(⟨title⟩)` {#function_HelpVariable}
 
-IE5.0 が入っていれば、タスクトレイ付近に [`&Variable`](#function_Variable) で設定された値が `⟨title⟩` [文字列](#string) と共にを表示されます。
+タスクトレイ付近に [`&Variable`](#function_Variable) で設定された値が `⟨title⟩` [文字列](#string) と共に表示されます。
 
 #### `&Ignore` {#function_Ignore}
 
@@ -939,11 +965,15 @@ key	A = T E S T
 
 #### `&LoadSetting(⟨設定名⟩)` {#function_LoadSetting}
 
-設定ファイルを再読み込みします。`⟨設定名⟩` [文字列](#string) は「設定(I)...」で設定した「名前」で、再読み込みする設定を指定します。`⟨設定名⟩`を省略すると現在の設定を再読み込みします。
+設定ファイルを再読み込みします。`⟨設定名⟩` [文字列](#string) は「[設定(<u>S</u>)...](#menu-s)」で設定した「名前」で、再読み込みする設定を指定します。`⟨設定名⟩`を省略すると現在の設定を再読み込みします。
+
+#### `&LogClear` {#function_LogClear}
+
+[ログウインドウ](#menu-l)の内容を消去します。
 
 #### `&MayuDialog(⟨dialog⟩, ⟨show_command⟩)` {#function_MayuDialog}
 
-「窓使いの憂鬱」のダイアログボックスを表示したり隠したりします。`⟨dialog⟩` には `Investigate` と `Log` が指定できます。それぞれ「調査」ダイアログと「ログ」ダイアログです。`⟨show_command⟩` には、`HIDE`, `SHOW`, `SHOWNA` などが指定できます。
+NYamyのダイアログボックスを表示したり隠したりします。`⟨dialog⟩` には `Investigate` と `Log` が指定できます。それぞれ「調査」ダイアログと「ログ」ダイアログです。`⟨show_command⟩` には、`HIDE`, `SHOW`, `SHOWNA` などが指定できます。
 
 #### `&MouseHook(⟨type⟩, ⟨parameter⟩)` {#function_MouseHook}
 
@@ -967,7 +997,7 @@ key	A = T E S T
 
 #### `&PlugIn(⟨DLLNAME⟩, ⟨FUNCNAME⟩, ⟨FUNCPARAM⟩, ⟨runAsThread⟩)` {#function_PlugIn}
 
-プラグインを実行します。`mayu.exe` のあるディレクトリの中の `Plugins` というディレクトリにプラグイン DLL を置いておくとそのプラグインの中の関数を「窓使いの憂鬱」から直接呼ぶことが出来ます。
+プラグインを実行します。`nyamy.exe` のあるディレクトリの中の `Plugins` というディレクトリにプラグイン DLL を置いておくとそのプラグインの中の関数を NYamy から直接呼ぶことが出来ます。(64bit 版の DLL が必要です。従来の 32bit 用プラグインはそのままでは動作しません)
 
 `⟨DLLNAME⟩` はプラグイン DLL 名です。`Plugins\⟨DLLNAME⟩.dll` が使用されます。
 
@@ -1061,17 +1091,23 @@ key A = &Variable(0, 10) &Repeat((X))
 
 上の例では、[[A]] を押すと、[[X]] が 10 回入力されます
 
+#### `&SetForegroundWindow(⟨ウィンドウクラス名⟩, ⟨op⟩, ⟨ウィンドウタイトル名⟩)` {#function_SetForegroundWindow}
+
+`⟨ウィンドウクラス名⟩` にマッチするウィンドウを前面に移動しフォーカスします。特定のアプリケーションをキー一発で呼び出す用途に使用します。
+
+`⟨op⟩` と `⟨ウィンドウタイトル名⟩` は省略可能です。`⟨op⟩` に `&&` を指定するとクラス名とタイトル名の両方にマッチするウィンドウ、`||` を指定するとどちらか一方にマッチするウィンドウが対象になります。省略時は `&&` かつタイトル名 `/.*/` (任意) です。
+
+```mayu
+key C-S-N = &SetForegroundWindow(/notepad\.exe/)
+```
+
 #### `&SetImeStatus(⟨status⟩)` {#function_SetImeStatus}
 
 IME の ON/OFF を切り替えます。`⟨status⟩` は `on`, `off`, `toggle` のいずれかで、省略時は `toggle` として扱われます。
 
-MS-IME2002/2003 と一部のアプリケーション (例えば MS Word2002/2003) の組み合わせでは「詳細なテキストサービス」を無効にしない限り機能しません。
-
 #### `&SetImeString(⟨text⟩)` {#function_SetImeString}
 
 IME を経由して `⟨text⟩` [文字列](#string) を入力します。
-
-Windows2000/XP のみで機能します。
 
 #### `&ShellExecute(⟨operation⟩, ⟨file⟩, ⟨parameters⟩, ⟨directory⟩, ⟨show_command⟩)` {#function_ShellExecute}
 
@@ -1095,18 +1131,10 @@ key M-B = &ShellExecute("open", "C:\\WINDOWS\\system32\\Control.exe",,, ShowNorm
 key M-C = &ShellExecute("open", "C:/WINDOWS/system32/Control.exe", "sysdm.cpl",, ShowNormal)
 ```
 
-インターネットエクスプローラで「窓使いの憂鬱」のホームページを開く例:
+既定のブラウザで Web ページを開く例:
 
 ```mayu
-key M-I = &ShellExecute("open", "C:\\Program Files\\Internet Explorer\\iexplore.exe\", "http://mayu.sourceforge.net",, ShowNormal)
-
-key M-H = &ShellExecute("open", "http://mayu.sourceforge.net",,, ShowNormal)
-```
-
-`flourish.mid` を演奏する例:
-
-```mayu
-key M-R = &ShellExecute("play", "C:\\WINDOWS\\Media\\flourish.mid",,, ShowNormal)
+key M-H = &ShellExecute("open", "https://www.example.com/",,, ShowNormal)
 ```
 
 #### `&Sync` {#function_Sync}
@@ -1187,6 +1215,10 @@ key 変換 = &VK(F13)
 #### `&WindowMinimize`, `&WindowMaximize`, `&WindowHMaximize`, `&WindowVMaximize` {#function_WindowMaxMinHVMax}
 
 それぞれ、ウィンドウを最小化、最大化、横方向に最大化、縦方向に最大化します。引数に `MDI` を指定すると、MDI 子ウィンドウを操作します。
+
+#### `&WindowHVMaximize(⟨is_horizontal⟩)` {#function_WindowHVMaximize}
+
+引数で方向を指定する形の横/縦最大化です。`⟨is_horizontal⟩` に `true` を指定すると横方向、`false` を指定すると縦方向に最大化します。[`&WindowHMaximize`](#function_WindowMaxMinHVMax) / [`&WindowVMaximize`](#function_WindowMaxMinHVMax) はそれぞれ `&WindowHVMaximize(true)` / `&WindowHVMaximize(false)` と同じです。横方向に最大化した状態で縦方向に最大化する (またはその逆) と、両方向に最大化された状態になります。引数の最後に `MDI` を追加指定すると、MDI 子ウィンドウを操作します。
 
 #### `&WindowMonitor(⟨monitor⟩, ⟨adjust_position⟩, ⟨adjust_size⟩)` {#function_WindowMonitor}
 
@@ -1300,123 +1332,45 @@ key M-C-T = &ClipboardCopy($WindowTitleName)
 
 #### 必要なもの {#compile_tool}
 
-Visual C++ を所有していない場合、マイクロソフトから無償で提供されているコンパイラを利用することでビルド可能です。
+- **Visual Studio 2026** — 「C++ によるデスクトップ開発」ワークロードをインストールしてください。無償の Community エディションでビルドできます。
+- **Ruby** — mruby のビルドに必要です。ネイティブ Windows 版 (RubyInstaller など) を PATH の通った場所にインストールしてください。
+- **git** — ソースの取得とサブモジュールの展開に必要です。
+- **Python 3** (任意) — マニュアル (この HTML) を Markdown ソースから再生成する場合のみ必要です。`pip install markdown` で Python-Markdown をインストールしてください。
 
-##### Visual C++
+#### ソースの取得 {#compile_source}
 
-商用の Visual C++ 6.0 SP5 以降、又はマイクロソフトから無償で提供されている [Visual C++ Toolkit 2003](http://www.microsoft.com/downloads/details.aspx?FamilyID=272be09d-40bb-49fd-9cb0-4bfa122fa91b&DisplayLang=en) をダウンロードして使用することが可能です。
-
-##### Platform SDK
-
-Windows XP に対応したものが必要です。MSDN で配布されていますし、マイクロソフトのから無償で提供されている [XPSP2 PSDK](http://www.microsoft.com/msdownload/platformsdk/sdkupdate/XPSP2FULLInstall.htm) を利用することもできます。
-
-##### (Visual C++ Toolkit 2003 を利用する場合のみ) .NET Framework SDK Version 1.1
-
-Visual C++ Toolkit 2003 のパッケージには nmake と cvtres が含まれていないので、[.NET Framework SDK Version 1.1](http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-4070-9F41-A333C6B9181D&displaylang=ja) をインストール(無償)する必要があります。
-
-`C:\Program Files\Microsoft.NET\SDK\v1.1\Bin\nmake.exe` と `C:\WINDOWS\Microsoft.NET\Framework\v1.1.4322\cvtres.exe` を Visual C++ Toolkit 2003 の `bin/` ディレクトリへコピーします。(`cvtres.exe` は必ず `link.exe` と同じディレクトリに置いてください。`nmake.exe` はパスが通っていれば使用可能です。)
-
-商用パッケージの Visual C++ には最初から含まれているので、入れる必要はありません。
-
-##### DDK
-
-デバイスドライバをビルドする場合のみ必要になります。MSDN で配布されていますし、マイクロソフトの[サイト](http://www.microsoft.com/whdc/ddk/winddk.mspx)から注文することもできます。
-
-##### 正規表現ライブラリ
-
-[Boost.Regex](http://www.boost.org/libs/regex/doc/index.html) が必要です。[Boost ライブラリ](http://www.boost.org/) に同梱されています。現在、「窓使いの憂鬱」のビルドが確認されている Boost のバージョンは 1.32.0 のみです。
-
-##### Perl
-
-いくつかの作業の為に Perl が必要です。[Cygwin](http://www.cygwin.com/) の perl 又は [ActivePerl](http://www.activestate.com/Products/ActivePerl/) をインストールしてください。
-
-##### bash, cvs, fileutils, sed, tar
-
-配布パッケージを作成するためにのみ [Cygwin](http://www.cygwin.com/) の bash, fileutils, sed, tar が必要です。また、cvs は Cygwin のものを使用することをおすすめします。さもないと改行コードの違いによるトラブルが起こるかもしれません。mayu のソースの改行コードはすべて LF のみになっています。
-
-#### ソースの展開 {#compile_source}
-
-##### ソースの展開
-
-SourfeForge の [Download](http://sourceforge.net/project/showfiles.php?group_id=5403) から、ソースファイルをダウンロードします。ソースファイルの展開には Cygwin の tar を使うのが良いでしょう。
-
-##### cvs による取り寄せ
-
-SourfeForge から cvs を使用して取り寄せることにより現在開発中で次のバージョンとなるはずのソースを入手することが出来ます。
+mruby を git サブモジュールとして参照しているため、`--recursive` を付けて clone します。
 
 ```mayu
-cvs -z 3 -d :pserver:anonymous@cvs1.sourceforge.net:/cvsroot/mayu checkout mayu
+git clone --recursive ⟨リポジトリURL⟩
 ```
 
-##### ディレクトリ構成
+既に clone 済みの場合は以下でサブモジュールを展開します。
 
-上記のどちらかの方法で「窓使いの憂鬱」本体のソースコードを展開後、Boost を展開します。最終的なディレクトリ構成が以下のようになるように展開してください。
-
-./  
-`|`  
-`+---`boost\_1\_??\_?/ ... Boost の展開により作成される  
-`|   |`  
-`|   +---`boost/ ... Boost の展開により作成される  
-`|   |   |`  
-`|   |   +---`detail/ ...  
-`|   |   +---`re\_detail/ ...  
-`|   |`  
-`|   +---`libs/ ... Boost の展開により作成される  
-`|       |`  
-`|       +---`regex/ ...  
-`|       +---`timer/ ...  
-`|`  
-`+---`mayu-3.??/ ... 「窓使いの憂鬱」本体ソース  
-`|`  
-`+---`contrib/ ...  
-`+---`d/ ...  
-`+---`r/ ...  
-`+---`s/ ...  
-`+---`tools/ ...  
+```mayu
+git submodule update --init
+```
 
 #### ビルド {#compile_build}
 
-##### Visual C++ の場合
-
-まず、いくつかの環境変数を設定します。
-
-`vcvars32.bat` を利用すると設定してくれるはずですが、以下の環境変数の設定が必要になります。
-
-- `PATH` … コンパイラと nmake にパスを通します。
-- `INCLUDE` … コンパイラと PSDK の include ディレクトリパスを設定します。
-- `LIB` … コンパイラと PSDK の lib ディレクトリパスを設定します。
-- `MSVCDIR` … Visual C++ Toolkit 2003 を使用する場合は設定されていないので、環境変数 `VCTOOLKITINSTALLDIR` と同じ内容に設定します。
-
-次にコンパイルを行います。
-
-Visual C++ Toolkit 2003 の場合は、以下のようにします。
+まず mruby をビルドします。リポジトリのルートで以下を実行すると、`scripter/mruby-dist/` にライブラリとヘッダが配置されます。
 
 ```mayu
-mayu-3.??> nmake MAYU_VC=vct
+powershell -ExecutionPolicy Bypass -File tools\build_mruby.ps1 Release
 ```
 
-Visual C++ 7.1 の場合は、以下のようにします。
+次に本体をビルドします。Visual Studio で `proj\nyamy.sln` を開いてビルドするか、開発者コマンドプロンプトで以下を実行します。
 
 ```mayu
-mayu-3.??> nmake MAYU_VC=vc71
+msbuild proj\nyamy.sln -p:Configuration=Release
 ```
 
-Visual C++ 7.0 の場合は、以下のようにします。
+`Release\` ディレクトリに `nyamy.exe` などの実行ファイルが作成されます。Debug 構成の場合は `Debug\` に作成されます。
+
+配布用 zip を作成するには以下を実行します。
 
 ```mayu
-mayu-3.??> nmake MAYU_VC=vc7
+powershell -ExecutionPolicy Bypass -File tools\makedistrib.ps1
 ```
-
-Visual C++ 6.0 の場合は、以下のようにします。
-
-```mayu
-mayu-3.??> nmake MAYU_VC=vc6
-```
-
-`out$(MAYU_VC)_winnt/`, `out$(MAYU_VC)_winnt_debug/` の各ディレクトリに実行ファイルが作成されます。
-
-`d/` ディレクトリ以下にはドライバのソースが入っているので、必要なら適当にコンパイルしてください。
 
 ---
-
-Visual C++ Toolkit 2003 を使用する場合は、`libcpmtd.lib` が提供されていないため、デバッグバージョンの mayu はビルドできません。

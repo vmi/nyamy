@@ -250,16 +250,6 @@ copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
 </Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
     </CustomBuild>
-    <CustomBuild Include="..\doc\banner-ja.gif">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
     <CustomBuild Include="..\doc\edit-setting-ja.png">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
 copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
