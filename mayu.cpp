@@ -89,7 +89,7 @@ class Mayu
 	enum {
 		WM_APP_taskTrayNotify = WM_APP + 101,	///
 		WM_APP_msgStreamNotify = WM_APP + 102,	///
-		WM_APP_scripterSettingReady = WM_APP + 120,	///< scripter generated Setting
+		WM_APP_scripterSettingReady = ScripterManager::WM_ScripterSettingReady,	///< scripter generated Setting
 		ID_TaskTrayIcon = 1,			///
 	};
 
@@ -435,9 +435,12 @@ private:
 			}
 
 			case WM_APP_scripterSettingReady: {
-				std::shared_ptr<Setting> *p = reinterpret_cast<std::shared_ptr<Setting>*>(i_lParam);
-				std::shared_ptr<Setting> newSetting = std::move(*p);
-				delete p;
+				// The Setting travels through ScripterManager's single slot;
+				// this notification carries no payload.  An empty slot is
+				// normal (a later commit superseded this one, or the slot was
+				// already taken), so simply ignore it.
+				std::shared_ptr<Setting> newSetting =
+					ScripterManager::takePendingSetting();
 				if (!newSetting) break;
 				This->m_log << L"successfully loaded (scripter)." << std::endl;
 				while (!This->m_engine.setSetting(newSetting))

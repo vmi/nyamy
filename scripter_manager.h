@@ -55,8 +55,25 @@ public:
 	                  const std::vector<FuncArg> &args,
 	                  const TriggerInfo &ctx);
 
-	/// notification message ID
-	static const UINT WM_ScripterSettingReady;
+	/// Notification message ID.  Posted with wParam == 0 and lParam == 0; the
+	/// Setting itself is picked up with takePendingSetting().
+	static constexpr UINT WM_ScripterSettingReady = WM_APP + 120;
+
+	// Single-slot handoff storage for a freshly built Setting.  The slot is
+	// static because the producing thread may outlive the ScripterManager
+	// object; there is at most one ScripterManager per process, so one slot is
+	// enough.
+
+	/// Store a Setting into the slot, releasing whatever it held before, so a
+	/// notification that is never dispatched cannot leak a Setting.
+	static void setPendingSetting(std::shared_ptr<Setting> i_setting);
+
+	/// Move the pending Setting out of the slot.  Returns an empty pointer when
+	/// the slot is empty (already taken, or superseded by a later Setting).
+	static std::shared_ptr<Setting> takePendingSetting();
+
+	/// Release anything still held in the slot.
+	static void clearPendingSetting();
 
 private:
 	// pipe handles

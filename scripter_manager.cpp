@@ -13,10 +13,50 @@
 #include "mayu.h"
 
 #include <process.h>
+#include <atomic>
 #include <vector>
 
 
-const UINT ScripterManager::WM_ScripterSettingReady = WM_APP + 120;
+//=============================================================================
+// pending Setting slot
+//=============================================================================
+
+// Single-slot handoff from the scripter data thread (producer) to the tasktray
+// window procedure (consumer).  WM_ScripterSettingReady carries no payload: the
+// Setting travels through this slot, so a notification that is posted but never
+// dispatched (WM_QUIT, destroyed window, shutdown race) cannot leak it, and a
+// stale HWND can no longer deliver a raw pointer to a foreign window procedure.
+
+namespace
+{
+
+std::atomic<std::shared_ptr<Setting> > &pendingSettingSlot()
+{
+	static std::atomic<std::shared_ptr<Setting> > slot;
+	return slot;
+}
+
+} // namespace
+
+
+void ScripterManager::setPendingSetting(std::shared_ptr<Setting> i_setting)
+{
+	// The superseded Setting, if any, is released as the returned temporary
+	// goes out of scope.
+	pendingSettingSlot().exchange(std::move(i_setting));
+}
+
+
+std::shared_ptr<Setting> ScripterManager::takePendingSetting()
+{
+	return pendingSettingSlot().exchange(nullptr);
+}
+
+
+void ScripterManager::clearPendingSetting()
+{
+	takePendingSetting();
+}
 
 
 //=============================================================================
@@ -54,6 +94,10 @@ ScripterManager::~ScripterManager()
 		WaitForMultipleObjects(n, handles, TRUE, 2000);
 
 	closeHandles();
+
+	// Release a Setting that was handed over but never dispatched, rather than
+	// keeping it alive until process exit.
+	clearPendingSetting();
 }
 
 void ScripterManager::sendQuit()
@@ -388,10 +432,14 @@ void ScripterManager::runReader()
 
 	CmdProcessor processor(m_soLog, m_log);
 	processor.onCommit([this](std::shared_ptr<Setting> s) {
-		auto *p = new std::shared_ptr<Setting>(std::move(s));
-		if (!PostMessage(m_hwndNotify, WM_ScripterSettingReady, 0,
-		                 reinterpret_cast<LPARAM>(p)))
-			delete p;
+		// Hand the Setting over through the static single slot and notify with
+		// an empty payload.  If the notification is lost, or superseded by a
+		// later commit, the Setting is released by the next store or by
+		// clearPendingSetting() at shutdown - it is never leaked.  A failed
+		// post needs no cleanup for the same reason, so the result is
+		// intentionally ignored.
+		setPendingSetting(std::move(s));
+		PostMessage(m_hwndNotify, WM_ScripterSettingReady, 0, 0);
 	});
 	processor.onExecKeySeq([this](AdHocKeySeq item) {
 		if (m_execKeySeqCallback) m_execKeySeqCallback(std::move(item));

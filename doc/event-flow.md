@@ -225,9 +225,10 @@ sequenceDiagram
 
     dt->>dt: CmdProcessor::process():85<br/>m_builder 初期化 (Global キーマップ設定)<br/>各コマンドを std::visit で SettingBuilder に積む
     dt->>dt: CmdId::Commit 受信:268<br/>SettingBuilder::build() → Setting<br/>m_builder.reset() → ビルダー解放<br/>onCommit コールバック実行
-    dt->>mayu: PostMessage(WM_ScripterSettingReady,<br/>0, (LPARAM)new shared_ptr<Setting>)<br/>scripter_manager.cpp :302
+    dt->>dt: ScripterManager::setPendingSetting():441<br/>static な単一スロットへ shared_ptr&lt;Setting&gt; を move<br/>(旧 Setting が残っていればここで解放)
+    dt->>mayu: PostMessage(WM_ScripterSettingReady, 0, 0)<br/>ペイロードなし。通知が失われても<br/>スロット上書き/終了時クリアで解放される
 
-    mayu->>mayu: WM_APP_scripterSettingReady ハンドラ:513<br/>shared_ptr<Setting> を取り出す
+    mayu->>mayu: WM_APP_scripterSettingReady ハンドラ:437<br/>ScripterManager::takePendingSetting()<br/>スロットが空なら何もしない
     mayu->>mayu: Engine::setSetting(newSetting):1333<br/>リトライループ (Engine 同期中は 1 秒待機)
 ```
 
@@ -351,6 +352,9 @@ flowchart LR
 | `ScripterManager::execUserFunc()` | 272 | ExecUserFunc を scripter へ送信 |
 | `ScripterManager::dataThread()` | 286 | CmdStream 読み取りスレッドエントリ |
 | `ScripterManager::runReader()` | 293 | CmdProcessor でパイプを消費 |
+| `ScripterManager::setPendingSetting()` | 42 | 完成した Setting を static な単一スロットへ move (旧 Setting はここで解放) |
+| `ScripterManager::takePendingSetting()` | 50 | スロットから Setting を取り出す。空なら空ポインタ |
+| `ScripterManager::clearPendingSetting()` | 56 | スロットを解放 (`~ScripterManager()` から呼ばれる) |
 | `ScripterManager::msgThread()` | 318 | scripter ログ読み取りスレッドエントリ |
 
 ### nyamy_scripter.cpp (scripter/)
@@ -373,8 +377,8 @@ flowchart LR
 
 | 箇所 | 行 | 役割 |
 |------|---:|------|
-| `WM_APP_scripterSettingReady` 定義 | 95 | メッセージ ID 定数 (`ScripterManager::WM_ScripterSettingReady` と同値) |
-| `WM_APP_scripterSettingReady` ハンドラ | 513 | Setting 受け取り → `Engine::setSetting()` 呼び出し |
+| `WM_APP_scripterSettingReady` 定義 | 92 | メッセージ ID 定数 (`ScripterManager::WM_ScripterSettingReady` から導出) |
+| `WM_APP_scripterSettingReady` ハンドラ | 437 | `ScripterManager::takePendingSetting()` で Setting 受け取り → `Engine::setSetting()` 呼び出し |
 | `WM_COPYDATA` ハンドラ | 301 | hook DLL からのフォーカス/ロックキー通知を受信 → `notifyHandler()` |
 | `notifyHandler()` | 150 | Notify 種別に応じて `Engine::setFocus()` などを呼び出し |
 | `m_scripter->start(syms)` | 771 | 初回起動時・リロード時に scripter を (再)起動 |
