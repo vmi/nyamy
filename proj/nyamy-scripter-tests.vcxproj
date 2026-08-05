@@ -133,9 +133,9 @@
   </ItemGroup>
   <ItemDefinitionGroup>
     <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\*.mayu" "$(OutDir)" &gt;NUL
+      <Command>copy /Y "$(ProjectDir)..\legacy\*.mayu" "$(OutDir)" &gt;NUL
 copy /Y "$(ProjectDir)..\*.mayu.rb" "$(OutDir)" &gt;NUL</Command>
-      <Message>Copying .mayu / .mayu.rb config files to output directory</Message>
+      <Message>Copying legacy\*.mayu / *.mayu.rb config files to output directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
