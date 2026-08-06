@@ -25,8 +25,10 @@ enum {
 	WM_APP_engineNotify = WM_APP + 110,
 };
 
-/// An item in the Engine input queue: either a raw keyboard event or an ad-hoc key sequence
-using InputEvent = std::variant<KEYBOARD_INPUT_DATA, AdHocKeySeq>;
+/// An item in the Engine input queue: a raw keyboard event, an ad-hoc key
+/// sequence, or a Setting to activate
+using InputEvent = std::variant<KEYBOARD_INPUT_DATA, AdHocKeySeq,
+                                std::shared_ptr<Setting> >;
 
 
 ///
@@ -292,6 +294,9 @@ private:
 	static unsigned int WINAPI keyboardHandler(void *i_this);
 	///
 	void keyboardHandler();
+
+	/// activate a Setting.  Engine thread only, called at an event boundary.
+	void applySetting(std::shared_ptr<Setting> i_setting);
 
 	/// check focus window
 	void checkFocusWindow();
@@ -606,8 +611,8 @@ public:
 		return m_hwndAssocWindow;
 	}
 
-	/// setting
-	bool setSetting(std::shared_ptr<Setting> newSetting);
+	/// schedule a Setting for activation in the engine thread
+	void scheduleSetting(std::shared_ptr<Setting> i_setting);
 
 	/// schedule an ad-hoc key sequence for processing in the engine thread
 	void scheduleAdHocKeySeq(AdHocKeySeq item);

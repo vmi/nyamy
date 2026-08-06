@@ -205,6 +205,7 @@ sequenceDiagram
     participant async as scripter_manager.cpp<br/>launchScripter() [async]
     participant dt as scripter_manager.cpp<br/>dataThread / runReader()
     participant sc as nyamy_scripter.cpp<br/>scripter_engine()
+    participant eng as engine.cpp<br/>keyboardHandler() [engine スレッド]
 
     mayu->>sm: start(syms):95
     sm->>async: std::async → launchScripter(syms):108
@@ -229,10 +230,20 @@ sequenceDiagram
     dt->>mayu: PostMessage(WM_ScripterSettingReady, 0, 0)<br/>ペイロードなし。通知が失われても<br/>スロット上書き/終了時クリアで解放される
 
     mayu->>mayu: WM_APP_scripterSettingReady ハンドラ:437<br/>ScripterManager::takePendingSetting()<br/>スロットが空なら何もしない
-    mayu->>mayu: Engine::setSetting(newSetting):1333<br/>リトライループ (Engine 同期中は 1 秒待機)
+    mayu->>eng: Engine::scheduleSetting():1514<br/>入力キューへ push_back<br/>(UI スレッドはここで解放される)
+    eng->>eng: keyboardHandler() でイベント境界に取り出し:1125<br/>Engine::applySetting()
 ```
 
-### Engine::setSetting() の内部処理 (engine.cpp :1333)
+UI スレッドで直接 `m_setting` を差し替えず、engine スレッドの入力キュー
+(`InputEvent` variant) に載せてイベント境界で適用する。これにより
+
+- キューに溜まった旧設定下のキーイベントより後に切り替わる
+- `&Sync` / `&Wait` の同期中を待つ必要がなくなる (取り出し地点では
+  `m_isSynchronizing` が必ず false)
+- UI スレッドがメッセージループへ即座に戻るため、`&Sync` を完了させる
+  メールスロット完了 APC が飢餓しない
+
+### Engine::applySetting() の内部処理 (engine.cpp :1460)
 
 ```mermaid
 ---
@@ -240,7 +251,7 @@ config:
   layout: elk
 ---
 flowchart TD
-    A["Engine::setSetting(shared_ptr&lt;Setting&gt;):1333"]
+    A["Engine::applySetting(shared_ptr&lt;Setting&gt;):1460"]
     B["旧設定のキー押下状態を保存<br>m_key->m_isPressed など"]
     C["m_setting をアトミック更新<br>memory_order_release"]
     D["g_hookData->m_correctKanaLockHandling を更新"]
@@ -285,7 +296,7 @@ flowchart LR
     T_kb -->|"WH_KEYBOARD_LL<br>→ keyboardDetour()"| T_handler
     T_mouse -->|"WH_MOUSE_LL<br>→ mouseDetour()"| T_handler
     T_handler -->|"SendInput()"| Windows
-    T_data -->|"PostMessage(WM_APP_scripterSettingReady)<br>→ setSetting()"| T_main
+    T_data -->|"PostMessage(WM_APP_scripterSettingReady)<br>→ scheduleSetting() で入力キューへ"| T_main
     T_sc -->|"cmd パイプ (CmdStream)"| T_data
     T_sc -->|"msg パイプ (stdout+stderr)"| T_msg
     T_main -->|"ctrl パイプ (CtrlStream: Start / Quit)"| T_sc
@@ -334,8 +345,9 @@ flowchart LR
 | `Engine::keyboardDetour(KBDLLHOOKSTRUCT*)` | 766 | フックコールバック → キューイング |
 | `Engine::mouseDetour(WPARAM, MSLLHOOKSTRUCT*)` | 806 | マウスコールバック → 擬似キー変換 |
 | `Engine::keyboardHandler()` | 981 | キュー処理メインループ (専用スレッド) |
-| `Engine::setSetting()` | 1333 | 新しい Setting を適用 |
-| `Engine::scheduleAdHocKeySeq()` | 1384 | AdHocKeySeq をキューに投入 |
+| `Engine::applySetting()` | 1460 | 新しい Setting を適用 (engine スレッド専用) |
+| `Engine::scheduleSetting()` | 1514 | Setting をキューに投入 (UI スレッドから) |
+| `Engine::scheduleAdHocKeySeq()` | 1526 | AdHocKeySeq をキューに投入 |
 | `Engine::reconstructCurrentFromContext()` | 1406 | TriggerInfo から Current を復元 (ExecKeySeq 用) |
 | `Engine::setFocus()` | 1518 | フォーカス情報をエンジンへ反映 |
 
@@ -378,7 +390,7 @@ flowchart LR
 | 箇所 | 行 | 役割 |
 |------|---:|------|
 | `WM_APP_scripterSettingReady` 定義 | 92 | メッセージ ID 定数 (`ScripterManager::WM_ScripterSettingReady` から導出) |
-| `WM_APP_scripterSettingReady` ハンドラ | 437 | `ScripterManager::takePendingSetting()` で Setting 受け取り → `Engine::setSetting()` 呼び出し |
+| `WM_APP_scripterSettingReady` ハンドラ | 437 | `ScripterManager::takePendingSetting()` で Setting 受け取り → `Engine::scheduleSetting()` で engine スレッドへ委譲 |
 | `WM_COPYDATA` ハンドラ | 301 | hook DLL からのフォーカス/ロックキー通知を受信 → `notifyHandler()` |
 | `notifyHandler()` | 150 | Notify 種別に応じて `Engine::setFocus()` などを呼び出し |
 | `m_scripter->start(syms)` | 771 | 初回起動時・リロード時に scripter を (再)起動 |

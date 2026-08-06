@@ -1116,6 +1116,17 @@ void Engine::keyboardHandler()
 		checkFocusWindow();
 
 		std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
+		// Activate a Setting handed over by the scripter.  Done here so the
+		// keymap changes at an event boundary, never in the middle of the
+		// events that were queued before it.  Unlike the branches below this
+		// one runs even while the engine is disabled: enabling it later has to
+		// pick up the newest setting.
+		if (std::holds_alternative<std::shared_ptr<Setting> >(event)) {
+			applySetting(std::move(std::get<std::shared_ptr<Setting> >(event)));
+			continue;
+		}
+
 		auto s = m_setting.load(std::memory_order_acquire);
 
 		// Handle AdHocKeySeq via the same entry point as normal keys
@@ -1441,11 +1452,13 @@ Engine::~Engine() {
 }
 
 
-// set m_setting
-bool Engine::setSetting(std::shared_ptr<Setting> newSetting) {
+// activate a Setting.  Engine thread only: called from keyboardHandler() at an
+// event boundary, where m_isSynchronizing is guaranteed to be false, because
+// &Sync and &Wait set and clear that flag within the processing of a single
+// event.  So unlike setFocus()/setLockState()/setShow() this needs no
+// synchronizing guard and cannot fail.
+void Engine::applySetting(std::shared_ptr<Setting> newSetting) {
 	std::lock_guard<std::recursive_mutex> lock(m_mutex);
-	if (m_isSynchronizing)
-		return false;
 
 	Setting *raw = newSetting.get();
 
@@ -1492,7 +1505,21 @@ bool Engine::setSetting(std::shared_ptr<Setting> newSetting) {
 	m_currentFocusOfThread = &m_globalFocus;
 	setCurrentKeymap(m_globalFocus.m_keymaps.front());
 	m_hwndFocus = NULL;
-	return true;
+
+	Acquire a(&m_log, 0);
+	m_log << L"successfully loaded (scripter)." << std::endl;
+}
+
+
+void Engine::scheduleSetting(std::shared_ptr<Setting> i_setting) {
+	// Called from the UI thread.  The Setting is activated by the engine
+	// thread at an event boundary; the caller must not wait for that to
+	// happen, because the mailslot completion APC that ends a &Sync can only
+	// run while the UI thread is back in the alertable wait of messageLoop().
+	WaitForSingleObject(m_queueMutex, INFINITE);
+	m_inputQueue->push_back(std::move(i_setting));
+	SetEvent(m_readEvent);
+	ReleaseMutex(m_queueMutex);
 }
 
 

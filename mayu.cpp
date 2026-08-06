@@ -439,12 +439,12 @@ private:
 				// this notification carries no payload.  An empty slot is
 				// normal (a later commit superseded this one, or the slot was
 				// already taken), so simply ignore it.
-				std::shared_ptr<Setting> newSetting =
-					ScripterManager::takePendingSetting();
-				if (!newSetting) break;
-				This->m_log << L"successfully loaded (scripter)." << std::endl;
-				while (!This->m_engine.setSetting(newSetting))
-					Sleep(100);
+				//
+				// Hand the Setting to the engine thread rather than applying
+				// it here: see Engine::scheduleSetting().
+				if (std::shared_ptr<Setting> newSetting =
+							ScripterManager::takePendingSetting())
+					This->m_engine.scheduleSetting(std::move(newSetting));
 				return 0;
 			}
 
