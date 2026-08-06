@@ -201,7 +201,10 @@ static void printPendingException(mrb_state *mrb, const char *prefix)
 // A Symbol is treated exactly like the equivalent String: both are parsed
 // as action text, where "$Name" refers to a named keyseq and a bare token
 // is a key name.
-static int resolveRhs(mrb_state *mrb, mrb_value rhs)
+// context is one of NYS_MODCTX_*: it decides which modifiers the action text
+// may carry (see nys_reg_keyseq).
+static int resolveRhs(mrb_state *mrb, mrb_value rhs,
+					  int context = NYS_MODCTX_KEYSEQ)
 {
 	if (mrb_string_p(rhs) || mrb_symbol_p(rhs)) {
 		std::string actions;
@@ -213,7 +216,7 @@ static int resolveRhs(mrb_state *mrb, mrb_value rhs)
 		} else {
 			actions = toStdStr(mrb, rhs);
 		}
-		int idx = nys_reg_keyseq(nullptr, actions.c_str());
+		int idx = nys_reg_keyseq(nullptr, actions.c_str(), context);
 		if (idx < 0)
 			raiseApiError(mrb, "nys_reg_keyseq failed");
 		return idx;
@@ -649,7 +652,9 @@ static mrb_value dsl_keyseq(mrb_state *mrb, mrb_value self)
 		actions   = actions_s.c_str();
 	}
 
-	int idx = nys_reg_keyseq(name, actions);
+	// a keyseq definition may carry ASSIGN-class modifiers, the same as
+	// `keyseq $NAME = ...' in a .mayu file
+	int idx = nys_reg_keyseq(name, actions, NYS_MODCTX_ASSIGN);
 	if (idx < 0) raiseApiError(mrb, "nys_reg_keyseq failed");
 
 	struct RClass *cls = mrb_class_get_under(mrb,
@@ -768,7 +773,8 @@ static mrb_value dsl_defsubst(mrb_state *mrb, mrb_value self)
 	if (mrb_nil_p(to_v))
 		mrb_raise(mrb, E_ARGUMENT_ERROR, "defsubst requires to: keyword");
 
-	int rhs_idx = resolveRhs(mrb, to_v);
+	// the substitute target may carry ASSIGN-class modifiers
+	int rhs_idx = resolveRhs(mrb, to_v, NYS_MODCTX_ASSIGN);
 	NYsStrs *lhs_ss = buildLhsStrs(mrb, lhs_v);
 	bool ok = nys_def_subst(lhs_ss, rhs_idx);
 	if (!ok) raiseApiError(mrb, "nys_def_subst failed");

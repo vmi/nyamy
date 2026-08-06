@@ -764,6 +764,14 @@ AstNodePtr MayuParser::parseKeyAssign()
 	// Parse modifier sequence
 	std::vector<AstModifierSpec> mods = parseModifierSpecs();
 
+	// `key MODIFIER* = MODIFIER*' used to change the default modifiers of every
+	// line below it.  Rejected rather than silently parsed as an assignment to a
+	// key named "=", which is what falling through would report.
+	if (!isEOL() && *lookToken() == L"=")
+		throw ErrorMessage()
+			<< L"changing the default modifiers is no longer supported; "
+			L"spell the modifiers out on each key.";
+
 	// Key assignment: key MODIFIER* KEY+ = KEY_SEQUENCE
 	auto node = std::make_unique<AstKeyAssign>();
 	node->m_loc = loc;

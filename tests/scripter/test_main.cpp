@@ -15,6 +15,8 @@
 #include "test_harness.h"
 #include "setting_dump.h"
 #include "setting.h"
+#include "keymap.h"
+#include "keyboard.h"
 #include "symbols.h"
 #include "nyamy_scripter.h"   // parseScancodeMapBlob (exported test helper)
 
@@ -74,6 +76,63 @@ struct Combo {
 	bool workaround;   // additionally load workaround.mayu / workaround.mayu.rb
 	std::vector<const wchar_t *> symbols;
 };
+
+
+// The keymap of the given name, or null.
+const Keymap *findKeymap(const Setting &i_setting, const wchar_t *i_name)
+{
+	for (const Keymap &km : i_setting.m_keymaps)
+		if (std::wstring(km.getName().c_str()) == i_name)
+			return &km;
+	return nullptr;
+}
+
+// A ModifiedKey as the engine builds one for a physical key event: every
+// modifier is cared for, U- / D- reflect the direction of the event.
+// i_locks presses the lock and window-state modifiers; R- and M0- ... M9- stay
+// released, as they are not lock state.
+struct Held {
+	bool ctrl = false, shift = false, alt = false, win = false, locks = false;
+};
+
+ModifiedKey physicalKey(Key *i_key, bool i_isPressed, Held i_held = Held())
+{
+	ModifiedKey mkey;
+	mkey.m_key = i_key;
+	Modifier &mod = mkey.m_modifier;
+	mod.press(Modifier::Type_Shift, i_held.shift);
+	mod.press(Modifier::Type_Alt, i_held.alt);
+	mod.press(Modifier::Type_Control, i_held.ctrl);
+	mod.press(Modifier::Type_Windows, i_held.win);
+	mod.press(Modifier::Type_Up, !i_isPressed);
+	mod.press(Modifier::Type_Down, i_isPressed);
+	for (int t = Modifier::Type_Repeat; t < Modifier::Type_ASSIGN; ++t) {
+		Modifier::Type type = static_cast<Modifier::Type>(t);
+		bool isMod = (Modifier::Type_Mod0 <= type && type <= Modifier::Type_Mod9);
+		mod.press(type, i_held.locks && !isMod
+						&& type != Modifier::Type_Repeat);
+	}
+	return mkey;
+}
+
+// The modifier of the first action of the key sequence assigned to i_mkey,
+// or null when there is no assignment or no action.
+const Modifier *firstActionModifier(const Keymap &i_keymap,
+									const ModifiedKey &i_mkey,
+									Action::Type *o_type = nullptr)
+{
+	const Keymap::KeyAssignment *ka = i_keymap.searchAssignment(i_mkey);
+	if (!ka) return nullptr;
+	const KeySeq::Actions &actions = ka->m_keySeq->getActions();
+	if (actions.empty()) return nullptr;
+	const Action *action = actions[0].get();
+	if (o_type) *o_type = action->getType();
+	if (action->getType() == Action::Type_key)
+		return &static_cast<const ActionKey *>(action)->m_modifiedKey.m_modifier;
+	if (action->getType() == Action::Type_function)
+		return &static_cast<const ActionFunction *>(action)->m_modifier;
+	return nullptr;
+}
 
 } // namespace
 
@@ -377,7 +436,203 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 5;
+	// Modifier defaults: what a key or an action says nothing about must stay
+	// dontcare (U- / D-, the locks, the window state), the way the old text
+	// loader did it.  Without that, only rules written with an explicit `*'
+	// match or emit anything.
+	{
+		printf("[%d] modifier defaults ... ", idx + 6);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__mod_defaults__.mayu",
+			L"include \"109.mayu\"\n"
+			L"keymap Global\n"
+			L"key A = B\n"				// nothing specified on either side
+			L"key C-D = E\n"			// basic modifier on the left side
+			L"key U-*F = G\n"			// U- only: key release
+			L"key *H = D-I\n"			// D- only: press without release
+			L"key *J = &Sync\n"			// function without a modifier
+			L"key *K = C-&Sync\n"		// function with a modifier
+			L"key *L = *&Sync\n");		// function ignoring the modifiers
+		// the same through the Ruby DSL, which compiles the two sides via
+		// separate entry points
+		writeUtf8File(exeDir + L"\\__mod_defaults__.rb",
+			L"load \"__mod_defaults__.mayu\"\n"
+			L"keymap \"Global\" do\n"
+			L"  key[\"M\"] = \"N\"\n"
+			L"  key[\"C-S-Z\"] = \"&WindowMaximize\"\n"
+			L"end\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__mod_defaults__.rb", syms);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		const Keymap *km = s ? findKeymap(*s, L"Global") : nullptr;
+		check(km != nullptr, "keymap Global exists");
+		if (km) {
+			Keyboard &kb = const_cast<Keyboard &>(s->m_keyboard);
+			auto key = [&](const wchar_t *name) {
+				return kb.searchKey(wstringi(name));
+			};
+			Held locksHeld; locksHeld.locks = true;
+			Held ctrlHeld;  ctrlHeld.ctrl = true;
+
+			// `key A = B': matches press and release, whatever the locks say,
+			// and emits B on both.
+			Action::Type type = Action::Type_key;
+			const Modifier *mod =
+				firstActionModifier(*km, physicalKey(key(L"A"), true), &type);
+			check(mod != nullptr, "bare key matches a press");
+			check(firstActionModifier(*km, physicalKey(key(L"A"), false)) != nullptr,
+				  "bare key matches a release");
+			check(firstActionModifier(*km,
+					physicalKey(key(L"A"), true, locksHeld)) != nullptr,
+				  "bare key ignores the lock modifiers");
+			if (mod) {
+				check(type == Action::Type_key, "bare rhs is a key action");
+				check(mod->isDontcare(Modifier::Type_Up) &&
+					  mod->isDontcare(Modifier::Type_Down),
+					  "bare rhs key emits both press and release");
+			}
+
+			// `key C-D = E': Control must be held.
+			check(firstActionModifier(*km,
+					physicalKey(key(L"D"), true, ctrlHeld)) != nullptr,
+				  "C- key matches with Control held");
+			check(firstActionModifier(*km,
+					physicalKey(key(L"D"), true)) == nullptr,
+				  "C- key does not match without Control");
+
+			// `key U-*F = G' / `key *H = D-I': U- and D- select the direction.
+			check(firstActionModifier(*km, physicalKey(key(L"F"), false)) != nullptr,
+				  "U- key matches a release");
+			check(firstActionModifier(*km, physicalKey(key(L"F"), true)) == nullptr,
+				  "U- key does not match a press");
+			mod = firstActionModifier(*km, physicalKey(key(L"H"), true));
+			check(mod != nullptr, "rhs D- key matches");
+			if (mod)
+				check(!mod->isDontcare(Modifier::Type_Down) &&
+					  mod->isOn(Modifier::Type_Down) &&
+					  !mod->isDontcare(Modifier::Type_Up) &&
+					  !mod->isOn(Modifier::Type_Up),
+					  "rhs D- key emits the press only");
+
+			// `&Sync' without a modifier runs on the press and releases every
+			// basic modifier; with `C-' it holds Control; with `*' it leaves
+			// the modifiers alone.
+			mod = firstActionModifier(*km, physicalKey(key(L"J"), true), &type);
+			check(mod != nullptr && type == Action::Type_function,
+				  "bare function is a function action");
+			if (mod) {
+				check(mod->isDontcare(Modifier::Type_Up) &&
+					  mod->isDontcare(Modifier::Type_Down),
+					  "bare function runs on press and release");
+				check(!mod->isDontcare(Modifier::Type_Control) &&
+					  !mod->isOn(Modifier::Type_Control) &&
+					  !mod->isDontcare(Modifier::Type_Shift) &&
+					  !mod->isOn(Modifier::Type_Shift),
+					  "bare function releases the basic modifiers");
+			}
+			mod = firstActionModifier(*km, physicalKey(key(L"K"), true));
+			check(mod != nullptr, "C-&Sync matches");
+			if (mod) {
+				check(mod->isDontcare(Modifier::Type_Down) ||
+					  mod->isOn(Modifier::Type_Down),
+					  "C-&Sync runs on the press");
+				check(!mod->isDontcare(Modifier::Type_Control) &&
+					  mod->isOn(Modifier::Type_Control),
+					  "C-&Sync holds Control");
+				check(!mod->isDontcare(Modifier::Type_Alt) &&
+					  !mod->isOn(Modifier::Type_Alt),
+					  "C-&Sync releases Alt");
+			}
+			mod = firstActionModifier(*km, physicalKey(key(L"L"), true));
+			check(mod != nullptr, "*&Sync matches");
+			if (mod)
+				check(mod->isDontcare(Modifier::Type_Control) &&
+					  mod->isDontcare(Modifier::Type_Shift),
+					  "*&Sync leaves the modifiers alone");
+
+			// The Ruby DSL must arrive at the same defaults.
+			mod = firstActionModifier(*km, physicalKey(key(L"M"), true), &type);
+			check(mod != nullptr, "DSL: bare key matches a press");
+			if (mod)
+				check(type == Action::Type_key &&
+					  mod->isDontcare(Modifier::Type_Up) &&
+					  mod->isDontcare(Modifier::Type_Down),
+					  "DSL: bare rhs key emits both press and release");
+			Held ctrlShift; ctrlShift.ctrl = true; ctrlShift.shift = true;
+			mod = firstActionModifier(*km,
+					physicalKey(key(L"Z"), true, ctrlShift), &type);
+			check(mod != nullptr, "DSL: C-S- key matches");
+			if (mod)
+				check(type == Action::Type_function &&
+					  mod->isDontcare(Modifier::Type_Down),
+					  "DSL: bare function runs on the press");
+		}
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// `key ⟨MODIFIER⟩ = ⟨MODIFIER⟩' changed the default modifiers of every line
+	// below it.  The statement is gone and must be rejected, not read as an
+	// assignment to a key named "=".
+	{
+		printf("[%d] default modifier statement rejected ... ", idx + 7);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__mod_stmt__.mayu",
+			L"include \"109.mayu\"\n"
+			L"keymap Global\n"
+			L"key ~NL- =\n");
+		writeUtf8File(exeDir + L"\\__mod_stmt__.rb",
+			L"load \"__mod_stmt__.mayu\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__mod_stmt__.rb", syms);
+		if (!s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (the load should have failed)\n");
+			++failures;
+		}
+	}
+
+	// A modifier that the context does not allow is an error, as it was in the
+	// old text loader: R- belongs to the left side, not to an action.
+	{
+		printf("[%d] out-of-context modifier rejected ... ", idx + 8);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__mod_bad__.mayu",
+			L"include \"109.mayu\"\n"
+			L"keymap Global\n"
+			L"key *A = R-B\n");
+		writeUtf8File(exeDir + L"\\__mod_bad__.rb",
+			L"load \"__mod_bad__.mayu\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__mod_bad__.rb", syms);
+		if (!s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (the load should have failed)\n");
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 8;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

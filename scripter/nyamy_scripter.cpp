@@ -271,7 +271,10 @@ static bool parseModifiedKey(const char* funcName,
 	                                  mods, keyName))
 		return setError(std::string(funcName) + ": invalid modifier key: "
 		                + std::string(str, len));
-	out.modifier = MayuCompiler::compileModifierSpecs(mods);
+	// a key being assigned to may carry every modifier type, so nothing here
+	// can be out of context
+	out.modifier =
+		MayuCompiler::compileModifierSpecs(mods, ModifierContext::Assign);
 	out.keyName  = keyName;
 	return true;
 }
@@ -643,13 +646,15 @@ static void remapKeySeqIdx(std::vector<CmdAction>& actions,
 }
 
 
-NYS_API int nys_reg_keyseq(const char* name, const char* actions)
+NYS_API int nys_reg_keyseq(const char* name, const char* actions, int context)
 {
 	if (!checkInLoadSetting("nys_reg_keyseq")) return -1;
 	if (!actions || !*actions) {
 		setError("nys_reg_keyseq: actions must not be empty");
 		return -1;
 	}
+	ModifierContext modContext = context == NYS_MODCTX_ASSIGN
+		? ModifierContext::Assign : ModifierContext::KeySeq;
 
 	// Parse and compile the action string at registration time.
 	std::wstring wactions = from_UTF8(actions);
@@ -669,7 +674,7 @@ NYS_API int nys_reg_keyseq(const char* name, const char* actions)
 	MayuCompiler compiler(nullWriter, g_symbols, cf, nullptr, nullptr);
 	std::vector<std::vector<CmdAction>> subSeqs;
 	compiler.setSubSeqCollector(&subSeqs);
-	std::vector<CmdAction> compiled = compiler.compileActions(*seq);
+	std::vector<CmdAction> compiled = compiler.compileActions(*seq, modContext);
 	compiler.setSubSeqCollector(nullptr);
 	if (compiler.hasErrors()) {
 		setError("nys_reg_keyseq: failed to compile actions");
@@ -1168,7 +1173,8 @@ NYS_API bool nys_exec_keyseq(const char* actions)
 	CmdStreamWriter nullWriter(nullSink);
 	ConfigFiles cf;
 	MayuCompiler compiler(nullWriter, g_symbols, cf, nullptr, nullptr);
-	std::vector<CmdAction> cmdActions = compiler.compileActions(*seq);
+	std::vector<CmdAction> cmdActions =
+		compiler.compileActions(*seq, ModifierContext::KeySeq);
 	if (compiler.hasErrors())
 		return setError("nys_exec_keyseq: failed to compile actions");
 

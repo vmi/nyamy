@@ -113,56 +113,109 @@ void MayuCompiler::compile(const AstFile &file,
 void MayuCompiler::error(const AstSourceLoc &loc, const std::wstring &msg)
 {
 	m_hasErrors = true;
-	if (m_log && m_soLog) {
-		Acquire a(m_soLog);
+	if (!m_log)
+		return;
+	auto emit = [&]() {
 		*m_log << loc.filename << L"(" << loc.line
 			   << L") : error: " << msg << std::endl;
+	};
+	// callers that own the log stream pass no lock object
+	if (m_soLog) {
+		Acquire a(m_soLog);
+		emit();
+	} else {
+		emit();
 	}
 }
 
 
-/*static*/
-ModifierSpec MayuCompiler::compileModifierSpecs(
-	const std::vector<AstModifierSpec> &specs)
+namespace {
+
+/// every modifier type as a bit mask
+constexpr uint64_t allModifierBits =
+	(static_cast<uint64_t>(1) << Modifier::Type_ASSIGN) - 1;
+
+inline uint64_t modifierBit(Modifier::Type type)
+{
+	return static_cast<uint64_t>(1) << type;
+}
+
+/// The first modifier type that may not be specified in i_context.  Types from
+/// here up are forced to dontcare, as the old loader's load_MODIFIER() did for
+/// everything at or above its i_mode.
+Modifier::Type contextLimit(ModifierContext context)
+{
+	return context == ModifierContext::KeySeq ? Modifier::Type_KEYSEQ
+											  : Modifier::Type_ASSIGN;
+}
+
+/// The state of the modifiers a prefix says nothing about.
+ModifierSpec modifierDefaults(ModifierContext context)
 {
 	ModifierSpec mod;
+	// a MODIFIER argument starts out caring about nothing; everywhere else the
+	// defaults are the ones Modifier() itself supplies
+	mod.dontcares = context == ModifierContext::Argument
+		? allModifierBits : Modifier::defaultDontcares();
+	return mod;
+}
 
-	// Collect which modifier bits were explicitly specified (not wildcard).
-	// Wildcards ("*" / "~" sentinels) are recognised by their name value.
-	uint64_t explicitBits = 0;
+} // namespace
+
+
+/*static*/
+ModifierSpec MayuCompiler::compileModifierSpecs(
+	const std::vector<AstModifierSpec> &specs,
+	ModifierContext context,
+	wstringi *o_invalidName)
+{
+	ModifierSpec mod = modifierDefaults(context);
+
+	// Types the context does not allow are dontcare and count as specified, so
+	// that a trailing wildcard does not touch them either.
+	uint64_t specifiedBits = 0;
+	for (int i = contextLimit(context); i < Modifier::Type_ASSIGN; ++i)
+		specifiedBits |= modifierBit(static_cast<Modifier::Type>(i));
+	mod.dontcares |= specifiedBits;
+	mod.modifiers &= ~specifiedBits;
+
+	// Apply the explicit specifiers.  Wildcards ("*" / "~" sentinels) are
+	// recognised by their name value and handled below.
 	for (const auto &spec : specs) {
-		// Find the modifier type
 		for (size_t i = 0; i < NUMBER_OF(g_modifierMap); ++i) {
-			if (_wcsicmp(spec.name.c_str(), g_modifierMap[i].name) == 0) {
-				Modifier::Type mt = g_modifierMap[i].type;
-				uint64_t bit = static_cast<uint64_t>(1) << mt;
-				explicitBits |= bit;
-				switch (spec.flag) {
-				case AstModifierSpec::Flag::Press:
-					mod.modifiers |= bit;
-					mod.dontcares &= ~bit;
-					break;
-				case AstModifierSpec::Flag::Release:
-					mod.modifiers &= ~bit;
-					mod.dontcares &= ~bit;
-					break;
-				case AstModifierSpec::Flag::Dontcare:
-					mod.dontcares |= bit;
-					break;
-				}
+			if (_wcsicmp(spec.name.c_str(), g_modifierMap[i].name) != 0)
+				continue;
+			Modifier::Type mt = g_modifierMap[i].type;
+			if (contextLimit(context) <= mt) {
+				if (o_invalidName && o_invalidName->empty())
+					*o_invalidName = spec.name;
 				break;
 			}
+			uint64_t bit = modifierBit(mt);
+			specifiedBits |= bit;
+			switch (spec.flag) {
+			case AstModifierSpec::Flag::Press:
+				mod.modifiers |= bit;
+				mod.dontcares &= ~bit;
+				break;
+			case AstModifierSpec::Flag::Release:
+				mod.modifiers &= ~bit;
+				mod.dontcares &= ~bit;
+				break;
+			case AstModifierSpec::Flag::Dontcare:
+				mod.dontcares |= bit;
+				break;
+			}
+			break;
 		}
 	}
 
 	// Apply wildcard sentinel ("*" = all-dontcare, "~" = all-release) to every
-	// modifier bit that was not explicitly specified.  This replicates the old
-	// pipeline's "trailing flag" behaviour (e.g. bare * before a key name).
+	// modifier bit that was not specified.  This replicates the old pipeline's
+	// "trailing flag" behaviour (e.g. bare * before a key name).
 	for (const auto &spec : specs) {
 		if (spec.name == L"*" || spec.name == L"~") {
-			const uint64_t allBits =
-				(static_cast<uint64_t>(1) << Modifier::Type_ASSIGN) - 1;
-			const uint64_t unspecBits = allBits & ~explicitBits;
+			const uint64_t unspecBits = allModifierBits & ~specifiedBits;
 			if (spec.flag == AstModifierSpec::Flag::Dontcare) {
 				mod.dontcares |= unspecBits;
 				mod.modifiers  &= ~unspecBits;
@@ -174,6 +227,48 @@ ModifierSpec MayuCompiler::compileModifierSpecs(
 		}
 	}
 
+	// Fix up U- / D-: specifying one of them implies the other is its opposite,
+	// and caring for both with the same value means neither matters.
+	{
+		const uint64_t up = modifierBit(Modifier::Type_Up);
+		const uint64_t down = modifierBit(Modifier::Type_Down);
+		bool isDontcareUp = !!(mod.dontcares & up);
+		bool isDontcareDown = !!(mod.dontcares & down);
+		bool isOnUp = !!(mod.modifiers & up);
+		bool isOnDown = !!(mod.modifiers & down);
+		if (isDontcareUp && isDontcareDown)
+			;
+		else if (isDontcareUp) {
+			mod.dontcares &= ~up;
+			if (isOnDown) mod.modifiers &= ~up; else mod.modifiers |= up;
+		} else if (isDontcareDown) {
+			mod.dontcares &= ~down;
+			if (isOnUp) mod.modifiers &= ~down; else mod.modifiers |= down;
+		} else if (isOnUp == isOnDown) {
+			mod.dontcares |= up | down;
+			mod.modifiers &= ~(up | down);
+		}
+	}
+
+	// R- only ever matters when it is spelled out.
+	if (!(specifiedBits & modifierBit(Modifier::Type_Repeat))) {
+		mod.dontcares |= modifierBit(Modifier::Type_Repeat);
+		mod.modifiers &= ~modifierBit(Modifier::Type_Repeat);
+	}
+
+	return mod;
+}
+
+
+ModifierSpec MayuCompiler::compileModifiers(
+	const std::vector<AstModifierSpec> &specs,
+	ModifierContext context,
+	const AstSourceLoc &loc)
+{
+	wstringi invalidName;
+	ModifierSpec mod = compileModifierSpecs(specs, context, &invalidName);
+	if (!invalidName.empty())
+		error(loc, L"`" + invalidName + L"': invalid modifier at this context.");
 	return mod;
 }
 
@@ -207,10 +302,12 @@ FuncArg MayuCompiler::compileArgument(const AstArgument &arg)
 		return FuncArgString{ arg.stringValue };
 	case AstArgument::Kind::KeySeqLiteral:
 		if (arg.keySeq)
-			return FuncArgKeySeqIdx{ compileKeySequence(*arg.keySeq) };
+			return FuncArgKeySeqIdx{
+				compileKeySequence(*arg.keySeq, ModifierContext::KeySeq) };
 		break;
 	case AstArgument::Kind::ModifierSeq:
-		return FuncArgModifierSpec{ compileModifierSpecs(arg.modifierSeq) };
+		return FuncArgModifierSpec{
+			compileModifierSpecs(arg.modifierSeq, ModifierContext::Argument) };
 	case AstArgument::Kind::TokenSeq:
 		return FuncArgTokenSeq{ arg.tokens };
 	}
@@ -218,10 +315,11 @@ FuncArg MayuCompiler::compileArgument(const AstArgument &arg)
 }
 
 
-CmdAction MayuCompiler::compileAction(const AstAction &action)
+CmdAction MayuCompiler::compileAction(const AstAction &action,
+									  ModifierContext context)
 {
 	CmdAction ba;
-	ba.modifier = compileModifierSpecs(action.modifiers);
+	ba.modifier = compileModifiers(action.modifiers, context, m_currentLoc);
 
 	if (auto *key = dynamic_cast<const AstActionKey *>(&action)) {
 		ba.type = CmdAction::Key;
@@ -238,18 +336,21 @@ CmdAction MayuCompiler::compileAction(const AstAction &action)
 		ba.type = CmdAction::SubSeq;
 		if (sub->sequence) {
 			for (const auto &a : sub->sequence->actions)
-				ba.subActions.push_back(compileAction(*a));
+				ba.subActions.push_back(compileAction(*a, context));
 		}
 	}
 	return ba;
 }
 
 
-uint32_t MayuCompiler::compileKeySequence(const AstKeySequence &seq)
+uint32_t MayuCompiler::compileKeySequence(const AstKeySequence &seq,
+										  ModifierContext context)
 {
 	CmdArgsRegKeySeq bks;
-	for (const auto &action : seq.actions)
-		bks.actions.push_back(compileAction(*action));
+	for (const auto &action : seq.actions) {
+		m_currentLoc = seq.m_loc;
+		bks.actions.push_back(compileAction(*action, context));
+	}
 
 	if (m_subSeqCollector) {
 		// Collection mode: gather the sub-sequence's actions and return its
@@ -264,12 +365,15 @@ uint32_t MayuCompiler::compileKeySequence(const AstKeySequence &seq)
 }
 
 
-std::vector<CmdAction> MayuCompiler::compileActions(const AstKeySequence &seq)
+std::vector<CmdAction> MayuCompiler::compileActions(const AstKeySequence &seq,
+													ModifierContext context)
 {
 	std::vector<CmdAction> result;
 	result.reserve(seq.actions.size());
-	for (const auto &action : seq.actions)
-		result.push_back(compileAction(*action));
+	for (const auto &action : seq.actions) {
+		m_currentLoc = seq.m_loc;
+		result.push_back(compileAction(*action, context));
+	}
 	return result;
 }
 
@@ -400,12 +504,15 @@ void MayuCompiler::visit(const AstDefSubstitute &node)
 	CmdArgsDefSubst data;
 	for (const auto &mkey : node.lhsKeys) {
 		CmdModifiedKey bmk;
-		bmk.modifier = compileModifierSpecs(mkey.modifiers);
+		bmk.modifier = compileModifiers(mkey.modifiers, ModifierContext::Assign,
+										node.m_loc);
 		bmk.keyName = mkey.keyName;
 		data.lhsKeys.push_back(std::move(bmk));
 	}
+	// the substitute target may carry ASSIGN-class modifiers
 	if (node.rhsKeySeq)
-		data.rhsKeySeqIdx = compileKeySequence(*node.rhsKeySeq);
+		data.rhsKeySeqIdx =
+			compileKeySequence(*node.rhsKeySeq, ModifierContext::Assign);
 	m_writer.writeDefSubst(data);
 }
 
@@ -437,8 +544,8 @@ void MayuCompiler::visit(const AstKeymapDef &node)
 	}
 	data.parentName = node.parentName;
 	if (node.defaultKeySeq)
-		data.defaultKeySeqIdx =
-			static_cast<int32_t>(compileKeySequence(*node.defaultKeySeq));
+		data.defaultKeySeqIdx = static_cast<int32_t>(
+			compileKeySequence(*node.defaultKeySeq, ModifierContext::KeySeq));
 	m_writer.writeBeginKeymap(data);
 }
 
@@ -448,12 +555,14 @@ void MayuCompiler::visit(const AstKeyAssign &node)
 	CmdArgsAssignKey data;
 	for (const auto &mkey : node.lhsKeys) {
 		CmdModifiedKey bmk;
-		bmk.modifier = compileModifierSpecs(mkey.modifiers);
+		bmk.modifier = compileModifiers(mkey.modifiers, ModifierContext::Assign,
+										node.m_loc);
 		bmk.keyName = mkey.keyName;
 		data.lhsKeys.push_back(std::move(bmk));
 	}
 	if (node.rhsKeySeq)
-		data.rhsKeySeqIdx = compileKeySequence(*node.rhsKeySeq);
+		data.rhsKeySeqIdx =
+			compileKeySequence(*node.rhsKeySeq, ModifierContext::KeySeq);
 	m_writer.writeAssignKey(data);
 }
 
@@ -463,7 +572,8 @@ void MayuCompiler::visit(const AstEventAssign &node)
 	CmdArgsAssignEvent data;
 	data.eventName = node.eventName;
 	if (node.keySeq)
-		data.rhsKeySeqIdx = compileKeySequence(*node.keySeq);
+		data.rhsKeySeqIdx =
+			compileKeySequence(*node.keySeq, ModifierContext::KeySeq);
 	m_writer.writeAssignEvent(data);
 }
 
@@ -494,8 +604,12 @@ void MayuCompiler::visit(const AstKeySeqDef &node)
 	if (node.keySeq) {
 		CmdArgsRegKeySeq bks;
 		bks.name = node.name;
-		for (const auto &action : node.keySeq->actions)
-			bks.actions.push_back(compileAction(*action));
+		// a named key sequence may carry ASSIGN-class modifiers
+		for (const auto &action : node.keySeq->actions) {
+			m_currentLoc = node.m_loc;
+			bks.actions.push_back(
+				compileAction(*action, ModifierContext::Assign));
+		}
 
 		m_nextKeySeqIdx++;
 		m_writer.writeRegKeySeq(bks);

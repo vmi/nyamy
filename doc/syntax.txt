@@ -19,13 +19,11 @@
 #		5. FUNCTION_NAME
 #		6. SYMBOL
 #	* the default of <...MODIFIED_KEY_NAME>'s modifier-settings is:
-#		1. "IL-", "NL-", "CL-", "SL-", "KL-",
+#		1. "IL-", "IC-", "I-", "NL-", "CL-", "SL-", "KL-",
 #		   "MAX-", "MIN-", "MMAX-", "MMIN-",
-#		   /L[0-9]/, "U-" and "D-"
+#		   /L[0-9]/, "R-", "U-" and "D-"
 #		   are specified with "*"
 #		2. all other modifiers are specified with "~"
-#		3. they can be changed by
-#		   "key" <ASSIGN_MODIFIER> "=" <ASSIGN_MODIFIER>
 #
 
 #

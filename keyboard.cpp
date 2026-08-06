@@ -77,19 +77,9 @@ std::wostream &operator<<(std::wostream &i_ost, const Key &i_mk)
 
 Modifier::Modifier()
 		: m_modifiers(0),
-		m_dontcares(0)
+		m_dontcares(defaultDontcares())
 {
 	ASSERT(Type_end <= (sizeof(MODIFIERS) * 8));
-	static const Type defaultDontCare[] = {
-		Type_Up, Type_Down, Type_Repeat,
-		Type_ImeLock, Type_ImeComp, Type_NumLock, Type_CapsLock, Type_ScrollLock,
-		Type_KanaLock,
-		Type_Maximized, Type_Minimized, Type_MdiMaximized, Type_MdiMinimized,
-		Type_Lock0, Type_Lock1, Type_Lock2, Type_Lock3, Type_Lock4,
-		Type_Lock5, Type_Lock6, Type_Lock7, Type_Lock8, Type_Lock9,
-	};
-	for (size_t i = 0; i < NUMBER_OF(defaultDontCare); ++ i)
-		dontcare(defaultDontCare[i]);
 }
 
 

@@ -124,12 +124,22 @@ NYS_API uint32_t nys_version(void);
 // Setting registration API  (valid only from within on_load_setting)
 //=============================================================================
 
+/// Modifier context of the actions passed to nys_reg_keyseq().
+/// A key-sequence right side may only carry the basic modifiers and U- / D-;
+/// a named sequence definition and a substitute target may also carry the
+/// ASSIGN-class ones (R-, NL-, M0-, L0-, ...).
+enum {
+	NYS_MODCTX_KEYSEQ = 0,		///< right side of a key / event assignment
+	NYS_MODCTX_ASSIGN = 1,		///< named keyseq definition, substitute target
+};
+
 /// Register a key sequence.
 /// Returns a non-negative index on success, or the existing index if name is
 /// already registered.  Returns -1 on failure.
 /// name: sequence name (NULL for anonymous; empty string is not allowed).
 /// actions: mayu-syntax action string (e.g. "A B C", "&BeginningOfLine", "$otherseq")
-NYS_API int  nys_reg_keyseq(const char* name, const char* actions);
+/// context: one of NYS_MODCTX_*
+NYS_API int  nys_reg_keyseq(const char* name, const char* actions, int context);
 
 /// Return the index of a previously registered named key sequence, or -1.
 NYS_API int  nys_get_keyseq_idx(const char* name);

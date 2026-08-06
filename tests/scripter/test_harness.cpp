@@ -104,7 +104,13 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 		// Deliver the Setting of the i_loadCount-th Commit.
 		if (++commitCount == i_loadCount) committed.set_value(s);
 	});
-	std::thread consumerThread([&]() { proc.process(reader); });
+	std::thread consumerThread([&]() {
+		proc.process(reader);
+		// End of stream without the expected Commit: the load failed, so
+		// unblock the waiter instead of letting it time out.  commitCount is
+		// only ever touched by this thread.
+		if (commitCount < i_loadCount) committed.set_value(nullptr);
+	});
 
 	// Send the Start command (carries the symbol set); once more per extra
 	// load to exercise the reload path.
@@ -113,16 +119,16 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	CtrlStreamWriter ctrlWriter(ctrlOut);
 	for (int i = 0; i < i_loadCount; ++i)
 		ctrlWriter.writeStart(wstringi(L"test"), wstringi(L""), i_symbols);
+	// Quit goes right behind the Start commands: the ctrl stream is processed in
+	// order, so every load runs first.  Quitting closes dataW, which gives the
+	// consumer EOF even when a load failed and no Commit is coming.
+	ctrlWriter.writeQuit();
 	ctrlOut.flush();
 
-	// Wait for the Commit (or time out on a Ruby error / hang).
+	// Wait for the Commit (or for the stream to end on a failed load).
 	std::shared_ptr<Setting> result;
 	if (committedFut.wait_for(std::chrono::seconds(30)) == std::future_status::ready)
 		result = committedFut.get();
-
-	// Quit the scripter; this closes dataW, giving the consumer EOF.
-	ctrlWriter.writeQuit();
-	ctrlOut.flush();
 
 	scripterThread.join();
 	consumerThread.join();
