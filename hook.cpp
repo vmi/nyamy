@@ -595,7 +595,11 @@ LRESULT CALLBACK getMessageProc(int i_nCode, WPARAM i_wParam, LPARAM i_lParam)
 				nVirtKey == VK_KANA ||
 				nVirtKey == VK_SCROLL)
 			notifyLockState(2);
-		else if (scanCode == g_hookData->m_syncKey &&
+		// m_syncKey is 0 whenever no &Sync is outstanding.  The test matters:
+		// keybd_event() reports scan code 0 for a virtual key MapVirtualKey()
+		// cannot translate, which would otherwise look like the sync key.
+		else if (g_hookData->m_syncKey != 0 &&
+				 scanCode == g_hookData->m_syncKey &&
 				 isExtended == g_hookData->m_syncKeyIsExtended)
 			notifySync();
 		break;

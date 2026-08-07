@@ -885,6 +885,12 @@ void Engine::funcSync(FunctionParam *i_param)
 		return;
 	const ScanCode *sc = sync->getScanCodes();
 
+	// Drop a signal left behind by an earlier &Sync: one that timed out and
+	// whose notification arrived afterwards.  m_eSync is auto reset, so such
+	// a leftover would complete this &Sync before the target application has
+	// seen anything.
+	CHECK_TRUE( ResetEvent(m_eSync) );
+
 	// set variables exported from mayu.dll
 	g_hookData->m_syncKey = sc->m_scan;
 	g_hookData->m_syncKeyIsExtended = !!(sc->m_flags & ScanCode::E0E1);
@@ -893,6 +899,13 @@ void Engine::funcSync(FunctionParam *i_param)
 
 	WaitResult r = waitWhileUnlocked(m_eSync, kSyncTimeoutMillisec);
 	m_isSynchronizing = false;
+
+	// Stop the hooks from reporting this key until the next &Sync.  Left set,
+	// it makes every hooked process notify us on each press of that key for
+	// the rest of the session - pointless traffic, and one more way to leave
+	// a stale signal behind.
+	g_hookData->m_syncKey = 0;
+
 	if (r == WaitResult::Timeout) {
 		Acquire a(&m_log, 0);
 		m_log << L" *FAILED*" << std::endl;
