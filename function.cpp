@@ -14,6 +14,11 @@
 #include <algorithm>
 #include <process.h>
 
+/// &Sync gives up waiting for the target application after this long
+static const DWORD kSyncTimeoutMillisec = 5000;
+/// &Wait refuses to park the engine thread for longer than this
+static const DWORD kWaitMaxMillisec = 5000;
+
 VKey loadVKeyFromCmd(const FuncArg &arg)
 {
 	// Number: already encoded
@@ -886,14 +891,12 @@ void Engine::funcSync(FunctionParam *i_param)
 	m_isSynchronizing = true;
 	generateKeyEvent(sync, false, false);
 
-	m_mutex.unlock();
-	DWORD r = WaitForSingleObject(m_eSync, 5000);
-	if (r == WAIT_TIMEOUT) {
+	WaitResult r = waitWhileUnlocked(m_eSync, kSyncTimeoutMillisec);
+	m_isSynchronizing = false;
+	if (r == WaitResult::Timeout) {
 		Acquire a(&m_log, 0);
 		m_log << L" *FAILED*" << std::endl;
 	}
-	m_mutex.lock();
-	m_isSynchronizing = false;
 }
 
 // toggle lock
@@ -1213,13 +1216,13 @@ void Engine::funcWait(FunctionParam *i_param, int i_milliSecond)
 {
 	if (!i_param->m_isPressed)
 		return;
-	if (i_milliSecond < 0 || 5000 < i_milliSecond)	// too long wait
-		return;
+	if (i_milliSecond < 0 ||
+			kWaitMaxMillisec < static_cast<DWORD>(i_milliSecond))
+		return;					// too long wait
 
 	m_isSynchronizing = true;
-	m_mutex.unlock();
-	Sleep(i_milliSecond);
-	m_mutex.lock();
+	// no event to wait for - just the timeout, cut short by shutdown
+	waitWhileUnlocked(NULL, static_cast<DWORD>(i_milliSecond));
 	m_isSynchronizing = false;
 }
 

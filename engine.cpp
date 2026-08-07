@@ -489,6 +489,8 @@ void Engine::generateKeySeqEvents(const Current &i_c, const KeySeq *i_keySeq,
 	else {
 		size_t i;
 		for (i = 0 ; i < actions.size() - 1; ++ i) {
+			if (m_isAborting)
+				return;
 			generateActionEvents(i_c, actions[i].get(), true);
 			generateActionEvents(i_c, actions[i].get(), false);
 		}
@@ -502,6 +504,12 @@ void Engine::generateKeySeqEvents(const Current &i_c, const KeySeq *i_keySeq,
 // generate keyboard events for current key
 void Engine::generateKeyboardEvents(const Current &i_c)
 {
+	// a &Sync or &Wait in this key sequence was cut short by shutdown; the
+	// hooks are already uninstalled, so the rest of the sequence would only
+	// inject keys nobody is listening for
+	if (m_isAborting)
+		return;
+
 	if (++ m_generateKeyboardEventsRecursionGuard ==
 			MAX_GENERATE_KEYBOARD_EVENTS_RECURSION_COUNT) {
 		Acquire a(&m_log);
@@ -847,6 +855,35 @@ void Engine::resyncKeyStates(bool i_force)
 	}
 	if (dropped)
 		resetModifiersIfIdle();
+}
+
+
+// park the engine thread with m_mutex released.  See the header for why the
+// mutex has to go and what stays safe while it is gone.
+Engine::WaitResult Engine::waitWhileUnlocked(HANDLE i_event, DWORD i_timeout)
+{
+	HANDLE handles[2];
+	DWORD count = 0;
+	if (i_event)
+		handles[count ++] = i_event;
+	const DWORD shutdownIndex = count;
+	handles[count ++] = m_eShutdown;
+
+	m_mutex.unlock();
+	DWORD r = WaitForMultipleObjects(count, handles, FALSE, i_timeout);
+	m_mutex.lock();
+
+	if (r == WAIT_OBJECT_0 + shutdownIndex) {
+		// stop unwinding into more key generation; the caller returns and
+		// keyboardHandler() leaves its loop through the m_isStopping check
+		m_isAborting = true;
+		return WaitResult::Aborted;
+	}
+	if (i_event && r == WAIT_OBJECT_0)
+		return WaitResult::Signaled;
+	// WAIT_TIMEOUT, or a failed wait: keep the historical behaviour of
+	// carrying on with the rest of the key sequence
+	return WaitResult::Timeout;
 }
 
 
@@ -1325,7 +1362,9 @@ Engine::Engine(womsgstream &i_log)
 		m_isLogMode(false),
 		m_isEnabled(true),
 		m_isSynchronizing(false),
+		m_isAborting(false),
 		m_eSync(NULL),
+		m_eShutdown(NULL),
 		m_generateKeyboardEventsRecursionGuard(0),
 		m_currentKeyPressCount(0),
 		m_currentKeyPressCountOnWin32(0),
@@ -1358,6 +1397,8 @@ Engine::Engine(womsgstream &i_log)
 
 	// create event for sync
 	CHECK_TRUE( m_eSync = CreateEvent(NULL, FALSE, FALSE, NULL) );
+	// manual reset: once shutdown starts every wait has to fail, not just one
+	CHECK_TRUE( m_eShutdown = CreateEvent(NULL, TRUE, FALSE, NULL) );
 	// create named pipe for &SetImeString
 	m_hookPipe = CreateNamedPipe(addSessionId(HOOK_PIPE_NAME).c_str(),
 								 PIPE_ACCESS_OUTBOUND,
@@ -1383,6 +1424,8 @@ void Engine::start() {
 
 	m_inputQueue = std::make_unique<std::deque<InputEvent>>();
 	m_isStopping = false;
+	m_isAborting = false;
+	CHECK_TRUE( ResetEvent(m_eShutdown) );
 	CHECK_TRUE( m_queueMutex = CreateMutex(NULL, FALSE, NULL) );
 	CHECK_TRUE( m_readEvent = CreateEvent(NULL, TRUE, FALSE, NULL) );
 	m_ol.Offset = 0;
@@ -1412,6 +1455,13 @@ HANDLE Engine::signalStop() {
 	// here is what used to make that a null dereference.  cleanupAfterStop()
 	// destroys it instead, and the caller only gets there once the reader
 	// threads are confirmed stopped.
+	// Break a &Sync or &Wait the engine thread may be parked in.  Without
+	// this it can sit there for up to 5 s - and during shutdown it always
+	// does, because uninstallMessageHook() has already stopped the sync
+	// notification from ever arriving - which is longer than the caller
+	// waits before cleanupAfterStop() frees the input queue underneath it.
+	CHECK_TRUE( SetEvent(m_eShutdown) );
+
 	WaitForSingleObject(m_queueMutex, INFINITE);
 	m_isStopping = true;
 	SetEvent(m_readEvent);
@@ -1455,6 +1505,7 @@ bool Engine::prepairQuit() {
 
 Engine::~Engine() {
 	CHECK_TRUE( CloseHandle(m_eSync) );
+	CHECK_TRUE( CloseHandle(m_eShutdown) );
 
 	// destroy named pipe for &SetImeString
 	if (m_hookPipe && m_hookPipe != INVALID_HANDLE_VALUE) {

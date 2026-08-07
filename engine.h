@@ -220,7 +220,11 @@ private:
 	bool volatile m_isLogMode;			/// is logging mode ?
 	bool volatile m_isEnabled;			/// is enabled  ?
 	bool volatile m_isSynchronizing;		/// is synchronizing ?
+	bool volatile m_isAborting;			/** shutdown cut a wait short;
+                                                    stop generating events */
 	HANDLE m_eSync;				/// event for synchronization
+	HANDLE m_eShutdown;				/** signaled by signalStop() to
+						    break &Sync / &Wait */
 	int m_generateKeyboardEventsRecursionGuard;	/** guard against too many
                                                     recursion */
 
@@ -339,6 +343,28 @@ private:
 
 	/// drop pressed-key marks that no longer match the OS key state
 	void resyncKeyStates(bool i_force);
+
+	/// result of waitWhileUnlocked()
+	enum class WaitResult {
+		Signaled,				/// i_event became signaled
+		Timeout,				/// i_timeout elapsed
+		Aborted,				/** shutdown; the caller must stop
+						    generating events */
+	};
+
+	/** Wait for i_event (NULL to wait for the timeout alone) or for shutdown,
+	    with m_mutex released for the duration.
+
+	    This is how &Sync and &Wait park the engine thread in the middle of a
+	    key sequence.  Releasing the mutex is required: the sync notification
+	    travels through the UI thread, which needs m_mutex to deliver it.  The
+	    caller must hold m_mutex exactly once - a recursive hold would not be
+	    released here and the notification could never arrive.
+
+	    While the mutex is released, m_isSynchronizing tells the UI thread
+	    entry points to drop what they were about to do; see the comment on
+	    that member.  Shutdown sets m_isAborting and the caller unwinds. */
+	WaitResult waitWhileUnlocked(HANDLE i_event, DWORD i_timeout);
 
 	/// get current modifiers
 	Modifier getCurrentModifiers(Key *i_key, bool i_isPressed);
