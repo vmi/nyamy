@@ -756,6 +756,11 @@ public:
 	void commandNotify(HWND i_hwnd, UINT i_message, WPARAM_T i_wParam,
 					   LPARAM_T i_lParam)
 	{
+		// m_hwndFocus belongs to the engine thread.  Take the mutex before the
+		// log, never the other way round: everywhere else in the engine the
+		// order is mutex then log, and reversing it here would be a deadlock
+		// waiting for the two to be taken at once.
+		Lock lock(this);
 		Acquire b(&m_log, 0);
 		HWND hf = m_hwndFocus;
 		if (!hf)

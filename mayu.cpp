@@ -70,8 +70,8 @@ class Mayu
 	PROCESS_INFORMATION m_pi;
 	HANDLE m_mutex;
 	HANDLE m_hNotifyMailslot;			/// mailslot to receive notify
-	HANDLE m_hNotifyEvent;			/// event on receive notify
-	OVERLAPPED m_olNotify;			///
+	HANDLE m_hNotifyThread;			/// thread reading the mailslot
+	bool volatile m_notifyReaderStop;		/// asks that thread to finish
 	BYTE m_notifyBuf[NOTIFY_MESSAGE_SIZE];
 	static const DWORD SESSION_LOCKED = 1<<0;
 	static const DWORD SESSION_DISCONNECTED = 1<<1;
@@ -94,32 +94,86 @@ class Mayu
 	};
 
 private:
-	static VOID CALLBACK mailslotProc(DWORD i_code, DWORD i_len, LPOVERLAPPED i_ol) {
-		Mayu *pThis;
-
-		if (i_code == ERROR_SUCCESS) {
-			pThis = reinterpret_cast<Mayu*>(CONTAINING_RECORD(i_ol, Mayu, m_olNotify));
-			pThis->mailslotHandler(i_code, i_len);
-		}
-		return;
+	static unsigned int WINAPI notifyReaderProc(void *i_this) {
+		reinterpret_cast<Mayu *>(i_this)->notifyReader();
+		_endthreadex(0);
+		return 0;
 	}
 
-	BOOL mailslotHandler(DWORD i_code, DWORD i_len) {
-		BOOL result;
+	/** Read notifications from the hooks and dispatch them.
 
-		if (i_len) {
+	    This has a thread of its own rather than being a completion routine on
+	    the UI thread, because an APC is delivered only while its thread sits
+	    in an alertable wait.  A tracked popup menu, a modal dialog or any long
+	    call out of the UI thread stops delivery - and &Sync parks the engine
+	    thread until its notification comes back through here, so it would then
+	    always run into its timeout.  Focus and lock state notifications were
+	    equally stuck behind such a UI thread.
+
+	    notifyHandler() can consequently run here and, through the WM_COPYDATA
+	    fallback hook.cpp uses when it cannot open the mailslot, on the UI
+	    thread at the same time.  What it touches is either its own argument or
+	    guarded: the engine behind its mutex, the log behind its own. */
+	void notifyReader() {
+		while (!m_notifyReaderStop) {
+			memset(m_notifyBuf, 0, sizeof(m_notifyBuf));
+
+			DWORD len = 0;
+			if (!ReadFile(m_hNotifyMailslot, m_notifyBuf, sizeof(m_notifyBuf),
+						  &len, NULL)) {
+				DWORD err = GetLastError();
+				// Anything but our own cancellation ends notifications for the
+				// rest of the session - as it did before, but silently.  Say so
+				// rather than leave a nyamy that quietly stops following focus.
+				if (!m_notifyReaderStop && err != ERROR_OPERATION_ABORTED) {
+					Acquire a(&m_log, 0);
+					m_log << L"internal error: cannot read notifications (0x"
+					<< std::hex << err << std::dec
+					<< L"); focus and lock state will no longer follow."
+					<< std::endl;
+				}
+				break;
+			}
+			if (m_notifyReaderStop)
+				break;
+
+			// anyone in the session can write here, so do not trust the length
+			if (len < sizeof(Notify))
+				continue;
+
 			COPYDATASTRUCT cd = {
-				.dwData = static_cast<ULONG_PTR>(reinterpret_cast<Notify*>(m_notifyBuf)->m_type),
-				.cbData = i_len,
+				.dwData = static_cast<ULONG_PTR>(
+					reinterpret_cast<Notify *>(m_notifyBuf)->m_type),
+				.cbData = len,
 				.lpData = m_notifyBuf,
 			};
 			notifyHandler(&cd);
 		}
+	}
 
-		memset(m_notifyBuf, 0, sizeof(m_notifyBuf));
-		result = ReadFileEx(m_hNotifyMailslot, m_notifyBuf, sizeof(m_notifyBuf),
-							&m_olNotify, Mayu::mailslotProc);
-		return result;
+	/// start reading notifications
+	void startNotifyReader() {
+		m_notifyReaderStop = false;
+		CHECK_TRUE( m_hNotifyThread = (HANDLE)_beginthreadex(
+			NULL, 0, notifyReaderProc, this, 0, NULL) );
+	}
+
+	/// stop reading notifications.  m_hNotifyThread is NULL afterwards if,
+	/// and only if, the thread is confirmed gone
+	void stopNotifyReader() {
+		if (!m_hNotifyThread)
+			return;
+		m_notifyReaderStop = true;
+		CancelIoEx(m_hNotifyMailslot, NULL);	// break the blocking ReadFile
+		if (WaitForSingleObject(m_hNotifyThread, 2000) == WAIT_OBJECT_0) {
+			CloseHandle(m_hNotifyThread);
+			m_hNotifyThread = NULL;
+		}
+		// Otherwise it is still inside ReadFile or notifyHandler and would use
+		// this object after it is torn down.  Leave the thread running and the
+		// mailslot open rather than pull either away from it; we are exiting.
+		// Not expected: CancelIoEx ends the read, and the only thing
+		// notifyHandler waits on is the engine mutex.
 	}
 
 	/// register class for tasktray
@@ -982,11 +1036,8 @@ public:
 			}
 		}
 
-		m_hNotifyEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-		ASSERT(m_hNotifyEvent);
-		m_olNotify.Offset = 0;
-		m_olNotify.OffsetHigh = 0;
-		m_olNotify.hEvent = m_hNotifyEvent;
+		m_hNotifyThread = NULL;
+		m_notifyReaderStop = false;
 		time(&m_startTime);
 
 		CHECK_TRUE( Register_focus() );
@@ -1130,6 +1181,10 @@ public:
 		// stop notify from mayu.dll
 		g_hookData->setHwndTaskTray(NULL);
 		CHECK_FALSE( uninstallMessageHook() );
+		// The hooks are gone, so nothing new will be written to the mailslot.
+		// Stop reading it before anything is torn down, so no notification can
+		// reach the engine while it is being shut down.
+		stopNotifyReader();
 
 		// --- Phase A: signal all shutdowns simultaneously ---
 		ReleaseMutex(m_hMutexYamyd);       // yamyd exits when it loses the mutex
@@ -1180,10 +1235,11 @@ public:
 		}
 		m_engine.cleanupAfterStop(hEngineThread);
 
-		CancelIo(m_hNotifyMailslot);
-		SleepEx(0, TRUE);
-		CloseHandle(m_hNotifyMailslot);
-		CloseHandle(m_hNotifyEvent);
+		// closing it while the reader thread is still blocked on it would pull
+		// the handle out from under that thread; stopNotifyReader() leaves
+		// m_hNotifyThread set when it could not confirm the thread had gone
+		if (!m_hNotifyThread)
+			CloseHandle(m_hNotifyMailslot);
 		ReleaseMutex(m_mutex);
 		WaitForSingleObject(m_mutex, INFINITE);
 		// first, detach log from edit control to avoid deadlock
@@ -1212,15 +1268,13 @@ public:
 		showBanner(false);
 		load();
 
-		mailslotHandler(0, 0);
+		startNotifyReader();
 		while (1) {
-			HANDLE handles[] = { m_hNotifyEvent };
-			switch (DWORD ret = MsgWaitForMultipleObjectsEx(NUMBER_OF(handles), &handles[0],
+			// notifications are read on their own thread; this one only has
+			// messages to wait for
+			switch (DWORD ret = MsgWaitForMultipleObjectsEx(0, NULL,
 						  INFINITE, QS_ALLINPUT, MWMO_ALERTABLE | MWMO_INPUTAVAILABLE)) {
-			case WAIT_OBJECT_0:			// m_hNotifyEvent
-				break;
-
-			case WAIT_OBJECT_0 + NUMBER_OF(handles): {
+			case WAIT_OBJECT_0: {
 				MSG msg;
 				if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) != 0) {
 					if (msg.message == WM_QUIT) {
