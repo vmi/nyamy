@@ -28,7 +28,7 @@ restart:
 
 	if (hwndFore) {
 		{
-			std::lock_guard<std::recursive_mutex> lock(m_mutex);
+			Lock lock(this);
 			if (m_currentFocusOfThread &&
 					m_currentFocusOfThread->m_threadId == threadId &&
 					m_currentFocusOfThread->m_hwndFocus == m_hwndFocus)
@@ -104,7 +104,7 @@ restart:
 		}
 	}
 
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	if (m_globalFocus.m_keymaps.empty()) {
 		Acquire a(&m_log, 1);
 		m_log << L"NO GLOBAL FOCUS" << std::endl;
@@ -824,7 +824,7 @@ static USHORT scanCodeToVKey(const ScanCode &i_sc)
 // unverifiable and dropped only when i_force is true (session unlock).
 void Engine::resyncKeyStates(bool i_force)
 {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	auto s = m_setting.load(std::memory_order_acquire);
 	if (!s)
 		return;
@@ -869,9 +869,11 @@ Engine::WaitResult Engine::waitWhileUnlocked(HANDLE i_event, DWORD i_timeout)
 	const DWORD shutdownIndex = count;
 	handles[count ++] = m_eShutdown;
 
-	m_mutex.unlock();
-	DWORD r = WaitForMultipleObjects(count, handles, FALSE, i_timeout);
-	m_mutex.lock();
+	DWORD r;
+	{
+		ScopedUnlock unlock(this);
+		r = WaitForMultipleObjects(count, handles, FALSE, i_timeout);
+	}
 
 	if (r == WAIT_OBJECT_0 + shutdownIndex) {
 		// stop unwinding into more key generation; the caller returns and
@@ -1152,7 +1154,7 @@ void Engine::keyboardHandler()
 
 		checkFocusWindow();
 
-		std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		Lock lock(this);
 
 		// Activate a Setting handed over by the scripter.  Done here so the
 		// keymap changes at an event boundary, never in the middle of the
@@ -1350,7 +1352,8 @@ void Engine::keyboardHandler()
 
 
 Engine::Engine(womsgstream &i_log)
-		: m_hwndAssocWindow(NULL),
+		: m_mutexDepth(0),
+		m_hwndAssocWindow(NULL),
 		m_setting(std::shared_ptr<Setting>{}),
 		m_buttonPressed(false),
 		m_dragging(false),
@@ -1521,7 +1524,7 @@ Engine::~Engine() {
 // event.  So unlike setFocus()/setLockState()/setShow() this needs no
 // synchronizing guard and cannot fail.
 void Engine::applySetting(std::shared_ptr<Setting> newSetting) {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 
 	Setting *raw = newSetting.get();
 
@@ -1698,7 +1701,7 @@ void Engine::checkShow(HWND i_hwnd) {
 bool Engine::setFocus(HWND i_hwndFocus, DWORD i_threadId,
 					  const wstringi &i_className, const wstringi &i_titleName,
 					  bool i_isConsole) {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	if (m_isSynchronizing)
 		return false;
 	if (i_hwndFocus == NULL)
@@ -1758,7 +1761,7 @@ bool Engine::setLockState(bool i_isNumLockToggled,
 						  bool i_isKanaLockToggled,
 						  bool i_isImeLockToggled,
 						  bool i_isImeCompToggled) {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	if (m_isSynchronizing)
 		return false;
 	m_currentLock.on(Modifier::Type_NumLock, i_isNumLockToggled);
@@ -1774,7 +1777,7 @@ bool Engine::setLockState(bool i_isNumLockToggled,
 // show
 bool Engine::setShow(bool i_isMaximized, bool i_isMinimized,
 					 bool i_isMDI) {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	if (m_isSynchronizing)
 		return false;
 	Acquire b(&m_log, 1);
@@ -1800,7 +1803,7 @@ bool Engine::setShow(bool i_isMaximized, bool i_isMinimized,
 
 // sync
 bool Engine::syncNotify() {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	if (!m_isSynchronizing)
 		return false;
 	CHECK_TRUE( SetEvent(m_eSync) );
@@ -1810,7 +1813,7 @@ bool Engine::syncNotify() {
 
 // thread attach notify
 bool Engine::threadAttachNotify(DWORD i_threadId) {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	m_attachedThreadIds.push_back(i_threadId);
 	return true;
 }
@@ -1818,7 +1821,7 @@ bool Engine::threadAttachNotify(DWORD i_threadId) {
 
 // thread detach notify
 bool Engine::threadDetachNotify(DWORD i_threadId) {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	m_detachedThreadIds.push_back(i_threadId);
 	m_attachedThreadIds.erase(remove(m_attachedThreadIds.begin(), m_attachedThreadIds.end(), i_threadId),
 							  m_attachedThreadIds.end());
@@ -1828,7 +1831,7 @@ bool Engine::threadDetachNotify(DWORD i_threadId) {
 
 // get help message
 void Engine::getHelpMessages(std::wstring *o_helpMessage, std::wstring *o_helpTitle) {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 	*o_helpMessage = m_helpMessage;
 	*o_helpTitle = m_helpTitle;
 }

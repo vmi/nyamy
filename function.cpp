@@ -1023,7 +1023,7 @@ void Engine::funcShellExecute(FunctionParam *i_param,
 // shell execute
 void Engine::shellExecute()
 {
-	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	Lock lock(this);
 
 	FunctionData_ShellExecute *fd =
 		reinterpret_cast<FunctionData_ShellExecute *>(

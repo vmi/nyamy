@@ -193,6 +193,56 @@ private:
 
 private:
 	std::recursive_mutex m_mutex;			/// mutex
+	/** Recursion depth of m_mutex, maintained by Lock.  ScopedUnlock asserts
+	    on it, because a recursive hold would survive its unlock() and leave
+	    the &Sync notification unable to reach the engine - a silent stall
+	    that is otherwise invisible until it happens in the field. */
+	int m_mutexDepth;
+
+	/// scoped lock of m_mutex.  Use instead of std::lock_guard, which would
+	/// not keep m_mutexDepth up to date
+	class Lock
+	{
+	public:
+		///
+		explicit Lock(Engine *i_engine) : m_engine(i_engine) {
+			m_engine->m_mutex.lock();
+			++ m_engine->m_mutexDepth;
+		}
+		///
+		~Lock() {
+			-- m_engine->m_mutexDepth;
+			m_engine->m_mutex.unlock();
+		}
+		Lock(const Lock &) = delete;		///
+		Lock &operator=(const Lock &) = delete;	///
+	private:
+		Engine *m_engine;				///
+	};
+
+	/** Temporarily release m_mutex, re-acquiring it on scope exit - including
+	    when the scope is left by an exception, which the raw unlock()/lock()
+	    pair this replaces did not survive.  Only valid where the mutex is
+	    held exactly once. */
+	class ScopedUnlock
+	{
+	public:
+		///
+		explicit ScopedUnlock(Engine *i_engine) : m_engine(i_engine) {
+			ASSERT( m_engine->m_mutexDepth == 1 );
+			m_engine->m_mutexDepth = 0;
+			m_engine->m_mutex.unlock();
+		}
+		///
+		~ScopedUnlock() {
+			m_engine->m_mutex.lock();
+			m_engine->m_mutexDepth = 1;
+		}
+		ScopedUnlock(const ScopedUnlock &) = delete;	///
+		ScopedUnlock &operator=(const ScopedUnlock &) = delete;	///
+	private:
+		Engine *m_engine;				///
+	};
 
 	// setting
 	HWND m_hwndAssocWindow;			/** associated window (we post
@@ -219,7 +269,26 @@ private:
 	HANDLE m_hookPipe;				/// named pipe for &SetImeString
 	bool volatile m_isLogMode;			/// is logging mode ?
 	bool volatile m_isEnabled;			/// is enabled  ?
-	bool volatile m_isSynchronizing;		/// is synchronizing ?
+	/** Is synchronizing ?  True only while the engine thread is parked in
+	    waitWhileUnlocked() in the middle of a key sequence, with m_mutex
+	    released.  What that window relies on:
+
+	    - The engine thread touches nothing while parked, so the state
+	      m_mutex guards stays consistent even though other threads can now
+	      take it.
+	    - setFocus(), setLockState() and setShow() check this flag and
+	      return false, dropping the notification rather than applying it
+	      mid-sequence.  Nothing re-sends it: focus recovers because
+	      checkFocusWindow() re-derives it on the next event, but the lock
+	      state stays stale until the next lock key.
+	    - applySetting() cannot run, being reachable only from this same
+	      thread's event loop, so the Setting the sequence holds pointers
+	      into stays alive.
+
+	    Entry points that do NOT check it (threadAttachNotify,
+	    threadDetachNotify, shellExecute, getHelpMessages) are safe only
+	    because of the first point above. */
+	bool volatile m_isSynchronizing;
 	bool volatile m_isAborting;			/** shutdown cut a wait short;
                                                     stop generating events */
 	HANDLE m_eSync;				/// event for synchronization
