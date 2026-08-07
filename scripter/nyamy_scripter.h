@@ -114,7 +114,22 @@ typedef struct NYsCallbacks {
 /// callbacks: callback table (must not be NULL; on_load_setting must not be NULL).
 /// exeCtx:   caller-supplied context pointer passed to every callback.
 /// Returns 0 when the Engine sends Quit, non-zero on error.
+///
+/// Runs the callbacks on the calling thread and reads the ctrl stream on a
+/// thread of its own, so that Quit is observed even while a callback is
+/// running.  Whatever was queued before Quit still runs first.
 NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx);
+
+/// Milliseconds nys_start() waits, after Quit (or ctrl-pipe EOF) is observed,
+/// for the calling thread to finish what it is running.  On timeout the process
+/// is terminated outright: a script stuck in a loop or a blocking call cannot
+/// be unwound, and the Engine's pipe readers stay blocked until this process's
+/// write ends are closed.  A scripter launched by nyamy should pass
+/// kScripterQuitTimeoutMillisec (ctrl_stream.h), which nyamy's own grace period
+/// is set to exceed.
+/// 0 (the default) waits indefinitely, which is what an in-process host wants.
+/// Call before nys_start().
+NYS_API void nys_set_quit_timeout(uint32_t millisec);
 
 /// Version check for FFI compatibility: major(16) | minor(8) | patch(8)
 NYS_API uint32_t nys_version(void);

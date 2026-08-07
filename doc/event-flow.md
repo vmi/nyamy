@@ -212,8 +212,8 @@ sequenceDiagram
 
     Note over async: 既存 scripter が起動中なら
     async->>sc: sendQuit() → CtrlId::Quit + ctrl パイプ close
-    sc->>sc: CtrlId::Quit 受信 → ループ脱出
-    async->>async: WaitForMultipleObjects<br/>(process + dataThread + msgThread)
+    sc->>sc: ctrl スレッドが Quit/EOF 受信 → Job{Quit} を積む<br/>script スレッドが実行中でも観測される
+    async->>async: forceStop(5000)<br/>(process + dataThread + msgThread を待ち、<br/>残れば TerminateProcess)
     async->>async: closeHandles() / m_quitSent=false
 
     async->>sc: CreateProcess(nyamy-scripter.exe)<br/>パイプ確立 + dataThread / msgThread 起動
@@ -286,7 +286,8 @@ flowchart LR
     end
 
     subgraph proc_sc["nyamy-scripter.exe プロセス"]
-        T_sc["scripter_engine()<br>nyamy_scripter.cpp :85<br>.mayu コンパイル・CmdStream 送出"]
+        T_scctrl["ctrl スレッド<br>nyamy_scripter.cpp :617<br>CtrlStream 読み出し専用・ジョブ投入<br>Quit 後のウォッチドッグ (自決)"]
+        T_sc["script スレッド (main)<br>nyamy_scripter.cpp :617<br>ジョブ実行・mruby 評価・CmdStream 送出"]
     end
 
     App32[("32-bit アプリ<br>(nyamy32.dll 注入済)")]
@@ -299,7 +300,8 @@ flowchart LR
     T_data -->|"PostMessage(WM_APP_scripterSettingReady)<br>→ scheduleSetting() で入力キューへ"| T_main
     T_sc -->|"cmd パイプ (CmdStream)"| T_data
     T_sc -->|"msg パイプ (stdout+stderr)"| T_msg
-    T_main -->|"ctrl パイプ (CtrlStream: Start / Quit)"| T_sc
+    T_main -->|"ctrl パイプ (CtrlStream: Start / Quit)"| T_scctrl
+    T_scctrl -->|"ジョブキュー (Start / ExecUserFunc / Quit)"| T_sc
     T_main -->|"CreateMutex + CreateProcess"| T_nyamyd
     T_nyamyd -->|"WH_GETMESSAGE / WH_CALLWNDPROC<br>DLL 注入"| App32
     T_main -->|"WH_GETMESSAGE / WH_CALLWNDPROC<br>DLL 注入"| App64
@@ -355,11 +357,13 @@ flowchart LR
 
 | 関数/メソッド | 行 | 役割 |
 |-------------|---:|------|
-| `ScripterManager::sendQuit()` | 57 | CtrlId::Quit 送信 + ctrl パイプ close (冪等) |
-| `ScripterManager::collectHandles()` | 76 | プロセス + スレッドハンドルを配列に収集 |
-| `ScripterManager::closeHandles()` | 85 | 全ハンドルを閉じて NULL/INVALID に初期化 |
-| `ScripterManager::start(syms)` | 95 | std::async で launchScripter を起動 (再起動も兼ねる)。前回が完了していなければスキップ |
-| `ScripterManager::launchScripter(syms)` | 108 | 起動済み scripter を停止後、新プロセスを起動し writeStart(syms) を送信 |
+| `ScripterManager::sendQuit()` | 96 | CtrlId::Quit 送信 (最大 200ms 再試行) + ctrl パイプ close (冪等) |
+| `ScripterManager::forceStop()` | 139 | 猶予付きで停止を待ち、残っていれば TerminateProcess。戻り値が「reader スレッドが本当に止まったか」 |
+| `ScripterManager::waitForPendingStart()` | 169 | 非同期 start/再起動タスクの完了待ち |
+| `ScripterManager::collectHandles()` | 175 | プロセス + スレッドハンドルを配列に収集 |
+| `ScripterManager::closeHandles()` | 184 | 全ハンドルを閉じて NULL/INVALID に初期化 |
+| `ScripterManager::start(syms)` | 194 | std::async で launchScripter を起動 (再起動も兼ねる)。前回が完了していなければスキップ |
+| `ScripterManager::launchScripter(syms)` | 249 | 起動済み scripter を forceStop してから新プロセスを起動し writeStart(syms) を送信 |
 | `ScripterManager::setExecKeySeqCallback()` | 266 | ExecKeySeq 受信時のコールバックを登録 |
 | `ScripterManager::execUserFunc()` | 272 | ExecUserFunc を scripter へ送信 |
 | `ScripterManager::dataThread()` | 286 | CmdStream 読み取りスレッドエントリ |
@@ -373,8 +377,9 @@ flowchart LR
 
 | 関数 | 行 | 役割 |
 |------|---:|------|
-| `doCompile()` | 51 | .mayu コンパイル + CmdStream 書き出し |
-| `scripter_engine()` | 85 | DLL エクスポート・CtrlStream ループ (Start / Quit / ExecUserFunc を処理) |
+| `JobQueue` | 242 | ctrl スレッド → script スレッドのジョブ受け渡し。Start は保留 ExecUserFunc を破棄、ExecUserFunc は 64 件上限、Quit は末尾 |
+| `nys_start()` | 617 | ctrl 読み出しスレッドを起こし、呼び出し元スレッドでジョブを実行。Quit 後は猶予内に終わらなければ自決 |
+| `nys_set_quit_timeout()` | 767 | 自決までの猶予 [ms]。0 = 無効 (既定) |
 
 ### cmd_processor.cpp
 
@@ -395,3 +400,72 @@ flowchart LR
 | `notifyHandler()` | 150 | Notify 種別に応じて `Engine::setFocus()` などを呼び出し |
 | `m_scripter->start(syms)` | 771 | 初回起動時・リロード時に scripter を (再)起動 |
 | nyamyd32 起動 | 1143〜1157 | `CreateMutex(MUTEX_YAMYD_BLOCKER)` + `CreateProcess("nyamyd32")` |
+
+---
+
+## 6. 終了フロー
+
+`~Mayu` は「合図はまとめて出し、待ちは並列に、解体は停止を確認してから」の順で進む。
+中心にあるのは **reader スレッド (dataThread / msgThread) を確実に止めること**である。
+この 2 本は同期匿名パイプの `ReadFile` でブロックしており、`CancelIoEx` は効かない。
+書き込み端 — すなわち scripter プロセス — が閉じるまで戻らない。生きたまま解体すると、
+閉じたハンドル・解放済みの `ScripterManager` / ログストリーム / tasktray ウィンドウ、
+そして Engine の入力キューを触りにいく。
+
+| フェーズ | 実施内容 | 対象 |
+|---------|---------|------|
+| A | `ReleaseMutex(m_hMutexYamyd)` / `waitForPendingStart()` + `sendQuit()` | nyamyd32 / scripter |
+| B | `postQuit()` → 3 秒待ち → `closeThread()` | InputHandler 2 本 (キーボード / マウス) |
+| C | `m_isStopping = true` + `SetEvent(m_readEvent)` | engine スレッド |
+| D | `WaitForMultipleObjects(..., kScripterQuitGraceMillisec)` | nyamyd32 プロセス + scripter プロセス + reader 2 本 + engine スレッド |
+| 確認 | `forceStop(0)` — 残っていれば `TerminateProcess` | scripter |
+| 解体 | `closeHandles()` / `m_scripter.reset()` / `cleanupAfterStop()` | ハンドル・入力キュー |
+
+B と C は `Engine::signalStop()` が担う。A で合図だけ先に出しておくので、D の待ちは
+全対象が並列に進んだ結果を受け取るだけになる。
+
+### 入力キューの生存期間
+
+Phase C は**キューを破棄しない**。`m_isStopping` を立てるだけで、破棄は `cleanupAfterStop()`
+まで遅らせる。理由はプロデューサの寿命にある。
+
+| プロデューサ | 経路 | 止まるタイミング |
+|---|---|---|
+| InputHandler スレッド | `keyboardDetour()` / `mouseDetour()` | Phase B |
+| scripter data スレッド | `scheduleAdHocKeySeq()` | `forceStop()` が true を返した時点 |
+| UI スレッド | `scheduleSetting()` | `~Mayu` 自身が UI スレッドなので構造的に起きない |
+
+data スレッドは Phase C の時点ではまだ生きうる。ここでキューを破棄すると
+`scheduleAdHocKeySeq()` が null 参照する。`cleanupAfterStop()` は `m_queueMutex` を
+閉じる場所でもあり、もともと「reader スレッド停止確認済み」を前提としている関数なので、
+キューの破棄をそこへ寄せることで制約 1 つで両方を賄える。
+
+Phase C 以降に積まれた項目は誰にも読まれずに溜まるが、`cleanupAfterStop()` の破棄で
+解放される。溜まる時間はシャットダウンの数百ミリ秒に限られる。
+
+### scripter 側の停止 (3 段構え)
+
+走り続けるスクリプトを中断する手段は存在しない (詳細は
+[scripter-design/protocol.md の Quit](scripter-design/protocol.md#quit-0xff))。
+プロセスを殺すことだけが停止手段であり、それが reader スレッドを解放する手段でもある。
+
+```mermaid
+sequenceDiagram
+    participant ui as nyamy UI スレッド
+    participant ctrl as scripter ctrl スレッド
+    participant scr as scripter script スレッド
+    participant rd as nyamy reader スレッド
+
+    ui->>ctrl: sendQuit() → Quit バイト + ctrl パイプ close
+    ctrl->>scr: Job{Quit} をキュー末尾へ
+    Note over ctrl: kScripterQuitTimeoutMillisec (3000ms) 待つ
+
+    alt スクリプトが戻る (正常系)
+        scr->>scr: on_quit() → プロセス正常終了 (0)
+    else 戻らない
+        ctrl->>ctrl: TerminateProcess(自プロセス) → 終了コード 2
+    end
+
+    Note over rd: どちらでも書き込み端が閉じる → ReadFile が EOF で戻る
+    ui->>ui: forceStop() が停止を確認 (最後の砦は nyamy 側の TerminateProcess)
+```

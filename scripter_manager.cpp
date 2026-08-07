@@ -81,18 +81,11 @@ ScripterManager::ScripterManager(SyncObject *i_soLog, std::wostream *i_log,
 
 ScripterManager::~ScripterManager()
 {
+	// Mayu normally stops the reader threads itself and leaves nothing to do
+	// here; this is the fallback for any other owner.
 	sendQuit();
-
-	// wait for any async start/restart task to finish
-	if (m_startFuture.valid())
-		m_startFuture.wait();
-
-	// wait for any handles not yet closed by an external WaitForMultipleObjects
-	HANDLE handles[3];
-	DWORD n = collectHandles(handles, 3);
-	if (n > 0)
-		WaitForMultipleObjects(n, handles, TRUE, 2000);
-
+	waitForPendingStart();
+	forceStop(kScripterQuitGraceMillisec);
 	closeHandles();
 
 	// Release a Setting that was handed over but never dispatched, rather than
@@ -105,18 +98,78 @@ void ScripterManager::sendQuit()
 	if (m_quitSent) return;
 	m_quitSent = true;
 
-	if (m_ctrlWriter) {
-		try { m_ctrlWriter->writeQuit(); } catch (...) {}
+	{
+		std::lock_guard<std::mutex> lock(m_ctrlMutex);
+		if (m_ctrlWriter) {
+			// Quit is written once, on the shutdown path, over a pipe left in
+			// drop-on-full mode - so make this one message wait for room
+			// instead of vanishing.  The scripter's ctrl thread drains
+			// unconditionally, so any backlog clears in well under the bound.
+			if (m_ctrlStreambuf)
+				m_ctrlStreambuf->setRetryOnce(200);
+			try {
+				m_ctrlWriter->writeQuit();
+				m_ctrlStream->flush();
+			} catch (...) {}
+			if (m_ctrlStreambuf && m_ctrlStreambuf->wasBlocked()) {
+				m_ctrlStreambuf->clearBlocked();
+				if (m_log) {
+					Acquire a(m_soLog, 0);
+					*m_log << L"ScripterManager: ctrl pipe full; Quit not "
+					          L"delivered (closing the pipe still signals it)"
+					       << std::endl;
+				}
+			}
+		}
+		m_ctrlWriter.reset();
+		m_ctrlStream.reset();
+		m_ctrlStreambuf.reset();
 	}
-	m_ctrlWriter.reset();
-	m_ctrlStream.reset();
-	m_ctrlStreambuf.reset();
 
-	// closing stdin causes scripter to see EOF and exit its loop
+	// Closing the write end is the signal that always gets through: the
+	// scripter sees EOF on its ctrl pipe.  CtrlId::Quit above is the early
+	// notice, not the guarantee.
 	if (m_hCtrlWrite != INVALID_HANDLE_VALUE) {
 		CloseHandle(m_hCtrlWrite);
 		m_hCtrlWrite = INVALID_HANDLE_VALUE;
 	}
+}
+
+
+bool ScripterManager::forceStop(DWORD i_graceMillisec)
+{
+	HANDLE h[3];
+	DWORD n = collectHandles(h, 3);
+	if (n == 0)
+		return true;
+	if (WaitForMultipleObjects(n, h, TRUE, i_graceMillisec) != WAIT_TIMEOUT)
+		return true;
+
+	// The scripter neither exited on its own nor terminated itself, so it is a
+	// foreign implementation, one wedged before its ctrl thread started, or one
+	// held alive by an error dialog.  Kill it: the reader threads are parked in
+	// a ReadFile that cannot be cancelled, and only closing the write ends
+	// releases them.
+	if (m_hScripterProcess) {
+		if (m_log) {
+			Acquire a(m_soLog, 0);
+			*m_log << L"ScripterManager: scripter did not exit; terminating."
+			       << std::endl;
+		}
+		TerminateProcess(m_hScripterProcess, 1);
+	}
+
+	n = collectHandles(h, 3);
+	return n == 0 ||
+	       WaitForMultipleObjects(n, h, TRUE, kScripterKillWaitMillisec)
+	           != WAIT_TIMEOUT;
+}
+
+
+void ScripterManager::waitForPendingStart()
+{
+	if (m_startFuture.valid())
+		m_startFuture.wait();
 }
 
 DWORD ScripterManager::collectHandles(HANDLE *buf, DWORD maxCount)
@@ -197,12 +250,12 @@ bool ScripterManager::launchScripter(const wstringi &configName,
                                       const wstringi &configPath,
                                       const Symbols &syms)
 {
-	// Stop existing scripter if running
+	// Stop existing scripter if running.  This runs on the async start task,
+	// which ~ScripterManager waits for, so an unbounded wait here would hang
+	// the UI thread whenever the old scripter is stuck.
 	if (m_hScripterProcess != NULL) {
 		sendQuit();
-		HANDLE h[3];
-		DWORD n = collectHandles(h, 3);
-		if (n > 0) WaitForMultipleObjects(n, h, TRUE, INFINITE);
+		forceStop(kScripterQuitGraceMillisec);
 		closeHandles();
 		m_quitSent = false;
 	}
@@ -243,6 +296,10 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	SetHandleInformation(m_hCtrlWrite, HANDLE_FLAG_INHERIT, 0);
 	SetHandleInformation(m_hDataRead,  HANDLE_FLAG_INHERIT, 0);
 	SetHandleInformation(m_hMsgRead,   HANDLE_FLAG_INHERIT, 0);
+	// hNul is passed as STARTUPINFO.hStdInput below but deliberately kept
+	// non-inheritable, which leaves the child without a usable stdin.  That is
+	// the intent: control travels over its own pipe (NYS_CTRL), so there is
+	// nothing for stdin to carry and nothing should arrive through it.
 	SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
 	// hCtrlRead, hDataWrite, hMsgWrite are inherited (sa.bInheritHandle=TRUE)
 
@@ -355,32 +412,36 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	CloseHandle(pi.hThread);
 	m_hScripterProcess = pi.hProcess;
 
-	// construct ctrl write stream
-	m_ctrlStreambuf = std::make_unique<PipeWriteStreambuf>(m_hCtrlWrite);
-	m_ctrlStream   = std::make_unique<std::ostream>(m_ctrlStreambuf.get());
-	m_ctrlWriter   = std::make_unique<CtrlStreamWriter>(*m_ctrlStream);
+	{
+		std::lock_guard<std::mutex> lock(m_ctrlMutex);
 
-	// start background threads
-	unsigned tid;
-	m_hDataThread = (HANDLE)_beginthreadex(NULL, 0, dataThread, this, 0, &tid);
-	m_hMsgThread  = (HANDLE)_beginthreadex(NULL, 0, msgThread,  this, 0, &tid);
+		// construct ctrl write stream
+		m_ctrlStreambuf = std::make_unique<PipeWriteStreambuf>(m_hCtrlWrite);
+		m_ctrlStream   = std::make_unique<std::ostream>(m_ctrlStreambuf.get());
+		m_ctrlWriter   = std::make_unique<CtrlStreamWriter>(*m_ctrlStream);
 
-	if (m_log) {
-		Acquire a(m_soLog, 0);
-		*m_log << L"ScripterManager: started " << cmdLineStr << std::endl;
+		// start background threads
+		unsigned tid;
+		m_hDataThread = (HANDLE)_beginthreadex(NULL, 0, dataThread, this, 0, &tid);
+		m_hMsgThread  = (HANDLE)_beginthreadex(NULL, 0, msgThread,  this, 0, &tid);
+
+		if (m_log) {
+			Acquire a(m_soLog, 0);
+			*m_log << L"ScripterManager: started " << cmdLineStr << std::endl;
+		}
+
+		// Send CtrlId::Start with config name, path, and symbols.
+		// This runs while the pipe is still blocking, so the (possibly large)
+		// Start message is delivered reliably before we switch to drop-on-full.
+		if (m_ctrlWriter) {
+			try { m_ctrlWriter->writeStart(configName, configPath, syms); } catch (...) {}
+		}
+
+		// From now on, ctrl writes (ExecUserFunc from the engine thread) must not
+		// block if the scripter is busy: drop and log instead of stalling input.
+		if (m_ctrlStreambuf)
+			m_ctrlStreambuf->setNonBlocking();
 	}
-
-	// Send CtrlId::Start with config name, path, and symbols.
-	// This runs while the pipe is still blocking, so the (possibly large)
-	// Start message is delivered reliably before we switch to drop-on-full.
-	if (m_ctrlWriter) {
-		try { m_ctrlWriter->writeStart(configName, configPath, syms); } catch (...) {}
-	}
-
-	// From now on, ctrl writes (ExecUserFunc from the engine thread) must not
-	// block if the scripter is busy: drop and log instead of stalling input.
-	if (m_ctrlStreambuf)
-		m_ctrlStreambuf->setNonBlocking();
 	return true;
 }
 
@@ -399,6 +460,9 @@ void ScripterManager::execUserFunc(const wstringi &name,
 	// non-blocking mode (see launchScripter), so if the scripter is busy and
 	// the pipe buffer is full this write is dropped rather than stalling all
 	// key processing.  Report the drop instead.
+	// The lock is what keeps the stream from being destroyed under us:
+	// sendQuit() resets it from the UI thread.
+	std::lock_guard<std::mutex> lock(m_ctrlMutex);
 	if (m_ctrlWriter) {
 		try { m_ctrlWriter->writeExecUserFunc(name, args, ctx); } catch (...) {}
 	}

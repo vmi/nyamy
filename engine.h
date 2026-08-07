@@ -203,6 +203,9 @@ private:
 	HANDLE m_threadHandle;
 	unsigned m_threadId;
 	std::unique_ptr<std::deque<InputEvent>> m_inputQueue;
+	/// engine thread exit flag; guarded by m_queueMutex.  The queue itself
+	/// outlives it, because its producers do (see signalStop).
+	bool m_isStopping;
 	HANDLE m_queueMutex;
 	MSLLHOOKSTRUCT m_msllHookCurrent;
 	bool m_buttonPressed;
@@ -569,7 +572,9 @@ public:
 	/// and return the engine thread handle for external WaitForMultipleObjects.
 	/// Must be called before cleanupAfterStop().
 	HANDLE signalStop();
-	/// release engine resources after the engine thread handle has been waited on.
+	/// release engine resources after the engine thread handle has been waited
+	/// on and every input queue producer - including the scripter's data
+	/// thread - has been confirmed stopped.
 	void cleanupAfterStop(HANDLE hEngineThread);
 
 	/// do some procedure before quit which must be done synchronously

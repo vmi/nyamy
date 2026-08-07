@@ -44,17 +44,35 @@ int main(int argc, char *argv[])
 それぞれ CtrlStream / CmdStream の通信チャネルとして使用する。
 stdin/stdout/stderr はバイナリプロトコルに使用しない。
 
+`nys_start()` は 2 スレッド構成である。ctrl スレッドは ctrl ストリームの読み出しと
+ジョブの積み込みだけを行い、呼び出し元スレッド (script スレッド) がジョブを取り出して
+コールバックを実行する。
+
 ```cpp
 NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 {
     // 環境変数 NYS_CTRL / NYS_CMD からハンドルを取得
-    // CtrlStream ループ:
-    //   Start(syms)     → callbacks->on_load_setting(exeCtx) 呼び出し → CmdStream 送出
+
+    // [ctrl スレッド] 読み出し専用ループ:
+    //   Start(syms)     → Job{Start} を積む (保留中の ExecUserFunc は破棄)
+    //   ExecUserFunc    → Job{ExecUserFunc} を積む (上限 64、超過分は捨ててログ)
+    //   Quit / EOF      → ループ脱出 → Job{Quit} を積む → ウォッチドッグへ
+
+    // [script スレッド = 呼び出し元] ジョブ実行ループ:
+    //   Start           → callbacks->on_load_setting(exeCtx) → CmdStream 送出
     //   ExecUserFunc    → nys_reg_user_func で登録したハンドラを呼び出す
-    //   Quit / EOF      → callbacks->on_quit(exeCtx); return 0
-    // on_load_setting が false → return 1
+    //   Quit            → callbacks->on_quit(exeCtx) → ループ脱出
+    // on_load_setting が false → 設定を破棄してログ (ループは継続)
 }
 ```
+
+分離の理由は **Quit への応答性**である。単一スレッドだと `on_load_setting` や
+ユーザー関数の実行中は Quit も EOF も観測されず、nyamy 側の reader スレッドは
+scripter プロセスが死ぬまで `ReadFile` から戻れない。詳細は
+[protocol.md の Quit](protocol.md#quit-0xff) を参照。
+
+Quit はキューの**末尾**に積まれ、先に積まれたジョブを追い越さない。停止までの時間は
+キューではなくウォッチドッグ (`nys_set_quit_timeout`) が有界にする。
 
 エラー時は Commit を書かず `stderr` に出力 (msg パイプ経由でログに表示される)。
 
@@ -62,15 +80,13 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 
 ## pipe_streambuf.h
 
-`PipeWriteStreambuf` / `PipeReadStreambuf` / `PipeReadWStreambuf` は
-`pipe_streambuf.h` に集約されており、`scripter_manager.cpp` と
-`nyamy_scripter.cpp` の両方からインクルードする。
+`PipeWriteStreambuf` / `PipeReadStreambuf` は `pipe_streambuf.h` に集約されており、
+`scripter_manager.cpp` と `nyamy_scripter.cpp` の両方からインクルードする。
 
 ```
 pipe_streambuf.h
   PipeWriteStreambuf   : Win32 HANDLE → std::streambuf (書き込み)
-  PipeReadStreambuf    : Win32 HANDLE → std::streambuf (読み込み、char)
-  PipeReadWStreambuf   : Win32 HANDLE → std::wstreambuf (読み込み、wchar_t)
+  PipeReadStreambuf    : Win32 HANDLE → std::streambuf (読み込み、char、4KB バッファ)
 ```
 
 ---

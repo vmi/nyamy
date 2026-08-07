@@ -42,6 +42,13 @@ public:
 	bool wasBlocked() const { return m_blocked; }
 	void clearBlocked() { m_blocked = false; }
 
+	/// The next sync() must not drop: retry for up to i_millisec while the pipe
+	/// stays full, then give up and report through wasBlocked().  Cleared by
+	/// that sync().  Used for Quit, which is written once on the shutdown path
+	/// and would otherwise be lost silently.  The bound is what keeps this off
+	/// the caller's back; a dead peer fails the write immediately anyway.
+	void setRetryOnce(DWORD i_millisec) { m_retryMillisec = i_millisec; }
+
 protected:
 	int_type overflow(int_type c) override {
 		if (c == EOF) return EOF;
@@ -73,10 +80,25 @@ protected:
 		// full buffer yields written < size; treat any non-complete write as
 		// "dropped" and discard the rest.  Never fail the stream: drops are
 		// reported through wasBlocked() so callers stay usable.
-		DWORD written = 0;
-		BOOL ok = WriteFile(m_h, m_buf.data(),
-		                    static_cast<DWORD>(m_buf.size()), &written, NULL);
-		if (!ok || written != m_buf.size())
+		DWORD retryMillisec = m_retryMillisec;
+		m_retryMillisec = 0;
+		ULONGLONG deadline = GetTickCount64() + retryMillisec;
+		size_t done = 0;
+		for (;;) {
+			DWORD written = 0;
+			BOOL ok = WriteFile(m_h, m_buf.data() + done,
+			                    static_cast<DWORD>(m_buf.size() - done),
+			                    &written, NULL);
+			done += written;
+			if (!ok || done == m_buf.size())
+				break;
+			// The reader is draining, so a full pipe empties shortly; a dead
+			// peer fails the write above instead of looping.
+			if (GetTickCount64() >= deadline)
+				break;
+			Sleep(5);
+		}
+		if (done != m_buf.size())
 			m_blocked = true;
 		m_buf.clear();
 		return 0;
@@ -86,6 +108,7 @@ private:
 	HANDLE m_h;
 	bool m_nonBlocking = false;
 	bool m_blocked = false;
+	DWORD m_retryMillisec = 0;
 	std::string m_buf;
 };
 
@@ -102,40 +125,18 @@ public:
 protected:
 	int_type underflow() override {
 		DWORD got = 0;
-		if (!ReadFile(m_h, &m_ch, 1, &got, NULL) || got == 0)
+		// ReadFile on a pipe returns as soon as any data is available, so
+		// asking for the whole buffer never waits for it to fill: this only
+		// saves system calls, it does not add latency.
+		if (!ReadFile(m_h, m_buf, sizeof(m_buf), &got, NULL) || got == 0)
 			return traits_type::eof();
-		setg(&m_ch, &m_ch, &m_ch + 1);
-		return traits_type::to_int_type(m_ch);
+		setg(m_buf, m_buf, m_buf + got);
+		return traits_type::to_int_type(m_buf[0]);
 	}
 
 private:
 	HANDLE m_h;
-	char m_ch = 0;
-};
-
-
-//=============================================================================
-// PipeReadWStreambuf - wraps a Win32 read pipe HANDLE as a std::wstreambuf
-// Reads UTF-16 wchar_t units from a pipe whose write end uses _O_U16TEXT mode
-//=============================================================================
-
-class PipeReadWStreambuf : public std::wstreambuf
-{
-public:
-	explicit PipeReadWStreambuf(HANDLE h) : m_h(h) {}
-
-protected:
-	int_type underflow() override {
-		DWORD got = 0;
-		if (!ReadFile(m_h, &m_ch, sizeof(wchar_t), &got, NULL) || got < sizeof(wchar_t))
-			return traits_type::eof();
-		setg(&m_ch, &m_ch, &m_ch + 1);
-		return traits_type::to_int_type(m_ch);
-	}
-
-private:
-	HANDLE m_h;
-	wchar_t m_ch = 0;
+	char m_buf[4096];
 };
 
 

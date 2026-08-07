@@ -29,9 +29,16 @@ public:
     ~ScripterManager();
 
     bool start(const Symbols &syms);     // プロセス起動・パイプ確立・Start(syms) 送信
-    void sendQuit();                     // Quit 送信 (non-blocking, idempotent)
+    void sendQuit();                     // Quit 送信 + ctrl パイプ close (idempotent)
     DWORD collectHandles(HANDLE*, DWORD); // WaitForMultipleObjects 用
     void closeHandles();
+
+    // 停止を「確認」する。i_graceMillisec 待っても残っていれば TerminateProcess し、
+    // さらに kScripterKillWaitMillisec 待つ。戻り値 false = reader スレッドがまだ
+    // 生きている = closeHandles() も本オブジェクトの破棄も安全でない。
+    bool forceStop(DWORD i_graceMillisec);
+    // 非同期の start()/再起動タスクの完了を待つ (待たないとハンドルが足下で変わる)
+    void waitForPendingStart();
 
     using ExecKeySeqCallback = std::function<void(AdHocKeySeq)>;
     void setExecKeySeqCallback(ExecKeySeqCallback cb);  // ExecKeySeq 受信コールバック設定

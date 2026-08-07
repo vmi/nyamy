@@ -73,9 +73,21 @@ typedef struct NYsCallbacks {
 // - on_load_setting()がfalseを返した場合 (返り値: 1)
 // callbacks: コールバックテーブル (on_load_setting は必須)
 // exeCtx:   各コールバックに透過的に渡される呼び出し元コンテキストポインタ
+// コールバックは呼び出し元スレッドで実行され、ctrl ストリームの読み出しは
+// 専用スレッドが行う (実行中でも Quit を観測できるようにするため)
 NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx);
 
+// Quit (または ctrl パイプの EOF) 観測後、実行中のコールバックの完了を待つ時間 [ms]。
+// タイムアウトするとプロセスを強制終了する (走り続けるスクリプトは中断できず、
+// nyamy 側の reader スレッドは本プロセスが書き込み端を閉じるまで解放されないため)。
+// 既定は 0 = 無期限に待つ。プロセス内ホストが道連れにされないようにするための既定値で、
+// nyamy が起動する scripter は kScripterQuitTimeoutMillisec (ctrl_stream.h) を渡す。
+// nys_start() の前に呼ぶこと。
+NYS_API void nys_set_quit_timeout(uint32_t millisec);
+
 // バージョン確認 (FFI 利用時の互換性検証用)
+// NYamy が 0.9.x の間は NYamy 本体と同じ値。1.0.0 リリース時に 1.0.0 で固定し、
+// 以後は本 C API が変わったときだけ動かす。
 NYS_API uint32_t nys_version(void);
 
 // 各項目設定。on_load_setting内で下記APIを呼び出して設定情報を構築する。
@@ -240,6 +252,15 @@ NYS_API const char* nys_last_error(void);
       トリガーコンテキストは内部で自動的に引き継がれる。
 4. Engineが終了を選択すると、`callbacks->on_quit(exeCtx)` が呼ばれた後 `nys_start()` が終了する。
     - 再読み込み時はscripterプロセス終了後、再起動される (プロセス再起動方式は未実装)。
+
+`nys_start()` は 2 スレッドで動く。ctrl ストリームの読み出しは専用スレッドが行い、
+コールバックは呼び出し元スレッドで実行される。したがって手順 1〜3 のコールバック実行中でも
+Quit / EOF は即座に観測される。観測後もキュー済みのジョブは順に実行され、
+`nys_set_quit_timeout()` で指定した時間内に終わらなければプロセスごと強制終了される
+(詳細は [protocol.md の Quit](protocol.md#quit-0xff))。
+
+ExecUserFunc の保留は 64 件が上限。ctrl パイプを常時 drain するようになった代わりに、
+溢れた分はここで捨ててログに出す (以前はパイプが満杯になることで nyamy 側が捨てていた)。
 
 ### CmdCommit 後のメモリ管理
 

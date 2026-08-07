@@ -20,6 +20,7 @@
 #  include <future>
 #  include <functional>
 #  include <memory>
+#  include <mutex>
 #  include <ostream>
 #  include <streambuf>
 #  include <windows.h>
@@ -44,6 +45,22 @@ public:
 	DWORD collectHandles(HANDLE *buf, DWORD maxCount);
 	/// close and null out all process/thread/pipe handles (call after WaitForMultipleObjects)
 	void closeHandles();
+
+	/// Wait for the scripter process and both reader threads to finish.
+	/// i_graceMillisec is how long the scripter is given to exit on its own;
+	/// pass kScripterQuitGraceMillisec unless the caller has already waited.
+	/// If anything is still running after that, the scripter process is
+	/// terminated and this waits kScripterKillWaitMillisec more.  Killing it is
+	/// the only way left to unblock a reader thread: it is parked in a
+	/// synchronous ReadFile on an anonymous pipe, which has no cancellation
+	/// path and only returns once the write end is closed.
+	/// Returns false if a reader thread is still running afterwards, in which
+	/// case neither closeHandles() nor destroying this object is safe.
+	bool forceStop(DWORD i_graceMillisec);
+
+	/// Wait for a pending asynchronous start()/restart to finish, so that the
+	/// pipe and thread handles stop changing under the caller.
+	void waitForPendingStart();
 
 	/// ExecKeySeq callback type (called from background thread with the materialized item)
 	using ExecKeySeqCallback = std::function<void(AdHocKeySeq)>;
@@ -86,7 +103,10 @@ private:
 	HANDLE m_hDataThread;
 	HANDLE m_hMsgThread;
 
-	// ostream and its streambuf to write to ctrl pipe
+	// ostream and its streambuf to write to ctrl pipe.
+	// Guarded by m_ctrlMutex: sendQuit() destroys them on the UI thread while
+	// execUserFunc() uses them on the engine thread.
+	std::mutex m_ctrlMutex;
 	std::unique_ptr<PipeWriteStreambuf> m_ctrlStreambuf;
 	std::unique_ptr<std::ostream>    m_ctrlStream;
 	std::unique_ptr<CtrlStreamWriter> m_ctrlWriter;

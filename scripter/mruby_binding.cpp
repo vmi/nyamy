@@ -1148,6 +1148,14 @@ bool mruby_on_load_setting(void* exeCtx)
 	}
 
 	// 2. Open mruby state and register DSL classes.
+	//    A second Start reloads in-process (the test harness does this; the
+	//    product restarts the process instead).  Close the previous state
+	//    first: g_funcTable and every registered handler belong to it, and
+	//    nys_start has already cleared the user-function table for this cycle.
+	if (ctx->mrb) {
+		mrb_close(ctx->mrb);
+		ctx->mrb = nullptr;
+	}
 	mrb_state *mrb = mrb_open();
 	if (!mrb) {
 		fprintf(stderr, "error: failed to initialise mruby\n");

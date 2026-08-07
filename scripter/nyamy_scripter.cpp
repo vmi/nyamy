@@ -7,6 +7,16 @@
 // Writes compiled setting commands to a CmdStream pipe handle (NYS_CMD env var).
 // stdout / stderr are binary UTF-8 log channels (one message per line).
 //
+// Design -- threading:
+//   nys_start() runs two threads.  A ctrl reader thread does nothing but read
+//   the ctrl stream and queue Jobs; the calling thread ("script thread") pops
+//   Jobs and runs the callbacks, which is where every global below is touched.
+//   The split exists so that Quit and the ctrl-pipe EOF are observed even while
+//   a script is running: a script that never returns cannot be interrupted, and
+//   nyamy's reader threads stay parked in a synchronous ReadFile until this
+//   process closes its write ends.  When the script thread does not finish in
+//   time, the ctrl thread terminates the process (see nys_set_quit_timeout).
+//
 // Design -- command queueing:
 //   nys_* API calls made during on_load_setting push commands into a typed
 //   command queue (g_cmdQueue).  When on_load_setting returns true the queue
@@ -45,9 +55,15 @@
 
 #include "pipe_streambuf.h"
 
+#include <algorithm>
+#include <atomic>
+#include <condition_variable>
+#include <deque>
 #include <fcntl.h>
 #include <io.h>
+#include <mutex>
 #include <sstream>
+#include <thread>
 #include <unordered_map>
 #include <map>
 #include <utility>
@@ -196,6 +212,86 @@ struct SessionAllocator {
 	}
 };
 static SessionAllocator* g_sessionAlloc = nullptr;
+
+// Milliseconds to wait for the script thread after Quit; 0 disables the kill.
+// Written before nys_start, read by the ctrl thread.
+static std::atomic<uint32_t> g_quitTimeoutMillisec{ 0 };
+
+
+//-----------------------------------------------------------------------------
+// Job queue: ctrl reader thread (producer) -> script thread (consumer)
+//-----------------------------------------------------------------------------
+
+// A unit of work handed between the two threads.  Both payloads are
+// self-contained -- readExecUserFunc allocates no NYsStrs -- so a Job can cross
+// threads without the session allocator, which stays on the script thread.
+struct Job {
+	enum class Kind { Start, ExecUserFunc, Quit };
+	Kind                 kind = Kind::Quit;
+	CtrlArgsStart        start;   // Kind::Start
+	CtrlArgsExecUserFunc exec;    // Kind::ExecUserFunc
+};
+
+// Upper bound on queued ExecUserFunc jobs.  The ctrl pipe used to provide the
+// back pressure by itself: nyamy writes it in PIPE_NOWAIT mode and drops when
+// it is full.  The reader now drains the pipe unconditionally, so the bound has
+// to live here instead - otherwise a script blocked inside a user function
+// would let key events accumulate for ever.
+static const size_t kMaxPendingExecUserFunc = 64;
+
+class JobQueue
+{
+public:
+	// Queue a setting load, dropping the ExecUserFunc jobs queued before it:
+	// they belong to the setting being replaced, and the handler table is
+	// cleared by the load, so at best they would do nothing and at worst reach
+	// a same-named handler of the new setting.
+	void pushStart(Job i_job) {
+		std::lock_guard<std::mutex> lock(m_mutex);
+		m_jobs.erase(std::remove_if(m_jobs.begin(), m_jobs.end(),
+			[](const Job &j) { return j.kind == Job::Kind::ExecUserFunc; }),
+			m_jobs.end());
+		m_jobs.push_back(std::move(i_job));
+		m_cond.notify_one();
+	}
+
+	// Returns false when the queue is full and the job was dropped.  The newest
+	// is dropped rather than the oldest so that what does run stays in order.
+	bool pushExec(Job i_job) {
+		std::lock_guard<std::mutex> lock(m_mutex);
+		size_t pending = 0;
+		for (const Job &j : m_jobs)
+			if (j.kind == Job::Kind::ExecUserFunc) ++pending;
+		if (pending >= kMaxPendingExecUserFunc)
+			return false;
+		m_jobs.push_back(std::move(i_job));
+		m_cond.notify_one();
+		return true;
+	}
+
+	// Queued at the back, never jumped ahead: whatever was queued before Quit
+	// still runs.  The watchdog, not the queue, bounds how long that may take.
+	void pushQuit() {
+		std::lock_guard<std::mutex> lock(m_mutex);
+		Job j;
+		j.kind = Job::Kind::Quit;
+		m_jobs.push_back(std::move(j));
+		m_cond.notify_one();
+	}
+
+	Job pop() {
+		std::unique_lock<std::mutex> lock(m_mutex);
+		m_cond.wait(lock, [this] { return !m_jobs.empty(); });
+		Job j = std::move(m_jobs.front());
+		m_jobs.pop_front();
+		return j;
+	}
+
+private:
+	std::mutex              m_mutex;
+	std::condition_variable m_cond;
+	std::deque<Job>         m_jobs;
+};
 
 } // namespace
 
@@ -554,19 +650,67 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 
 	CtrlStreamReader ctrlReader(ctrlStream);
 
-	for (;;) {
-		CtrlId id;
-		if (!ctrlReader.readNext(id))
-			break;
+	JobQueue queue;
 
-		if (id == CtrlId::Quit) {
+	// Signalled by the script thread once it has run the Quit job.  Manual
+	// reset: the ctrl thread may get here after it is already set.
+	HANDLE hScriptDone = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	std::thread ctrlThread([&]() {
+		// Nothing but reading and queueing happens here, so Quit and the
+		// ctrl-pipe EOF are observed even while a script is running.
+		try {
+			for (;;) {
+				CtrlId id;
+				if (!ctrlReader.readNext(id))
+					break;                        // EOF: nyamy closed the pipe
+				if (id == CtrlId::Quit) {
+					break;
+				} else if (id == CtrlId::Start) {
+					Job j;
+					j.kind  = Job::Kind::Start;
+					j.start = ctrlReader.readStart();
+					queue.pushStart(std::move(j));
+				} else if (id == CtrlId::ExecUserFunc) {
+					Job j;
+					j.kind = Job::Kind::ExecUserFunc;
+					j.exec = ctrlReader.readExecUserFunc();
+					wstringi name = j.exec.name;
+					if (!queue.pushExec(std::move(j)))
+						logLine(L"[nys] job queue full; discarded ExecUserFunc("
+						        + std::wstring(name) + L")");
+				}
+			}
+		} catch (...) {
+			// truncated payload: treat as end of stream
+		}
+		queue.pushQuit();
+
+		// A script that never returns cannot be interrupted, and nyamy cannot
+		// release its pipe readers until this process closes its write ends -
+		// so close them the only way left.  TerminateProcess rather than
+		// ExitProcess: ExitProcess would try to unwind a thread that is still
+		// holding CRT and loader locks.
+		uint32_t timeout = g_quitTimeoutMillisec.load();
+		if (timeout > 0 &&
+		    WaitForSingleObject(hScriptDone, timeout) == WAIT_TIMEOUT) {
+			logLine(L"[nys] script did not stop within "
+			        + std::to_wstring(timeout) + L" ms after Quit; terminating.");
+			fflush(stderr);
+			TerminateProcess(GetCurrentProcess(), 2);
+		}
+	});
+
+	for (;;) {
+		Job job = queue.pop();
+
+		if (job.kind == Job::Kind::Quit) {
 			if (callbacks->on_quit) callbacks->on_quit(exeCtx);
 			break;
-		} else if (id == CtrlId::Start) {
-			auto startArgs = ctrlReader.readStart();
-			g_configName = std::move(startArgs.configName);
-			g_configPath = std::move(startArgs.configPath);
-			g_symbols    = std::move(startArgs.symbols);
+		} else if (job.kind == Job::Kind::Start) {
+			g_configName = std::move(job.start.configName);
+			g_configPath = std::move(job.start.configPath);
+			g_symbols    = std::move(job.start.symbols);
 
 			resetQueue();
 			g_callbackState = CallbackState::LoadSetting;
@@ -588,10 +732,10 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 					logLine(L"[nys] on_load_setting returned false; setting discarded.");
 				}
 			}
-		} else if (id == CtrlId::ExecUserFunc) {
+		} else {
 			SessionAllocator sa;
 			g_sessionAlloc = &sa;
-			CtrlArgsExecUserFunc req = ctrlReader.readExecUserFunc();
+			CtrlArgsExecUserFunc &req = job.exec;
 			std::string funcName = to_UTF8(std::wstring(req.name));
 			auto it = g_userFuncs.find(funcName);
 			if (it != g_userFuncs.end() && it->second) {
@@ -604,9 +748,12 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 			}
 			g_sessionAlloc = nullptr;
 			// sa goes out of scope here, freeing all NYsFuncArgs/NYsStrs
-			// including NYsFuncArg::strs entries inside req.args
 		}
 	}
+
+	SetEvent(hScriptDone);
+	ctrlThread.join();
+	CloseHandle(hScriptDone);
 
 	g_dataWriter = nullptr;
 	g_dataStream = nullptr;
@@ -616,9 +763,19 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 	return 0;
 }
 
+
+NYS_API void nys_set_quit_timeout(uint32_t millisec)
+{
+	g_quitTimeoutMillisec.store(millisec);
+}
+
+// FFI compatibility version.  While NYamy is 0.9.x this tracks NYamy's own
+// version; it is pinned to 1.0.0 when NYamy 1.0.0 ships and only moves after
+// that when this C API changes.  Deliberately not derived from the VERSION
+// macro: the two stop tracking each other at 1.0.0.
 NYS_API uint32_t nys_version(void)
 {
-	return (0u << 16) | (1u << 8) | 0u;
+	return (0u << 16) | (9u << 8) | 0u;
 }
 
 

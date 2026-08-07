@@ -1133,12 +1133,17 @@ public:
 
 		// --- Phase A: signal all shutdowns simultaneously ---
 		ReleaseMutex(m_hMutexYamyd);       // yamyd exits when it loses the mutex
-		if (m_scripter)
-			m_scripter->sendQuit();            // scripter: send quit + close stdin pipe
+		if (m_scripter) {
+			// launchScripter() runs on an async task and rewrites the pipe and
+			// thread handles; let it finish before we read or close them.
+			m_scripter->waitForPendingStart();
+			m_scripter->sendQuit();            // scripter: send quit + close ctrl pipe
+		}
 
 		// --- Phase B+C: stop InputHandlers in parallel, then signal engine ---
-		// signalStop() waits for both InputHandlers (up to 3 s, in parallel),
-		// clears the input queue, and signals the engine thread to exit.
+		// signalStop() waits for both InputHandlers (up to 3 s, in parallel)
+		// and signals the engine thread to exit.  The input queue outlives it
+		// and is released by cleanupAfterStop() below.
 		HANDLE hEngineThread = m_engine.signalStop();
 
 		// --- Phase D: wait for all remaining threads/processes in parallel ---
@@ -1149,17 +1154,31 @@ public:
 			n += m_scripter->collectHandles(handles + n, 6 - n);
 		handles[n++] = hEngineThread;
 		if (n > 0)
-			WaitForMultipleObjects(n, handles, TRUE, 5000);
+			WaitForMultipleObjects(n, handles, TRUE, kScripterQuitGraceMillisec);
 
 		// --- cleanup handles ---
 		if (m_pi.hProcess) { CloseHandle(m_pi.hProcess); m_pi.hProcess = NULL; }
 		CloseHandle(m_hMutexYamyd);
-		if (m_scripter)
-			m_scripter->closeHandles();
-		m_engine.cleanupAfterStop(hEngineThread);
 
-		// ~ScripterManager() is now a no-op (handles already closed above)
-		m_scripter.reset();
+		// The reader threads keep using this object's log stream, tasktray
+		// window and callbacks, and the engine's input queue.  Closing the
+		// pipes they read, destroying ScripterManager, detaching the log,
+		// destroying the windows and cleanupAfterStop() are all use-after-free
+		// unless the threads have actually finished, and their ReadFile cannot
+		// be cancelled - so make sure they are gone.  Phase D already waited
+		// kScripterQuitGraceMillisec, hence the 0 grace here.
+		if (m_scripter) {
+			if (m_scripter->forceStop(0)) {
+				m_scripter->closeHandles();
+				m_scripter.reset();
+			} else {
+				// Not reachable in practice: terminating the scripter closes
+				// the pipe write ends.  Leak the manager rather than free
+				// memory a live thread is still reading; we are exiting.
+				(void)m_scripter.release();
+			}
+		}
+		m_engine.cleanupAfterStop(hEngineThread);
 
 		CancelIo(m_hNotifyMailslot);
 		SleepEx(0, TRUE);

@@ -1079,7 +1079,7 @@ void Engine::keyboardHandler()
 
 		WaitForSingleObject(m_queueMutex, INFINITE);
 		while (SignalObjectAndWait(m_queueMutex, m_readEvent, INFINITE, true) == WAIT_OBJECT_0) {
-			if (!m_inputQueue) {
+			if (m_isStopping) {
 				ReleaseMutex(m_queueMutex);
 				return;
 			}
@@ -1319,6 +1319,7 @@ Engine::Engine(womsgstream &i_log)
 		m_dragging(false),
 		m_keyboardHandler(installKeyboardHook, Engine::keyboardDetour),
 		m_mouseHandler(installMouseHook, Engine::mouseDetour),
+		m_isStopping(false),
 		m_readEvent(NULL),
 		m_queueMutex(NULL),
 		m_isLogMode(false),
@@ -1381,6 +1382,7 @@ void Engine::start() {
 	m_mouseHandler.start(this);
 
 	m_inputQueue = std::make_unique<std::deque<InputEvent>>();
+	m_isStopping = false;
 	CHECK_TRUE( m_queueMutex = CreateMutex(NULL, FALSE, NULL) );
 	CHECK_TRUE( m_readEvent = CreateEvent(NULL, TRUE, FALSE, NULL) );
 	m_ol.Offset = 0;
@@ -1404,9 +1406,14 @@ HANDLE Engine::signalStop() {
 	m_mouseHandler.closeThread();
 	m_keyboardHandler.closeThread();
 
-	// Phase C: signal engine thread to exit (safe now that hooks are stopped)
+	// Phase C: signal engine thread to exit (safe now that hooks are stopped).
+	// The queue itself stays alive: the scripter's data thread can still be
+	// running and pushing into it through scheduleAdHocKeySeq().  Destroying it
+	// here is what used to make that a null dereference.  cleanupAfterStop()
+	// destroys it instead, and the caller only gets there once the reader
+	// threads are confirmed stopped.
 	WaitForSingleObject(m_queueMutex, INFINITE);
-	m_inputQueue.reset();
+	m_isStopping = true;
 	SetEvent(m_readEvent);
 	ReleaseMutex(m_queueMutex);
 
@@ -1416,9 +1423,14 @@ HANDLE Engine::signalStop() {
 	return h;
 }
 
-// Call after the engine thread handle returned by signalStop() has been waited on.
+// Call after the engine thread handle returned by signalStop() has been waited
+// on AND every producer of the input queue has been confirmed stopped - which
+// for the scripter's data thread means ScripterManager::forceStop() returned
+// true.  Both the queue and m_queueMutex go away here, so a producer still
+// running would dereference freed memory.
 void Engine::cleanupAfterStop(HANDLE hEngineThread) {
 	CloseHandle(hEngineThread);
+	m_inputQueue.reset();
 	CHECK_TRUE( CloseHandle(m_readEvent) );
 	m_readEvent = NULL;
 	CloseHandle(m_queueMutex);

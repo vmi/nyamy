@@ -140,6 +140,36 @@ enum class CtrlId : uint8_t {
 [0xFF]
 ```
 
+**確実な停止信号は Quit バイトではなく ctrl パイプの EOF である。** ctrl パイプは
+drop-on-full モード (`PIPE_NOWAIT`) で運用しているため Quit バイトは理屈の上では
+捨てられうる。`sendQuit()` は取りこぼしを避けるため最大 200 ms 再試行するが、
+それでも書けなかった場合は握りつぶさずログに出す。いずれにせよ直後の
+`CloseHandle` による EOF が届くので、停止そのものは保証される。Quit バイトは
+その前倒し通知という位置づけ。
+
+停止は次の 3 段構えで、時間の大小関係は `ctrl_stream.h` の定数に一元化され
+`static_assert` で固定されている。
+
+| 段 | 主体 | 猶予 | 手段 |
+|---|---|---|---|
+| 1 | scripter の script スレッド | — | Quit ジョブを取り出して `on_quit` → 正常終了 |
+| 2 | scripter の ctrl スレッド | `kScripterQuitTimeoutMillisec` (3000 ms) | `TerminateProcess(GetCurrentProcess())` で自決 (終了コード 2) |
+| 3 | nyamy の `ScripterManager::forceStop()` | `kScripterQuitGraceMillisec` (5000 ms) | `TerminateProcess` + `kScripterKillWaitMillisec` (2000 ms) 待ち |
+
+段 2 が要るのは、走り続けるスクリプトを中断する手段が存在しないため。mruby には
+実行中の VM に割り込む口がコンパイルオプション無しでは無く、ブロッキング呼び出しに
+至っては中断点自体が無い。プロセスを殺すことだけが停止手段であり、それは同時に
+nyamy の reader スレッドを解放する唯一の手段でもある (同期匿名パイプの `ReadFile` は
+`CancelIoEx` が効かず、書き込み端が閉じたときにしか戻らない)。
+
+段 3 が残るのは、自決できない相手がいるため: ini の `cmdLine` で差し替えた別実装、
+ctrl スレッドが立つ前に固まったプロセス、エラーダイアログで生き残ったプロセスなど。
+`forceStop()` の戻り値は「reader スレッドが本当に止まったか」であり、nyamy はこれを
+見てから ScripterManager を解体する。
+
+段 2 の猶予は `nys_set_quit_timeout()` で設定する。既定は 0 (無効 = 無期限に待つ)
+で、プロセス内ホスト (テストハーネス) が道連れにされないようにしてある。
+
 ### 将来の変更 (未実装、プロセス再起動方式)
 
 プロセス再起動方式では、シンボルは argv (`-D` フラグ) で渡すため `Start (0x01)` が不要になる。
@@ -237,12 +267,17 @@ sequenceDiagram
     participant new as scripter (新)
 
     nyamy->>old: CtrlStream: Quit 送信 + ctrl パイプをクローズ
-    old-->>nyamy: 終了
-    nyamy->>nyamy: WaitForMultipleObjects(process/threads) / closeHandles
+    old-->>nyamy: 終了 (走り続けていれば 3 秒後に自決)
+    nyamy->>nyamy: forceStop(5000) — 停止を確認 (最終手段は TerminateProcess)
+    nyamy->>nyamy: closeHandles
     nyamy->>new: CreateProcess (新パイプ + 新 CmdProcessor)
     nyamy->>new: CtrlStream: Start(syms)
     new->>nyamy: Reset (0xFE) + CmdStream + Commit (0xFF)
 ```
+
+`launchScripter()` は `std::async` のタスク上で動き、そのタスクは
+`~ScripterManager` から待たれる。ここでの待ちが無期限だと UI スレッドが
+巻き添えでハングするため、`forceStop()` による有界の待ちにしてある。
 
 補足: `nys_start()` のループは同一プロセスへの複数回 Start も処理できる
 (consumer 側も Reset ごとに新しい Setting の構築を開始するため成立する)。
