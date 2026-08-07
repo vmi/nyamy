@@ -2,12 +2,17 @@
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!-- Regenerates doc\README-ja.html from doc\src\manual-ja\*.md.
 
-       This project is deliberately NOT built as part of the solution: the
-       generated HTML is committed, so an ordinary C++ build needs neither
-       Python nor Python-Markdown.  nyamy.sln registers it with ActiveCfg but
-       without Build.0, which excludes it from "Build Solution" while leaving
-       "Build" on its context menu working.  Tick it in Configuration Manager
-       to opt into building it every time.
+       Part of "Build Solution", so editing the Markdown sources is enough to
+       refresh the manual.  Python is only an optional prerequisite, though, so
+       the command below sets MAKEDOC_OPTIONAL=1: with no interpreter or no
+       Python-Markdown, makedoc.ps1 logs a warning and succeeds without
+       generating anything, leaving the build green.  A broken manual (dangling
+       link, CommonMark emphasis trap) still fails the build.
+
+       A skip only warns, which is easy to miss in a long build log.  To get
+       the failure as an error instead, run the shim directly:
+
+           tools\ps1exec.cmd tools\makedoc.ps1 doc\src doc
 
        Prerequisites: Python 3.10+ and  py -m pip install -r tools\requirements.txt  -->
   <ItemGroup Label="ProjectConfigurations">
@@ -68,12 +73,14 @@
   <ItemGroup>
     <CustomBuild Include="..\doc\src\template.html">
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">makedoc: generating doc\README-ja.html from doc\src</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\tools\ps1exec.cmd ..\tools\makedoc.ps1 ..\doc\src ..\doc
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">set MAKEDOC_OPTIONAL=1
+..\tools\ps1exec.cmd ..\tools\makedoc.ps1 ..\doc\src ..\doc
 </Command>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">@(DocSource);%(AdditionalInputs)</AdditionalInputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\doc\README-ja.html;..\doc\style.css;..\doc\HISTORY-ja.html;..\doc\README-nyamy.html;..\doc\README-ymgw.html;%(Outputs)</Outputs>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">makedoc: generating doc\README-ja.html from doc\src</Message>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\tools\ps1exec.cmd ..\tools\makedoc.ps1 ..\doc\src ..\doc
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">set MAKEDOC_OPTIONAL=1
+..\tools\ps1exec.cmd ..\tools\makedoc.ps1 ..\doc\src ..\doc
 </Command>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">@(DocSource);%(AdditionalInputs)</AdditionalInputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\doc\README-ja.html;..\doc\style.css;..\doc\HISTORY-ja.html;..\doc\README-nyamy.html;..\doc\README-ymgw.html;%(Outputs)</Outputs>

@@ -3,6 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 18.2.11415.280
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "distrib", "distrib.vcxproj", "{5C8F02E7-A047-4486-BE7B-A2ADA2B6D1FB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{89B73A41-31DE-4480-A574-2C8806F66E8B} = {89B73A41-31DE-4480-A574-2C8806F66E8B}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nyamy", "nyamy.vcxproj", "{DA7DE112-259F-46EA-8F7D-A4298C5639F3}"
 EndProject
@@ -144,11 +147,17 @@ Global
 		{A1B2C3D4-E5F6-4789-ABCD-1234567890AB}.Release|x64.ActiveCfg = Release|x64
 		{A1B2C3D4-E5F6-4789-ABCD-1234567890AB}.Release|x64.Build.0 = Release|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|Mixed Platforms.Build.0 = Debug|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|Win32.ActiveCfg = Debug|x64
+		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|Win32.Build.0 = Debug|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|x64.ActiveCfg = Debug|x64
+		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|x64.Build.0 = Debug|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Release|Mixed Platforms.Build.0 = Release|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Release|Win32.ActiveCfg = Release|x64
+		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Release|Win32.Build.0 = Release|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Release|x64.ActiveCfg = Release|x64
+		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
