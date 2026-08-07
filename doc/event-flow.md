@@ -256,7 +256,7 @@ sequenceDiagram
 
     dt->>dt: CmdProcessor::process():91<br/>m_builder 初期化 (Global キーマップ設定)<br/>各コマンドを std::visit で SettingBuilder に積む
     dt->>dt: CmdId::Commit 受信:317<br/>SettingBuilder::build() → Setting<br/>m_builder.reset() → ビルダー解放<br/>onCommit コールバック実行
-    dt->>dt: ScripterManager::setPendingSetting():42<br/>static な単一スロットへ shared_ptr&lt;Setting&gt; を move<br/>(旧 Setting が残っていればここで解放)
+    dt->>dt: ScripterManager::setPendingSetting():42<br/>static な単一スロットへ Setting の shared_ptr を move<br/>(旧 Setting が残っていればここで解放)
     dt->>mayu: PostMessage(WM_ScripterSettingReady, 0, 0)<br/>ペイロードなし。通知が失われても<br/>スロット上書き/終了時クリアで解放される
 
     mayu->>mayu: WM_APP_scripterSettingReady ハンドラ:491<br/>ScripterManager::takePendingSetting()<br/>スロットが空なら何もしない
