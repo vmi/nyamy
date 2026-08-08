@@ -332,6 +332,12 @@ void CmdProcessor::operator()(CmdArgsCommit)
 	}
 	m_pendingSubsts.clear();
 
+	// Every keymap starts with only its explicit "mod" statements; fold in the
+	// keyboard-wide defmod keys and the parent keymap's assignments.  Without
+	// this no key is recognized as a modifier, so the engine reads Shift and
+	// Control as released and injects a spurious release before each key.
+	m_builder->adjustModifiers();
+
 	m_builder.reset();
 	m_committed = std::move(m_setting);
 	if (m_commitCallback) m_commitCallback(m_committed);

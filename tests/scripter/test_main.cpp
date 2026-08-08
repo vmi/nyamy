@@ -632,7 +632,75 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 8;
+	// Every keymap must end up knowing which keys are modifiers: the keys named
+	// by `defmod' plus whatever the parent keymap assigns, folded in on top of
+	// the keymap's own `mod' statements.  The engine reads this list to decide
+	// whether Control is held; when it stays empty every key looks unmodified
+	// and a spurious modifier release is injected before it.
+	{
+		printf("[%d] keymap modifier assignments ... ", idx + 9);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__mod_assign__.mayu",
+			L"include \"109.mayu\"\n"
+			L"keymap Global\n"
+			L"keymap ModChild : Global\n");
+		writeUtf8File(exeDir + L"\\__mod_assign__.rb",
+			L"load \"__mod_assign__.mayu\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__mod_assign__.rb", syms);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		auto assigns = [&](const Keymap *km, Modifier::Type mt,
+		                   const wchar_t *keyName) {
+			if (!km) return false;
+			Keyboard &kb = const_cast<Keyboard &>(s->m_keyboard);
+			Key *key = kb.searchKey(wstringi(keyName));
+			if (!key) return false;
+			const Keymap::ModAssignments &ma = km->getModAssignments(mt);
+			for (Keymap::ModAssignments::const_iterator i = ma.begin();
+			     i != ma.end(); ++ i)
+				if ((*i).m_key == key)
+					return true;
+			return false;
+		};
+
+		const Keymap *global = s ? findKeymap(*s, L"Global") : nullptr;
+		const Keymap *child = s ? findKeymap(*s, L"ModChild") : nullptr;
+		check(global != nullptr, "keymap Global exists");
+		check(child != nullptr, "keymap ModChild exists");
+		// from `defmod'
+		check(assigns(global, Modifier::Type_Control, L"LeftControl"),
+		      "Global: LeftControl is a Control modifier");
+		check(assigns(global, Modifier::Type_Control, L"RightControl"),
+		      "Global: RightControl is a Control modifier");
+		check(assigns(global, Modifier::Type_Shift, L"LeftShift"),
+		      "Global: LeftShift is a Shift modifier");
+		check(assigns(global, Modifier::Type_Alt, L"LeftAlt"),
+		      "Global: LeftAlt is an Alt modifier");
+		check(assigns(global, Modifier::Type_Windows, L"LeftWindows"),
+		      "Global: LeftWindows is a Windows modifier");
+		// from 109.mayu's own `mod shift += E0RightShift'
+		check(assigns(global, Modifier::Type_Shift, L"E0RightShift"),
+		      "Global: E0RightShift is a Shift modifier");
+		// inherited by a child keymap
+		check(assigns(child, Modifier::Type_Control, L"LeftControl"),
+		      "ModChild inherits the Control modifiers");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 9;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);
