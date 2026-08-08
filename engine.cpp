@@ -1477,10 +1477,10 @@ HANDLE Engine::signalStop() {
 }
 
 // Call after the engine thread handle returned by signalStop() has been waited
-// on AND every producer of the input queue has been confirmed stopped - which
-// for the scripter's data thread means ScripterManager::forceStop() returned
-// true.  Both the queue and m_queueMutex go away here, so a producer still
-// running would dereference freed memory.
+// on AND every producer of the input queue has stopped - which for the
+// scripter's data thread means ScripterManager::forceStop() has returned.  Both
+// the queue and m_queueMutex go away here, so a producer still running would
+// dereference freed memory.
 void Engine::cleanupAfterStop(HANDLE hEngineThread) {
 	CloseHandle(hEngineThread);
 	m_inputQueue.reset();

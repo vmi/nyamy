@@ -75,6 +75,7 @@ ScripterManager::ScripterManager(SyncObject *i_soLog, std::wostream *i_log,
 	, m_hScripterProcess(NULL)
 	, m_hDataThread(NULL)
 	, m_hMsgThread(NULL)
+	, m_hReaderStop(CreateEvent(NULL, TRUE, FALSE, NULL))
 	, m_quitSent(false)
 {
 }
@@ -92,6 +93,9 @@ ScripterManager::~ScripterManager()
 	// Release a Setting that was handed over but never dispatched, rather than
 	// keeping it alive until process exit.
 	clearPendingSetting();
+
+	if (m_hReaderStop)
+		CloseHandle(m_hReaderStop);
 }
 
 void ScripterManager::sendQuit()
@@ -137,20 +141,27 @@ void ScripterManager::sendQuit()
 }
 
 
-bool ScripterManager::forceStop(DWORD i_graceMillisec)
+void ScripterManager::stopReaders()
 {
+	if (m_hReaderStop)
+		SetEvent(m_hReaderStop);
+}
+
+
+void ScripterManager::forceStop(DWORD i_graceMillisec)
+{
+	stopReaders();
+
 	HANDLE h[3];
 	DWORD n = collectHandles(h, 3);
 	if (n == 0)
-		return true;
+		return;
 	if (WaitForMultipleObjects(n, h, TRUE, i_graceMillisec) != WAIT_TIMEOUT)
-		return true;
+		return;
 
 	// The scripter neither exited on its own nor terminated itself, so it is a
 	// foreign implementation, one wedged before its ctrl thread started, or one
-	// held alive by an error dialog.  Kill it: the reader threads are parked in
-	// a ReadFile that cannot be cancelled, and only closing the write ends
-	// releases them.
+	// held alive by an error dialog.  Kill it rather than let it outlive nyamy.
 	if (m_hScripterProcess) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
@@ -161,9 +172,8 @@ bool ScripterManager::forceStop(DWORD i_graceMillisec)
 	}
 
 	n = collectHandles(h, 3);
-	return n == 0 ||
-	       WaitForMultipleObjects(n, h, TRUE, kScripterKillWaitMillisec)
-	           != WAIT_TIMEOUT;
+	if (n > 0)
+		WaitForMultipleObjects(n, h, TRUE, kScripterKillWaitMillisec);
 }
 
 
@@ -268,6 +278,8 @@ static void closePipeHandle(HANDLE *io_h)
 // inherits an ordinary synchronous client handle.  Named rather than anonymous
 // because only a named pipe handle can be opened for overlapped I/O, which is
 // what lets a parked reader thread be stopped without killing the scripter.
+// The ends nyamy reads are therefore overlapped; the ctrl end it writes is not,
+// since PIPE_NOWAIT already keeps that write off the engine thread's back.
 // Nothing changes on the child's side, so a foreign scripter launched through
 // the ini "cmdLine" setting is unaffected.
 //
@@ -296,7 +308,8 @@ static bool createNamedPipePair(bool i_serverReads, DWORD i_bufSize,
 		// the server end is left non-inheritable (no SECURITY_ATTRIBUTES)
 		HANDLE hServer = CreateNamedPipe(
 			name,
-			(i_serverReads ? PIPE_ACCESS_INBOUND : PIPE_ACCESS_OUTBOUND) |
+			(i_serverReads ? PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED
+			               : PIPE_ACCESS_OUTBOUND) |
 				FILE_FLAG_FIRST_PIPE_INSTANCE,
 			PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT |
 				PIPE_REJECT_REMOTE_CLIENTS,
@@ -487,7 +500,8 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		m_ctrlStream   = std::make_unique<std::ostream>(m_ctrlStreambuf.get());
 		m_ctrlWriter   = std::make_unique<CtrlStreamWriter>(*m_ctrlStream);
 
-		// start background threads
+		// start background threads.  A restart above left the stop event set.
+		ResetEvent(m_hReaderStop);
 		unsigned tid;
 		m_hDataThread = (HANDLE)_beginthreadex(NULL, 0, dataThread, this, 0, &tid);
 		m_hMsgThread  = (HANDLE)_beginthreadex(NULL, 0, msgThread,  this, 0, &tid);
@@ -557,7 +571,7 @@ unsigned __stdcall ScripterManager::dataThread(void *param)
 
 void ScripterManager::runReader()
 {
-	PipeReadStreambuf rsb(m_hDataRead);
+	PipeReadStreambuf rsb(m_hDataRead, m_hReaderStop);
 	std::istream pipeStream(&rsb);
 	CmdStreamReader reader(pipeStream);
 
@@ -593,7 +607,7 @@ unsigned __stdcall ScripterManager::msgThread(void *param)
 
 void ScripterManager::runMsgReader()
 {
-	PipeReadStreambuf rsb(m_hMsgRead);
+	PipeReadStreambuf rsb(m_hMsgRead, m_hReaderStop);
 	std::istream     is(&rsb);
 	std::string      line;
 

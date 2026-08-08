@@ -1193,6 +1193,7 @@ public:
 			// thread handles; let it finish before we read or close them.
 			m_scripter->waitForPendingStart();
 			m_scripter->sendQuit();            // scripter: send quit + close ctrl pipe
+			m_scripter->stopReaders();         // reader threads: end their reads
 		}
 
 		// --- Phase B+C: stop InputHandlers in parallel, then signal engine ---
@@ -1216,22 +1217,13 @@ public:
 		CloseHandle(m_hMutexYamyd);
 
 		// The reader threads keep using this object's log stream, tasktray
-		// window and callbacks, and the engine's input queue.  Closing the
-		// pipes they read, destroying ScripterManager, detaching the log,
-		// destroying the windows and cleanupAfterStop() are all use-after-free
-		// unless the threads have actually finished, and their ReadFile cannot
-		// be cancelled - so make sure they are gone.  Phase D already waited
+		// window and callbacks, and the engine's input queue, so nothing below
+		// may run while they are alive.  Phase D already waited
 		// kScripterQuitGraceMillisec, hence the 0 grace here.
 		if (m_scripter) {
-			if (m_scripter->forceStop(0)) {
-				m_scripter->closeHandles();
-				m_scripter.reset();
-			} else {
-				// Not reachable in practice: terminating the scripter closes
-				// the pipe write ends.  Leak the manager rather than free
-				// memory a live thread is still reading; we are exiting.
-				(void)m_scripter.release();
-			}
+			m_scripter->forceStop(0);
+			m_scripter->closeHandles();
+			m_scripter.reset();
 		}
 		m_engine.cleanupAfterStop(hEngineThread);
 

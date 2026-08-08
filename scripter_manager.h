@@ -41,22 +41,20 @@ public:
 
 	/// signal quit to scripter process (non-blocking; idempotent)
 	void sendQuit();
+	/// End the reads the reader threads are parked in, so that they return
+	/// whatever the scripter is doing (non-blocking; idempotent).
+	void stopReaders();
 	/// fill buf with active wait handles (process + reader threads); returns count
 	DWORD collectHandles(HANDLE *buf, DWORD maxCount);
 	/// close and null out all process/thread/pipe handles (call after WaitForMultipleObjects)
 	void closeHandles();
 
-	/// Wait for the scripter process and both reader threads to finish.
-	/// i_graceMillisec is how long the scripter is given to exit on its own;
-	/// pass kScripterQuitGraceMillisec unless the caller has already waited.
-	/// If anything is still running after that, the scripter process is
-	/// terminated and this waits kScripterKillWaitMillisec more.  Killing it is
-	/// the only way left to unblock a reader thread: it is parked in a
-	/// synchronous ReadFile on an anonymous pipe, which has no cancellation
-	/// path and only returns once the write end is closed.
-	/// Returns false if a reader thread is still running afterwards, in which
-	/// case neither closeHandles() nor destroying this object is safe.
-	bool forceStop(DWORD i_graceMillisec);
+	/// Stop the reader threads and wait for them and the scripter process to
+	/// finish.  i_graceMillisec is how long the scripter is given to exit on
+	/// its own; pass kScripterQuitGraceMillisec unless the caller has already
+	/// waited.  If it is still running after that it is terminated, so that it
+	/// does not outlive nyamy.
+	void forceStop(DWORD i_graceMillisec);
 
 	/// Wait for a pending asynchronous start()/restart to finish, so that the
 	/// pipe and thread handles stop changing under the caller.
@@ -99,9 +97,10 @@ private:
 	HANDLE m_hMsgRead;          ///< scripter stdout+stderr -> nyamy (log text, merged)
 	HANDLE m_hScripterProcess;
 
-	// background threads (data + msg)
+	// background threads (data + msg) and the event that ends their reads
 	HANDLE m_hDataThread;
 	HANDLE m_hMsgThread;
+	HANDLE m_hReaderStop;
 
 	// ostream and its streambuf to write to ctrl pipe.
 	// Guarded by m_ctrlMutex: sendQuit() destroys them on the UI thread while
