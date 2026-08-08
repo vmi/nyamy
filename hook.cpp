@@ -427,7 +427,7 @@ static void notifyCommand(
 		NotifyCommand32 ntc;
 		ntc.m_type = Notify::Type_command32;
 #endif // !_WIN64
-		ntc.m_hwnd = i_hwnd;
+		ntc.setHwnd(i_hwnd);
 		ntc.m_message = i_message;
 		ntc.m_wParam = i_wParam;
 		ntc.m_lParam = i_lParam;

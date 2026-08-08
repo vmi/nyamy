@@ -88,19 +88,35 @@ struct NotifyThreadDetach : public Notify {
 
 ///
 struct NotifyCommand32 : public Notify {
-	HWND m_hwnd;					///
+	DWORD _m_hwnd;				///
 	UINT m_message;				///
 	unsigned int m_wParam;				///
 	long m_lParam;				///
+
+	inline HWND getHwnd() const {
+		return reinterpret_cast<HWND>(static_cast<uintptr_t>(_m_hwnd));
+	}
+
+	inline void setHwnd(HWND i_hwnd) {
+		_m_hwnd = static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_hwnd));
+	}
 };
 
 
 ///
 struct NotifyCommand64 : public Notify {
-	HWND m_hwnd;					///
+	DWORD _m_hwnd;				///
 	UINT m_message;				///
 	unsigned __int64 m_wParam;				///
 	__int64 m_lParam;				///
+
+	inline HWND getHwnd() const {
+		return reinterpret_cast<HWND>(static_cast<uintptr_t>(_m_hwnd));
+	}
+
+	inline void setHwnd(HWND i_hwnd) {
+		_m_hwnd = static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_hwnd));
+	}
 };
 
 
@@ -126,6 +142,27 @@ struct NotifyShow : public Notify {
 struct NotifyLog : public Notify {
 	wchar_t m_msg[GANA_MAX_PATH];			///
 };
+
+
+// The 32-bit hook DLL, the 64-bit hook DLL and nyamy.exe write and read
+// these over one channel, so each of them has to have the same layout in
+// every build.  Pointer sized members are what breaks that - hence the DWORD
+// plus accessors for every window handle above.  Pin the sizes down here so
+// a member added without that care fails to build rather than to parse.
+static_assert(sizeof(Notify) == 8, "Notify layout is not build independent");
+static_assert(sizeof(NotifySetFocus) == 4176, "NotifySetFocus layout is not build independent");
+static_assert(sizeof(NotifyLockState) == 16, "NotifyLockState layout is not build independent");
+static_assert(sizeof(NotifyThreadAttach) == 12, "NotifyThreadAttach layout is not build independent");
+static_assert(sizeof(NotifyThreadDetach) == 12, "NotifyThreadDetach layout is not build independent");
+static_assert(sizeof(NotifyCommand32) == 24, "NotifyCommand32 layout is not build independent");
+static_assert(sizeof(NotifyCommand64) == 32, "NotifyCommand64 layout is not build independent");
+static_assert(sizeof(NotifyShow) == 16, "NotifyShow layout is not build independent");
+static_assert(sizeof(NotifyLog) == 2088, "NotifyLog layout is not build independent");
+
+// the receiver reads into a buffer of this size, so nothing may exceed it
+static_assert(sizeof(NotifyLog) <= NOTIFY_MESSAGE_SIZE &&
+			  sizeof(NotifyShow) <= NOTIFY_MESSAGE_SIZE,
+			  "a notification no longer fits in NOTIFY_MESSAGE_SIZE");
 
 
 ///
