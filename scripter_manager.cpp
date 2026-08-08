@@ -106,12 +106,6 @@ void ScripterManager::sendQuit()
 	{
 		std::lock_guard<std::mutex> lock(m_ctrlMutex);
 		if (m_ctrlWriter) {
-			// Quit is written once, on the shutdown path, over a pipe left in
-			// drop-on-full mode - so make this one message wait for room
-			// instead of vanishing.  The scripter's ctrl thread drains
-			// unconditionally, so any backlog clears in well under the bound.
-			if (m_ctrlStreambuf)
-				m_ctrlStreambuf->setRetryOnce(200);
 			try {
 				m_ctrlWriter->writeQuit();
 				m_ctrlStream->flush();

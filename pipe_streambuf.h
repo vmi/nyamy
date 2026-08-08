@@ -23,6 +23,12 @@
 // is full), the message is dropped and wasBlocked() reports true instead of
 // blocking the caller.  This is meant for the ctrl pipe, whose writer runs on
 // the engine's keyboard-handler thread and must never stall on a busy scripter.
+//
+// The drop is all or nothing: a PIPE_NOWAIT write to a byte-mode pipe either
+// takes the whole message or writes nothing at all - including when the message
+// is larger than the entire buffer, which is therefore always dropped.  A
+// partial write would leave a truncated message in the stream and desynchronise
+// the reader's framing for good, so the reporting below rests on this.
 //=============================================================================
 
 class PipeWriteStreambuf : public std::streambuf
@@ -41,13 +47,6 @@ public:
 	/// true if the most recent flush was dropped because the pipe was full
 	bool wasBlocked() const { return m_blocked; }
 	void clearBlocked() { m_blocked = false; }
-
-	/// The next sync() must not drop: retry for up to i_millisec while the pipe
-	/// stays full, then give up and report through wasBlocked().  Cleared by
-	/// that sync().  Used for Quit, which is written once on the shutdown path
-	/// and would otherwise be lost silently.  The bound is what keeps this off
-	/// the caller's back; a dead peer fails the write immediately anyway.
-	void setRetryOnce(DWORD i_millisec) { m_retryMillisec = i_millisec; }
 
 protected:
 	int_type overflow(int_type c) override {
@@ -75,30 +74,12 @@ protected:
 	int sync() override {
 		if (!m_nonBlocking || m_buf.empty())
 			return 0;
-		// Emit the whole buffered message in one non-blocking write.  In
-		// PIPE_NOWAIT mode WriteFile writes only what currently fits, so a
-		// full buffer yields written < size; treat any non-complete write as
-		// "dropped" and discard the rest.  Never fail the stream: drops are
-		// reported through wasBlocked() so callers stay usable.
-		DWORD retryMillisec = m_retryMillisec;
-		m_retryMillisec = 0;
-		ULONGLONG deadline = GetTickCount64() + retryMillisec;
-		size_t done = 0;
-		for (;;) {
-			DWORD written = 0;
-			BOOL ok = WriteFile(m_h, m_buf.data() + done,
-			                    static_cast<DWORD>(m_buf.size() - done),
-			                    &written, NULL);
-			done += written;
-			if (!ok || done == m_buf.size())
-				break;
-			// The reader is draining, so a full pipe empties shortly; a dead
-			// peer fails the write above instead of looping.
-			if (GetTickCount64() >= deadline)
-				break;
-			Sleep(5);
-		}
-		if (done != m_buf.size())
+		// Emit the whole buffered message in one non-blocking write.  Never
+		// fail the stream: a drop is reported through wasBlocked() so callers
+		// stay usable.
+		DWORD written = 0;
+		if (!WriteFile(m_h, m_buf.data(), static_cast<DWORD>(m_buf.size()),
+		               &written, NULL) || written != m_buf.size())
 			m_blocked = true;
 		m_buf.clear();
 		return 0;
@@ -108,7 +89,6 @@ private:
 	HANDLE m_h;
 	bool m_nonBlocking = false;
 	bool m_blocked = false;
-	DWORD m_retryMillisec = 0;
 	std::string m_buf;
 };
 
