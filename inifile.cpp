@@ -24,6 +24,21 @@ std::wstring trim(const std::wstring &i_str)
 }
 
 
+// Windows GetPrivateProfileString() convention: a value whose first and
+// last characters are a matching pair of quotes (' or ") has the quotes
+// discarded.  A lone quote, or quotes appearing only at one end, are left
+// as-is (matches documented GetPrivateProfileString behavior).
+std::wstring stripQuotes(const std::wstring &i_value)
+{
+	if (i_value.size() >= 2) {
+		wchar_t q = i_value.front();
+		if ((q == L'"' || q == L'\'') && i_value.back() == q)
+			return i_value.substr(1, i_value.size() - 2);
+	}
+	return i_value;
+}
+
+
 // is the line a section header ?  if so, extract its name
 bool parseSectionHeader(const std::wstring &i_line, std::wstring *o_name)
 {
@@ -49,7 +64,7 @@ bool parseKeyValue(const std::wstring &i_line,
 	if (eq == std::wstring::npos)
 		return false;
 	*o_key = trim(t.substr(0, eq));
-	*o_value = trim(t.substr(eq + 1));
+	*o_value = stripQuotes(trim(t.substr(eq + 1)));
 	return !o_key->empty();
 }
 
