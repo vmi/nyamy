@@ -3,6 +3,8 @@
 *.sdf
 *.opensdf
 *.aps
+\#*
+.\#*
 functions.h
 /Debug
 /Release

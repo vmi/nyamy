@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="ソース ファイル">
@@ -15,47 +15,102 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\104.mayu.rb">
+    <None Include="..\104.mayu.rb">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\104on109.mayu.rb">
+    </None>
+    <None Include="..\104on109.mayu.rb">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\109.mayu.rb">
+    </None>
+    <None Include="..\109.mayu.rb">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\109on104.mayu.rb">
+    </None>
+    <None Include="..\109on104.mayu.rb">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\default.mayu.rb">
+    </None>
+    <None Include="..\default.mayu.rb">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\dot.mayu.rb">
+    </None>
+    <None Include="..\dot.mayu.rb">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\emacsedit.mayu.rb">
+    </None>
+    <None Include="..\emacsedit.mayu.rb">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\workaround.mayu.rb">
+    </None>
+    <None Include="..\workaround.mayu.rb">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\workaround.reg">
+    </None>
+    <None Include="..\workaround.reg">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\nyamy.ini">
+    </None>
+    <None Include="..\nyamy.ini">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\README.md">
+    </None>
+    <None Include="..\LICENSE.txt">
       <Filter>リソース ファイル</Filter>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\tools\makedistrib.ps1">
+    </None>
+    <None Include="..\README.md">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\README-ja.html">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\style.css">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\syntax.txt">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\HISTORY-ja.html">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\README-nyamy.html">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\README-ymgw.html">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\edit-setting-ja.png">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\investigate-ja.png">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\log-ja.png">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\menu-ja.png">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\pause-ja.png">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\setting-ja.png">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\target.png">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\doc\version-ja.png">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\scripter\nyamy_scripter.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </None>
+    <None Include="..\s\install.cmd">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\s\install.ps1">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\s\uninstall.cmd">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\s\uninstall.ps1">
       <Filter>リソース ファイル</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\LICENSE.txt">
+    <CustomBuild Include="..\tools\makedistrib.ps1">
       <Filter>リソース ファイル</Filter>
     </CustomBuild>
   </ItemGroup>

@@ -14,5 +14,8 @@ indent_style = tab
 indent_size = tab
 tab_width = 4
 
+[*.{bat,cmd}]
+charset = unset
+
 [.git*]
 end_of_line = lf

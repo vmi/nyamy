@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -44,116 +44,58 @@
   <PropertyGroup>
     <_ProjectFileVersion>12.0.30501.0</_ProjectFileVersion>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PostBuildEvent>
-      <Command>copy /Y ..\scripter\nyamy_scripter.h $(OutDir)nyamy_scripter.h
-..\tools\ps1exec.cmd ..\tools\makedistrib.ps1 $(Configuration) $(VERSION)</Command>
-    </PostBuildEvent>
+  <ItemDefinitionGroup>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <PostBuildEvent>
-      <Command>copy /Y ..\scripter\nyamy_scripter.h $(OutDir)nyamy_scripter.h
-..\tools\ps1exec.cmd ..\tools\makedistrib.ps1 $(Configuration) $(VERSION)</Command>
-    </PostBuildEvent>
-  </ItemDefinitionGroup>
+  <!-- All payload sources listed as None so they show up in Solution Explorer
+       and, via @(None), feed AdditionalInputs below: editing any of them
+       (or the built binaries) re-triggers packaging. The actual copy into
+       $(OutDir) and the Compress-Archive call live entirely in
+       makedistrib.ps1; see that script for the single canonical file list. -->
   <ItemGroup>
-    <CustomBuild Include="..\104.mayu.rb">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\104on109.mayu.rb">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\109.mayu.rb">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\109on104.mayu.rb">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\default.mayu.rb">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\dot.mayu.rb">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\emacsedit.mayu.rb">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\workaround.mayu.rb">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\workaround.reg">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\nyamy.ini">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
+    <None Include="..\104.mayu.rb" />
+    <None Include="..\104on109.mayu.rb" />
+    <None Include="..\109.mayu.rb" />
+    <None Include="..\109on104.mayu.rb" />
+    <None Include="..\default.mayu.rb" />
+    <None Include="..\dot.mayu.rb" />
+    <None Include="..\emacsedit.mayu.rb" />
+    <None Include="..\workaround.mayu.rb" />
+    <None Include="..\workaround.reg" />
+    <None Include="..\nyamy.ini" />
+    <None Include="..\LICENSE.txt" />
+    <None Include="..\README.md" />
+    <None Include="..\doc\README-ja.html" />
+    <None Include="..\doc\style.css" />
+    <None Include="..\doc\syntax.txt" />
+    <None Include="..\doc\HISTORY-ja.html" />
+    <None Include="..\doc\README-nyamy.html" />
+    <None Include="..\doc\README-ymgw.html" />
+    <None Include="..\doc\edit-setting-ja.png" />
+    <None Include="..\doc\investigate-ja.png" />
+    <None Include="..\doc\log-ja.png" />
+    <None Include="..\doc\menu-ja.png" />
+    <None Include="..\doc\pause-ja.png" />
+    <None Include="..\doc\setting-ja.png" />
+    <None Include="..\doc\target.png" />
+    <None Include="..\doc\version-ja.png" />
+    <None Include="..\scripter\nyamy_scripter.h" />
+    <None Include="..\s\install.cmd" />
+    <None Include="..\s\install.ps1" />
+    <None Include="..\s\uninstall.cmd" />
+    <None Include="..\s\uninstall.ps1" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\README-yamy.txt">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
+    <CustomBuild Include="..\tools\makedistrib.ps1">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">distrib: packaging $(Configuration) build</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\tools\ps1exec.cmd ..\tools\makedistrib.ps1 $(Configuration) $(VERSION)
 </Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">@(None);$(OutDir)nyamy.exe;$(OutDir)nyamy32.dll;$(OutDir)nyamy64.dll;$(OutDir)nyamyd32;$(OutDir)nyamy-scripter.exe;$(OutDir)nyamy-scripter.dll;$(OutDir)nyamy-scripter.lib;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)nyamy-$(VERSION)-debug.zip;%(Outputs)</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">distrib: packaging $(Configuration) build</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\tools\ps1exec.cmd ..\tools\makedistrib.ps1 $(Configuration) $(VERSION)
 </Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\README.md">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">@(None);$(OutDir)nyamy.exe;$(OutDir)nyamy32.dll;$(OutDir)nyamy64.dll;$(OutDir)nyamyd32;$(OutDir)nyamy-scripter.exe;$(OutDir)nyamy-scripter.dll;$(OutDir)nyamy-scripter.lib;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)nyamy-$(VERSION).zip;%(Outputs)</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -173,163 +115,6 @@
       <Project>{bf9e2f1c-a900-4f36-b185-12ba6430673d}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\tools\makedistrib.ps1" />
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\LICENSE.txt">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">copy /Y %(FullPath) $(OutDir)%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-  </ItemGroup>
-  <!-- Documentation. The HTML is generated by the makedoc project and
-       committed, so distrib only copies it; it needs no Python. -->
-  <ItemGroup>
-    <CustomBuild Include="..\doc\README-ja.html">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\style.css">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\syntax.txt">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\HISTORY-ja.html">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\README-nyamy.html">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\README-ymgw.html">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\edit-setting-ja.png">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\investigate-ja.png">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\log-ja.png">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\menu-ja.png">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\pause-ja.png">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\setting-ja.png">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\target.png">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\doc\version-ja.png">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist "$(OutDir)doc" mkdir "$(OutDir)doc"
-copy /Y %(FullPath) $(OutDir)doc\%(Filename)%(Extension)
-</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)doc\%(Filename)%(Extension);%(Outputs)</Outputs>
-    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
