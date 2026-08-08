@@ -1579,9 +1579,9 @@ void Engine::applySetting(std::shared_ptr<Setting> newSetting) {
 
 void Engine::scheduleSetting(std::shared_ptr<Setting> i_setting) {
 	// Called from the UI thread.  The Setting is activated by the engine
-	// thread at an event boundary; the caller must not wait for that to
-	// happen, because the mailslot completion APC that ends a &Sync can only
-	// run while the UI thread is back in the alertable wait of messageLoop().
+	// thread at an event boundary, which an outstanding &Sync or &Wait can
+	// push back by as much as their timeout; the caller must not wait for
+	// that, or the tasktray and every dialog freeze along with it.
 	WaitForSingleObject(m_queueMutex, INFINITE);
 	m_inputQueue->push_back(std::move(i_setting));
 	SetEvent(m_readEvent);
