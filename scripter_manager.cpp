@@ -454,7 +454,12 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 
 	STARTUPINFO si = {};
 	si.cb         = sizeof(si);
-	si.dwFlags    = STARTF_USESTDHANDLES;
+	// FORCEOFFFEEDBACK: a child created while the parent still carries the
+	// shell's startup feedback inherits it, and the scripter is a console
+	// process that never pumps messages, so the "app starting" cursor would
+	// stay up until Windows gives up on it (~5 seconds) - on every start and
+	// every reload.
+	si.dwFlags    = STARTF_USESTDHANDLES | STARTF_FORCEOFFFEEDBACK;
 	si.hStdInput  = hNul;       // stdin = NUL (EOF on read)
 	si.hStdOutput = hMsgWrite;  // stdout = message log
 	si.hStdError  = hMsgWrite;  // stderr = same pipe (merged)
