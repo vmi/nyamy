@@ -56,6 +56,7 @@ class Mayu
 						    other applications */
 	NOTIFYICONDATA m_ni;				/// taskbar icon data
 	HICON m_tasktrayIcon[2];			/// taskbar icon
+	int m_tasktrayIconRetries;			/// attempts left at adding it
 	bool m_canUseTasktrayBaloon;			///
 
 	womsgstream m_log;				/** log stream (output to log
@@ -91,6 +92,7 @@ class Mayu
 		WM_APP_msgStreamNotify = WM_APP + 102,	///
 		WM_APP_scripterSettingReady = ScripterManager::WM_ScripterSettingReady,	///< scripter generated Setting
 		ID_TaskTrayIcon = 1,			///
+		ID_TaskTrayIconRetryTimer = 2,		///< timer retrying the icon
 	};
 
 private:
@@ -678,6 +680,13 @@ private:
 				return 0;
 			}
 
+			case WM_TIMER:
+				if (i_wParam == ID_TaskTrayIconRetryTimer) {
+					This->onTasktrayIconRetryTimer();
+					return 0;
+				}
+				break;
+
 			case WM_DESTROY:
 				if (This->m_usingSN) {
 					wtsUnRegisterSessionNotification(i_hwnd);
@@ -692,7 +701,8 @@ private:
 						This->m_log << L"Tasktray icon is updated." << std::endl;
 					} else {
 						Acquire a(&This->m_log, 1);
-						This->m_log << L"Tasktray icon already exists." << std::endl;
+						This->m_log << L"Tasktray icon is not ready yet; retrying."
+						<< std::endl;
 					}
 					return 0;
 				} else if (i_message == This->m_WM_MayuIPC) {
@@ -797,22 +807,50 @@ private:
 		}
 	}
 
+	// one attempt at putting the icon into the task tray.
+	// http://support.microsoft.com/kb/418138/JA/ is why NIM_MODIFY is worth a
+	// try of its own when NIM_ADD fails
+	bool tryAddTasktrayIcon() {
+		if (Shell_NotifyIcon(NIM_ADD, &m_ni))
+			return true;
+		return !!Shell_NotifyIcon(NIM_MODIFY, &m_ni);
+	}
+
 	// change the task tray icon
 	bool showTasktrayIcon(bool i_doesAdd = false) {
 		m_ni.hIcon  = m_tasktrayIcon[m_engine.getIsEnabled() ? 1 : 0];
 		m_ni.szInfo[0] = m_ni.szInfoTitle[0] = L'\0';
 		if (i_doesAdd) {
-			// http://support.microsoft.com/kb/418138/JA/
-			int guard = 60;
-			for (; !Shell_NotifyIcon(NIM_ADD, &m_ni) && 0 < guard; -- guard) {
-				if (Shell_NotifyIcon(NIM_MODIFY, &m_ni)) {
-					return true;
-				}
-				Sleep(1000);				// 1sec
+			// The shell refuses the icon until its tray is up, which at logon is
+			// still seconds away, so the attempt has to be repeated.  Retry from
+			// a timer rather than sleeping here: the shell keeps its
+			// "app starting" cursor up until this thread reaches its message
+			// loop, so sleeping through the retry budget put a busy cursor on
+			// screen for as long as Windows allows one (~5 seconds).
+			m_tasktrayIconRetries = 60;
+			if (tryAddTasktrayIcon()) {
+				KillTimer(m_hwndTaskTray, ID_TaskTrayIconRetryTimer);
+				return true;
 			}
-			return 0 < guard;
+			SetTimer(m_hwndTaskTray, ID_TaskTrayIconRetryTimer, 1000, NULL);
+			return false;
 		} else {
 			return !!Shell_NotifyIcon(NIM_MODIFY, &m_ni);
+		}
+	}
+
+	/// ID_TaskTrayIconRetryTimer expired
+	void onTasktrayIconRetryTimer() {
+		if (tryAddTasktrayIcon()) {
+			KillTimer(m_hwndTaskTray, ID_TaskTrayIconRetryTimer);
+			Acquire a(&m_log, 1);
+			m_log << L"Tasktray icon is added." << std::endl;
+			return;
+		}
+		if (-- m_tasktrayIconRetries <= 0) {
+			KillTimer(m_hwndTaskTray, ID_TaskTrayIconRetryTimer);
+			Acquire a(&m_log, 0);
+			m_log << L"warning: gave up adding the tasktray icon." << std::endl;
 		}
 	}
 
@@ -1020,6 +1058,7 @@ public:
 			m_hwndLog(NULL),
 			m_WM_TaskbarRestart(RegisterWindowMessage(L"TaskbarCreated")),
 			m_WM_MayuIPC(RegisterWindowMessage(WM_MayuIPC_NAME)),
+			m_tasktrayIconRetries(0),
 			m_canUseTasktrayBaloon(
 				PACKVERSION(5, 0) <= getDllVersion(L"shlwapi.dll")),
 			m_log(WM_APP_msgStreamNotify),
