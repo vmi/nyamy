@@ -700,7 +700,124 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 9;
+	// `def option nls-keys' lists the scan codes whose break event never
+	// arrives, so the engine can synthesize one.  E0/E1 prefixed codes are
+	// stored as 0xE0nn / 0xE1nn.
+	{
+		printf("[%d] nls-keys option ... ", idx + 10);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__nls_keys__.mayu",
+			L"include \"109.mayu\"\n"
+			L"def option nls-keys = \"0x3a, E0-0x29, 112\"\n");
+		writeUtf8File(exeDir + L"\\__nls_keys__.rb",
+			L"load \"__nls_keys__.mayu\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__nls_keys__.rb", syms);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		check(s != nullptr, "setting built");
+		if (s) {
+			check(s->m_nlsKeys.size() == 3, "three scan codes parsed");
+			check(s->m_nlsKeys.count(0x3a) == 1, "hex scan code parsed");
+			check(s->m_nlsKeys.count(0xe029) == 1, "E0- prefix parsed");
+			check(s->m_nlsKeys.count(112) == 1, "decimal scan code parsed");
+
+			// what keyboardDetour() asks on every key event
+			check(s->isNlsKey(0x3a, 0), "0x3a is an NLS key");
+			check(!s->isNlsKey(0x3a, KEYBOARD_INPUT_DATA::E0),
+				  "E0-0x3a is not, the bare 0x3a is");
+			check(s->isNlsKey(0x29, KEYBOARD_INPUT_DATA::E0),
+				  "E0-0x29 is an NLS key");
+			check(!s->isNlsKey(0x29, 0), "bare 0x29 is not");
+			check(!s->isNlsKey(0x1d, 0), "an unlisted scan code is not");
+		}
+
+		// Key names defined by defkey stand in for scan codes.  109.mayu names
+		// these keys in Japanese, spelled here with \u escapes to keep this
+		// file ASCII:
+		//   Eisuu     (0x3a)    -> U+82F1 U+6570
+		//   E0Zenkaku (E0-0x29) -> "E0" U+534A U+89D2 '/' U+5168 U+89D2
+		//   E0Eisuu   (E0-0x3a) -> "E0" U+82F1 U+6570
+		// The last one is both a valid key name and something that looks like
+		// an E0 prefix, so it pins down the disambiguation rule as well.
+		writeUtf8File(exeDir + L"\\__nls_names__.rb",
+			L"load \"109.mayu\"\n"
+			L"defoption \"nls-keys\", value: \""
+			L"\u82F1\u6570, "
+			L"E0\u534A\u89D2/\u5168\u89D2, "
+			L"E0\u82F1\u6570\"\n");
+		Symbols symsN;
+		std::shared_ptr<Setting> sn =
+			buildSetting(exeDirU8 + "\\__nls_names__.rb", symsN);
+		check(sn != nullptr, "names: setting built");
+		if (sn) {
+			check(sn->m_nlsKeys.count(0x3a) == 1, "names: Eisuu -> 0x3a");
+			check(sn->m_nlsKeys.count(0xe029) == 1,
+				  "names: E0Zenkaku -> E0-0x29");
+			check(sn->m_nlsKeys.count(0xe03a) == 1,
+				  "names: E0Eisuu is a name, not an E0 prefix");
+			check(sn->m_nlsKeys.size() == 3, "names: three scan codes");
+		}
+
+		// an unknown name is an error, and leaves nothing behind
+		writeUtf8File(exeDir + L"\\__nls_bad__.rb",
+			L"load \"109.mayu\"\n"
+			L"defoption \"nls-keys\", value: \"0x3a, NoSuchKeyXYZ\"\n");
+		Symbols symsB;
+		std::shared_ptr<Setting> sb =
+			buildSetting(exeDirU8 + "\\__nls_bad__.rb", symsB);
+		if (sb)
+			check(sb->m_nlsKeys.empty(), "an unknown name discards the list");
+
+		// Pause spans two scan codes, so it cannot take a synthesized break
+		writeUtf8File(exeDir + L"\\__nls_multi__.rb",
+			L"load \"109.mayu\"\n"
+			L"defoption \"nls-keys\", value: \"Pause\"\n");
+		Symbols symsM;
+		std::shared_ptr<Setting> sm =
+			buildSetting(exeDirU8 + "\\__nls_multi__.rb", symsM);
+		if (sm)
+			check(sm->m_nlsKeys.empty(), "a multi-scan-code key is rejected");
+
+		// the Ruby DSL has to reach the same place
+		writeUtf8File(exeDir + L"\\__nls_dsl__.rb",
+			L"load \"109.mayu\"\n"
+			L"defoption \"nls-keys\", value: \"0x3a, E0-0x29, 112\"\n");
+		Symbols syms3;
+		std::shared_ptr<Setting> s3 =
+			buildSetting(exeDirU8 + "\\__nls_dsl__.rb", syms3);
+		check(s3 != nullptr, "DSL: setting built");
+		if (s3)
+			check(s3->m_nlsKeys == s->m_nlsKeys,
+				  "DSL: same scan codes as the .mayu form");
+
+		// no option at all means no synthesized breaks anywhere
+		writeUtf8File(exeDir + L"\\__nls_none__.rb",
+			L"load \"109.mayu\"\n");
+		Symbols syms2;
+		std::shared_ptr<Setting> s2 =
+			buildSetting(exeDirU8 + "\\__nls_none__.rb", syms2);
+		check(s2 != nullptr, "setting without the option built");
+		if (s2) {
+			check(s2->m_nlsKeys.empty(), "default is an empty set");
+			check(!s2->isNlsKey(0x3a, 0), "default synthesizes no break");
+		}
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 10;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

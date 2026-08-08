@@ -921,8 +921,24 @@ unsigned int Engine::keyboardDetour(KBDLLHOOKSTRUCT *i_kid)
 		kid.Reserved = 0;
 		kid.ExtraInformation = 0;
 
+		// An NLS key delivers a make but never a break: the keyboard layout
+		// driver consumes the release before this hook runs (README-yamy.txt
+		// 3.2), and it is unreachable through Raw Input or GetAsyncKeyState
+		// too.  Left alone the key would stay pressed for the rest of the
+		// session, which also stops resetModifiersIfIdle() from ever running
+		// again.  Pair the make with a synthesized break, the way mouse wheel
+		// events are paired in mouseDetour().
+		auto s = m_setting.load(std::memory_order_acquire);
+		bool needsBreak = s
+						  && !(kid.Flags & KEYBOARD_INPUT_DATA::BREAK)
+						  && s->isNlsKey(kid.MakeCode, kid.Flags);
+
 		WaitForSingleObject(m_queueMutex, INFINITE);
 		m_inputQueue->push_back(kid);
+		if (needsBreak) {
+			kid.Flags |= KEYBOARD_INPUT_DATA::BREAK;
+			m_inputQueue->push_back(kid);
+		}
 		SetEvent(m_readEvent);
 		ReleaseMutex(m_queueMutex);
 		return 1;

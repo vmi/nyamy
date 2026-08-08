@@ -256,6 +256,13 @@ NYS_API int nys_scancode_map_length(void);
 /// Both out pointers may be NULL.  Returns false if idx is out of range.
 NYS_API bool nys_scancode_map_entry(int idx, unsigned* from_word, unsigned* to_word);
 
+/// Return true if word (as resolved by nys_sc_resolve) is currently
+/// registered by "def option nls-keys".
+/// Reflects the most recent nys_def_option("nls-keys", ...) call, parsed the
+/// same way as the downstream Setting build; a key defined after that call
+/// is not seen until the option is set again.
+NYS_API bool nys_is_nls_key_word(int word);
+
 
 //=============================================================================
 // Path resolution API  (valid from on_load_setting and on_exec_user_func)

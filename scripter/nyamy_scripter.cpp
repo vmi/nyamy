@@ -57,10 +57,12 @@
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <cstring>
 #include <deque>
 #include <fcntl.h>
 #include <io.h>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <thread>
 #include <unordered_map>
@@ -163,6 +165,11 @@ static std::unordered_map<std::string, nys_on_exec_user_func> g_userFuncs;
 // Used by nys_sc_resolve to turn a defined key name into its first scan code.
 // Case-insensitive lookup via wstringi's comparator; cleared on reset.
 static std::map<wstringi, uint16_t> g_keyNameToScan;
+
+// Scan-code WORD set from the most recent "def option nls-keys" value,
+// re-parsed by nys_def_option so nys_is_nls_key_word can answer without
+// waiting for the downstream Setting build.  Cleared on reset.
+static std::set<uint16_t> g_nlsKeys;
 
 // Cached registry Scancode Map, as (from, to) WORD pairs.
 // Read lazily on first query (g_scancodeMapLoaded guards the one-shot read),
@@ -331,6 +338,7 @@ static void resetQueue()
 	g_cmdQueue.clear();
 	g_userFuncs.clear();
 	g_keyNameToScan.clear();
+	g_nlsKeys.clear();
 	g_scancodeMap.clear();
 	g_scancodeMapLoaded = false;
 }
@@ -871,6 +879,50 @@ NYS_API int nys_get_keyseq_idx(const char* name)
 	return (it != g_keyseqByName.end()) ? it->second : -1;
 }
 
+// Shared by nys_sc_resolve and the "nls-keys" option parser: a key name
+// defined by a prior nys_def_key takes priority, falling back to a
+// scan-code literal ("0x1c", "E0-0x1c", "28").
+static bool resolveScanWord(const std::string& str, uint16_t* out)
+{
+	if (str.empty()) return false;
+
+	auto it = g_keyNameToScan.find(wstringi(from_UTF8(str)));
+	if (it != g_keyNameToScan.end()) {
+		*out = it->second;
+		return true;
+	}
+
+	AstScanCode sc;
+	if (!MayuParser::parseScanCode(wstringi(from_UTF8(str)), sc))
+		return false;
+	*out = cmdScanToWord(MayuCompiler::compileScanCode(sc));
+	return true;
+}
+
+// "0x3a, E0-0x29, 112, NLS-1" -> a set of scan-code WORDs, mirroring
+// CmdProcessor::parseNlsKeys.  Separators are commas and whitespace.
+// On an unresolvable item the set is left empty, matching the downstream
+// Setting build's behavior of discarding the whole option on error.
+static void parseNlsKeysOption(const std::string& value)
+{
+	g_nlsKeys.clear();
+
+	size_t i = 0, n = value.size();
+	while (i < n) {
+		if (value[i] == ',' || value[i] == ' ' || value[i] == '\t') { ++i; continue; }
+
+		size_t begin = i;
+		while (i < n && value[i] != ',' && value[i] != ' ' && value[i] != '\t') ++i;
+
+		uint16_t word = 0;
+		if (!resolveScanWord(value.substr(begin, i - begin), &word)) {
+			g_nlsKeys.clear();
+			return;
+		}
+		g_nlsKeys.insert(word);
+	}
+}
+
 NYS_API bool nys_def_key(const NYsStrs* names, const NYsStrs* scancodes)
 {
 	if (!checkInLoadSetting("nys_def_key")) return false;
@@ -976,6 +1028,9 @@ NYS_API bool nys_def_option(const char* option_name, const char* value)
 	if (!checkInLoadSetting("nys_def_option")) return false;
 	if (!option_name || !*option_name) return setError("nys_def_option: option_name is empty");
 	if (!value)                         return setError("nys_def_option: value is null");
+
+	if (std::strcmp(option_name, "nls-keys") == 0)
+		parseNlsKeysOption(value);
 
 	CmdArgsDefOption d;
 	d.optionName = from_UTF8(option_name);
@@ -1203,17 +1258,17 @@ static void loadScancodeMapOnce()
 NYS_API int nys_sc_resolve(const char* str)
 {
 	if (!str || !*str) return -1;
+	uint16_t word = 0;
+	if (!resolveScanWord(str, &word)) return -1;
+	return word;
+}
 
-	// Key names take priority over scan-code literals.
-	auto it = g_keyNameToScan.find(wstringi(from_UTF8(str)));
-	if (it != g_keyNameToScan.end())
-		return it->second;
-
-	// Fall back to parsing str as a scan-code literal ("0x1c", "E0-0x1c", "28").
-	AstScanCode sc;
-	if (!MayuParser::parseScanCode(wstringi(from_UTF8(str)), sc))
-		return -1;
-	return cmdScanToWord(MayuCompiler::compileScanCode(sc));
+// Return true if word (as returned by nys_sc_resolve) is registered by the
+// most recent "def option nls-keys".
+NYS_API bool nys_is_nls_key_word(int word)
+{
+	if (word < 0) return false;
+	return g_nlsKeys.count(static_cast<uint16_t>(word)) != 0;
 }
 
 NYS_API int nys_scancode_map_length(void)

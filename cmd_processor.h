@@ -53,6 +53,8 @@ private:
 	void warning(const std::wstring &msg);
 	void beginSetting();
 	void applyDefSubst(const CmdArgsDefSubst &data);
+	bool nlsScanCode(const std::wstring &item, USHORT *o_code);
+	void parseNlsKeys(const wstringi &value);
 	static bool lookupModifierType(const wstringi &name, Modifier::Type *o_mt);
 	static Keymap::AssignMode parseAssignMode(const wstringi &s);
 

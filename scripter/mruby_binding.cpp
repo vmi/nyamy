@@ -999,6 +999,16 @@ static mrb_value dsl_sc(mrb_state *mrb, mrb_value self)
 	return mrb_int_value(mrb, scResolveArgOrRaise(mrb, v));
 }
 
+// DSL#nls_key?(key_or_scancode)  ->  true if registered by
+// `defoption "nls-keys"' (key names take priority, see #sc)
+static mrb_value dsl_nls_key_p(mrb_state *mrb, mrb_value self)
+{
+	(void)self;
+	mrb_value v;
+	mrb_get_args(mrb, "o", &v);
+	return mrb_bool_value(nys_is_nls_key_word(scResolveArgOrRaise(mrb, v)));
+}
+
 // ScancodeMap[from] / ScancodeMap.from(from)  ->  remapped scan code or nil
 static mrb_value scancodemap_from(mrb_state *mrb, mrb_value self)
 {
@@ -1102,6 +1112,7 @@ static void nyamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, dsl_cls, "deffunc",     dsl_deffunc,     MRB_ARGS_ANY());
 	mrb_define_method(mrb, dsl_cls, "exec_keyseq", dsl_exec_keyseq, MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, dsl_cls, "sc",          dsl_sc,          MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, dsl_cls, "nls_key?",    dsl_nls_key_p,   MRB_ARGS_REQ(1));
 
 	// ScancodeMap: read-only view of the registry Scancode Map (top-level module).
 	struct RClass *scmap = mrb_define_module(mrb, "ScancodeMap");

@@ -71,6 +71,7 @@ public:
 	unsigned int *oneShotRepeatableDelay() { return &m_setting.m_oneShotRepeatableDelay; }
 	bool *mouseEvent() { return &m_setting.m_mouseEvent; }
 	LONG *dragThreshold() { return &m_setting.m_dragThreshold; }
+	std::set<USHORT> *nlsKeys() { return &m_setting.m_nlsKeys; }
 
 	// CmdLoadContext interface (used during command-stream interpretation)
 	const Keymap *resolveKeymap(const wstringi &name) override {

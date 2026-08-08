@@ -8,6 +8,8 @@
 #include "errormessage.h"
 #include "function.h"
 
+#include <cstdlib>
+
 
 namespace {
 
@@ -230,6 +232,84 @@ void CmdProcessor::operator()(CmdArgsDefOption &data)
 	else if (name == L"delay-of !!!") *m_builder->oneShotRepeatableDelay() = static_cast<unsigned int>(_wtoi(value.c_str()));
 	else if (name == L"mouse-event") *m_builder->mouseEvent() = !(value == L"false");
 	else if (name == L"drag-threshold") *m_builder->dragThreshold() = static_cast<LONG>(_wtoi(value.c_str()));
+	else if (name == L"nls-keys") parseNlsKeys(value);
+}
+
+
+// One item of "def option nls-keys": either a scan code - decimal, or hex with
+// a 0x prefix, optionally preceded by "E0-" / "E1-" - or the name of a key
+// defined earlier by defkey.  A name is only tried when the item is not a
+// number in its entirety, so key names that begin with "E0" stay unambiguous.
+// See Setting::m_nlsKeys for the encoding.
+bool CmdProcessor::nlsScanCode(const std::wstring &item, USHORT *o_code)
+{
+	const wchar_t *p = item.c_str();
+	USHORT prefix = 0;
+	if ((p[0] == L'E' || p[0] == L'e') && p[1] && p[2] == L'-') {
+		if (p[1] == L'0') prefix = 0xe000;
+		else if (p[1] == L'1') prefix = 0xe100;
+		if (prefix) p += 3;
+	}
+
+	wchar_t *end = NULL;
+	unsigned long scan = wcstoul(p, &end, 0);
+	if (*p && end && *end == L'\0') {
+		if (0xff < scan) {
+			error(L"scan code out of range in `def option nls-keys': " + item);
+			return false;
+		}
+		*o_code = static_cast<USHORT>(prefix | scan);
+		return true;
+	}
+
+	Key *key = m_builder->searchKey(wstringi(item.c_str()));
+	if (!key) {
+		error(L"unknown scan code or key name in `def option nls-keys': "
+			  + item);
+		return false;
+	}
+	// a key spanning several scan codes never matches a single input event,
+	// so a synthesized break could not reach it anyway
+	if (key->getScanCodesSize() != 1) {
+		error(L"key with multiple scan codes in `def option nls-keys': "
+			  + item);
+		return false;
+	}
+
+	const ScanCode &sc = key->getScanCodes()[0];
+	USHORT code = static_cast<USHORT>(sc.m_scan & 0xff);
+	if (sc.m_flags & ScanCode::E0) code |= 0xe000;
+	else if (sc.m_flags & ScanCode::E1) code |= 0xe100;
+	*o_code = code;
+	return true;
+}
+
+
+// "0x3a, E0-0x29, 112, 英数" -> a set of scan codes.  Separators are commas
+// and whitespace.  Key names have to be defined before this option is read.
+void CmdProcessor::parseNlsKeys(const wstringi &value)
+{
+	std::set<USHORT> *keys = m_builder->nlsKeys();
+	keys->clear();
+
+	const wchar_t *p = value.c_str();
+	while (*p) {
+		if (*p == L',' || *p == L' ' || *p == L'\t') {
+			++ p;
+			continue;
+		}
+
+		const wchar_t *begin = p;
+		while (*p && *p != L',' && *p != L' ' && *p != L'\t')
+			++ p;
+
+		USHORT code = 0;
+		if (!nlsScanCode(std::wstring(begin, p), &code)) {
+			keys->clear();
+			return;
+		}
+		keys->insert(code);
+	}
 }
 
 

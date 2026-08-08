@@ -125,7 +125,7 @@ NYS_API bool nys_def_alias(const char* alias_name, const char* key_name);
 NYS_API bool nys_def_subst(const NYsStrs* lhs_mod_keys, int rhs_keyseq_idx);
 
 // def option ... 相当
-// option_name: オプション名 (例: "KL-", "delay-of !!!", "mouse-event", "drag-threshold")
+// option_name: オプション名 (例: "KL-", "delay-of !!!", "mouse-event", "drag-threshold", "nls-keys")
 // value: 値文字列 (例: "true", "500")
 NYS_API bool nys_def_option(const char* option_name, const char* value);
 

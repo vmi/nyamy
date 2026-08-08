@@ -28,12 +28,30 @@ public:
 	LONG m_dragThreshold;			///
 	unsigned int m_oneShotRepeatableDelay;	///
 
+	/** Scan codes of NLS keys: keys whose break event never reaches the hook
+	    because the keyboard layout driver consumes it first (see
+	    README-yamy.txt 3.2).  E0/E1 prefixed codes are held as 0xE0nn / 0xE1nn,
+	    the encoding the scripter's sc() helper produces. */
+	std::set<USHORT> m_nlsKeys;
+
 public:
 	Setting()
 			: m_correctKanaLockHandling(false),
 			m_mouseEvent(false),
 			m_dragThreshold(0),
 			m_oneShotRepeatableDelay(0) { }
+
+	/// does this scan code need a synthesized break ?
+	bool isNlsKey(USHORT i_scan, USHORT i_flags) const {
+		if (m_nlsKeys.empty())
+			return false;
+		USHORT code = static_cast<USHORT>(i_scan & 0xff);
+		if (i_flags & KEYBOARD_INPUT_DATA::E0)
+			code |= 0xe000;
+		else if (i_flags & KEYBOARD_INPUT_DATA::E1)
+			code |= 0xe100;
+		return m_nlsKeys.find(code) != m_nlsKeys.end();
+	}
 };
 
 
