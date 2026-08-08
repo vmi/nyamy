@@ -123,8 +123,8 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx);
 /// Milliseconds nys_start() waits, after Quit (or ctrl-pipe EOF) is observed,
 /// for the calling thread to finish what it is running.  On timeout the process
 /// is terminated outright: a script stuck in a loop or a blocking call cannot
-/// be unwound, and the Engine's pipe readers stay blocked until this process's
-/// write ends are closed.  A scripter launched by nyamy should pass
+/// be unwound, and a scripter that outlives the nyamy that spawned it would run
+/// on with nobody left to stop it.  A scripter launched by nyamy should pass
 /// kScripterQuitTimeoutMillisec (ctrl_stream.h), which nyamy's own grace period
 /// is set to exceed.
 /// 0 (the default) waits indefinitely, which is what an in-process host wants.

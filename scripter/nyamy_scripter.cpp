@@ -12,10 +12,9 @@
 //   the ctrl stream and queue Jobs; the calling thread ("script thread") pops
 //   Jobs and runs the callbacks, which is where every global below is touched.
 //   The split exists so that Quit and the ctrl-pipe EOF are observed even while
-//   a script is running: a script that never returns cannot be interrupted, and
-//   nyamy's reader threads stay parked in a synchronous ReadFile until this
-//   process closes its write ends.  When the script thread does not finish in
-//   time, the ctrl thread terminates the process (see nys_set_quit_timeout).
+//   a script is running, since a script that never returns cannot be
+//   interrupted.  When the script thread does not finish in time, the ctrl
+//   thread terminates the process (see nys_set_quit_timeout).
 //
 // Design -- command queueing:
 //   nys_* API calls made during on_load_setting push commands into a typed
@@ -686,11 +685,10 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 		}
 		queue.pushQuit();
 
-		// A script that never returns cannot be interrupted, and nyamy cannot
-		// release its pipe readers until this process closes its write ends -
-		// so close them the only way left.  TerminateProcess rather than
-		// ExitProcess: ExitProcess would try to unwind a thread that is still
-		// holding CRT and loader locks.
+		// A script that never returns cannot be interrupted, so the only way to
+		// stop is to die - and if nyamy went down first, nobody else is going
+		// to.  TerminateProcess rather than ExitProcess: ExitProcess would try
+		// to unwind a thread that is still holding CRT and loader locks.
 		uint32_t timeout = g_quitTimeoutMillisec.load();
 		if (timeout > 0 &&
 		    WaitForSingleObject(hScriptDone, timeout) == WAIT_TIMEOUT) {

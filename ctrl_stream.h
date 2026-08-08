@@ -26,9 +26,7 @@ enum class CtrlId : uint8_t {
 // A script that never returns cannot be interrupted: mruby offers no way into
 // a running VM without a compile-time option, and a blocking call has no
 // cancellation point at all.  Killing the scripter process is therefore the
-// only way to stop one, and it is also what releases nyamy's reader threads -
-// they are parked in a synchronous ReadFile on an anonymous pipe, which only
-// returns once the write end is closed.
+// only way to stop one.
 //
 // Two layers do the killing, and the order between them is what these
 // constants encode: the scripter terminates itself first, and nyamy's
@@ -36,6 +34,9 @@ enum class CtrlId : uint8_t {
 // implementation launched through the ini "cmdLine" setting, one wedged before
 // its ctrl thread started, or one held alive by a Windows Error Reporting
 // dialog.
+//
+// nyamy's reader threads do not depend on any of this: their reads are
+// overlapped and end on a stop event (ScripterManager::stopReaders).
 //=============================================================================
 
 /// Milliseconds the scripter waits for a running script after it observes Quit
@@ -46,8 +47,7 @@ const uint32_t kScripterQuitTimeoutMillisec = 3000;
 /// Milliseconds nyamy waits for the scripter to exit on its own after Quit.
 const uint32_t kScripterQuitGraceMillisec = 5000;
 
-/// Milliseconds nyamy waits after TerminateProcess: the reader threads only
-/// have to return from the one ReadFile that closing the write ends released.
+/// Milliseconds nyamy waits after TerminateProcess for the process to go away.
 const uint32_t kScripterKillWaitMillisec = 2000;
 
 static_assert(kScripterQuitGraceMillisec > kScripterQuitTimeoutMillisec,

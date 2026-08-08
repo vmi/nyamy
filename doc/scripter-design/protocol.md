@@ -26,18 +26,13 @@ CmdStream を汚染しない。
 nyamy 側 (`ScripterManager::launchScripter()`) の処理:
 
 ```cpp
-// パイプ生成 (sa.bInheritHandle = TRUE で子プロセスに継承可能)
-CreatePipe(&hCtrlRead,   &m_hCtrlWrite, &sa, 0);  // ctrl
-CreatePipe(&m_hDataRead, &hDataWrite,   &sa, 0);  // cmd (data)
-CreatePipe(&m_hMsgRead,  &hMsgWrite,    &sa, 0);  // msg (log)
-hNul = CreateFile(L"NUL", GENERIC_READ, ..., &sa, ...);  // stdin 代替
-
-// nyamy 側ハンドルは子プロセスに継承させない
-SetHandleInformation(m_hCtrlWrite, HANDLE_FLAG_INHERIT, 0);
-SetHandleInformation(m_hDataRead,  HANDLE_FLAG_INHERIT, 0);
-SetHandleInformation(m_hMsgRead,   HANDLE_FLAG_INHERIT, 0);
-SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
-// hCtrlRead, hDataWrite, hMsgWrite は継承可能 (sa.bInheritHandle=TRUE)
+// パイプ生成。nyamy 側がサーバ端、子プロセスに渡すクライアント端のみ継承可能。
+// 読み取り側 (data / msg) のサーバ端は FILE_FLAG_OVERLAPPED 付きで、これが
+// reader スレッドを停止イベントで畳める根拠になる (「Quit」参照)。
+createNamedPipePair(false, 16*1024, &m_hCtrlWrite, &hCtrlRead);  // ctrl
+createNamedPipePair(true,  64*1024, &m_hDataRead,  &hDataWrite); // cmd (data)
+createNamedPipePair(true,  16*1024, &m_hMsgRead,   &hMsgWrite);  // msg (log)
+hNul = CreateFile(L"NUL", GENERIC_READ, ..., NULL, ...);  // stdin 代替 (継承不可)
 
 // 環境変数ブロックにハンドル番号を設定
 wchar_t ctrlVal[32], cmdVal[32];
@@ -141,11 +136,10 @@ enum class CtrlId : uint8_t {
 ```
 
 **確実な停止信号は Quit バイトではなく ctrl パイプの EOF である。** ctrl パイプは
-drop-on-full モード (`PIPE_NOWAIT`) で運用しているため Quit バイトは理屈の上では
-捨てられうる。`sendQuit()` は取りこぼしを避けるため最大 200 ms 再試行するが、
-それでも書けなかった場合は握りつぶさずログに出す。いずれにせよ直後の
-`CloseHandle` による EOF が届くので、停止そのものは保証される。Quit バイトは
-その前倒し通知という位置づけ。
+drop-on-full モード (`PIPE_NOWAIT`) で運用しているため Quit バイトは捨てられうる
+(捨てるときは全バイト捨てるので、切り詰めたメッセージは残らない)。書けなかった
+場合は握りつぶさずログに出す。いずれにせよ直後の `CloseHandle` による EOF が届く
+ので、停止そのものは保証される。Quit バイトはその前倒し通知という位置づけ。
 
 停止は次の 3 段構えで、時間の大小関係は `ctrl_stream.h` の定数に一元化され
 `static_assert` で固定されている。
@@ -158,14 +152,15 @@ drop-on-full モード (`PIPE_NOWAIT`) で運用しているため Quit バイ�
 
 段 2 が要るのは、走り続けるスクリプトを中断する手段が存在しないため。mruby には
 実行中の VM に割り込む口がコンパイルオプション無しでは無く、ブロッキング呼び出しに
-至っては中断点自体が無い。プロセスを殺すことだけが停止手段であり、それは同時に
-nyamy の reader スレッドを解放する唯一の手段でもある (同期匿名パイプの `ReadFile` は
-`CancelIoEx` が効かず、書き込み端が閉じたときにしか戻らない)。
+至っては中断点自体が無い。プロセスを殺すことだけが停止手段であり、**nyamy が先に
+落ちた場合に暴走スクリプトを抱えたプロセスが取り残されるのを防ぐ**のがこの段の役目。
 
 段 3 が残るのは、自決できない相手がいるため: ini の `cmdLine` で差し替えた別実装、
 ctrl スレッドが立つ前に固まったプロセス、エラーダイアログで生き残ったプロセスなど。
-`forceStop()` の戻り値は「reader スレッドが本当に止まったか」であり、nyamy はこれを
-見てから ScripterManager を解体する。
+
+**nyamy の reader スレッドの停止は、この 3 段構えとは独立している。** data / msg
+パイプの nyamy 側ハンドルは overlapped なので、`stopReaders()` の停止イベントで
+保留中の読み取りを畳める。scripter が生きていようと固まっていようと関係ない。
 
 段 2 の猶予は `nys_set_quit_timeout()` で設定する。既定は 0 (無効 = 無期限に待つ)
 で、プロセス内ホスト (テストハーネス) が道連れにされないようにしてある。
@@ -268,7 +263,7 @@ sequenceDiagram
 
     nyamy->>old: CtrlStream: Quit 送信 + ctrl パイプをクローズ
     old-->>nyamy: 終了 (走り続けていれば 3 秒後に自決)
-    nyamy->>nyamy: forceStop(5000) — 停止を確認 (最終手段は TerminateProcess)
+    nyamy->>nyamy: forceStop(5000) — reader を停止イベントで畳み、<br/>プロセスの停止を確認 (最終手段は TerminateProcess)
     nyamy->>nyamy: closeHandles
     nyamy->>new: CreateProcess (新パイプ + 新 CmdProcessor)
     nyamy->>new: CtrlStream: Start(syms)

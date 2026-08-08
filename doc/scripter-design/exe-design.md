@@ -87,6 +87,8 @@ Quit はキューの**末尾**に積まれ、先に積まれたジョブを追�
 pipe_streambuf.h
   PipeWriteStreambuf   : Win32 HANDLE → std::streambuf (書き込み)
   PipeReadStreambuf    : Win32 HANDLE → std::streambuf (読み込み、char、4KB バッファ)
+                         停止イベントを渡すと overlapped 読み取りになり、
+                         シグナルで畳める (nyamy 側の data / msg が使う)
 ```
 
 ---
