@@ -1378,20 +1378,26 @@ int WINAPI wWinMain(_In_ HINSTANCE i_hInstance, _In_opt_ HINSTANCE /* i_hPrevIns
 	CHECK_TRUE( InitCommonControlsEx(&icc) );
 
 	// is another mayu running ?
+	// CreateMutex() hands back a valid handle for a mutex that already
+	// exists, so an existing instance shows in GetLastError(), never in the
+	// handle - testing the handle alone let every further instance start.
+	// ERROR_ACCESS_DENIED means the mutex is there but out of our reach,
+	// which in practice is an elevated instance seen from a normal one.
 	HANDLE mutex = CreateMutex((SECURITY_ATTRIBUTES *)NULL, TRUE,
 							   MUTEX_MAYU_EXCLUSIVE_RUNNING);
-	if (mutex == nullptr) {
+	DWORD mutexError = GetLastError();	// before anything overwrites it
+	if (mutex == nullptr || mutexError == ERROR_ALREADY_EXISTS) {
 		std::wstring title = loadString(IDS_mayu);
 		std::wstring text;
-		DWORD err = GetLastError();
-		if (err == ERROR_ALREADY_EXISTS) {
+		if (mutexError == ERROR_ALREADY_EXISTS ||
+				mutexError == ERROR_ACCESS_DENIED) {
 			// another mayu already running
 			text = loadString(IDS_mayuAlreadyExists);
 		}
 		else {
 			// failed to create mutex for unknown reason
 			wchar_t buf[1024]{ L"" };
-			std::swprintf(buf, NUMBER_OF(buf), loadString(IDS_unexpectedError).c_str(), err);
+			std::swprintf(buf, NUMBER_OF(buf), loadString(IDS_unexpectedError).c_str(), mutexError);
 			text = buf;
 		}
 		if (g_hookData) {
@@ -1400,6 +1406,10 @@ int WINAPI wWinMain(_In_ HINSTANCE i_hInstance, _In_opt_ HINSTANCE /* i_hPrevIns
 						WM_TaskbarRestart, 0, 0);
 		}
 		MessageBox((HWND)NULL, text.c_str(), title.c_str(), MB_OK | MB_ICONSTOP);
+		// we do not own it: closing only drops our reference, the running
+		// instance keeps the mutex alive
+		if (mutex)
+			CloseHandle(mutex);
 		return 1;
 	}
 
