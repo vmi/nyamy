@@ -14,6 +14,7 @@
 
 #include <process.h>
 #include <atomic>
+#include <random>
 #include <vector>
 
 
@@ -246,6 +247,81 @@ static std::wstring expandVars(const std::wstring &s, const std::wstring &nyamyH
 }
 
 
+// Pipe buffer sizes.  CreatePipe() used the 4 KB default; the ctrl size is
+// stated explicitly because it is the threshold at which ExecUserFunc is
+// dropped rather than allowed to stall the engine thread.
+static const DWORD kCtrlPipeBufSize = 16 * 1024;
+static const DWORD kDataPipeBufSize = 64 * 1024;
+static const DWORD kMsgPipeBufSize  = 16 * 1024;
+
+
+static void closePipeHandle(HANDLE *io_h)
+{
+	if (*io_h != INVALID_HANDLE_VALUE) {
+		CloseHandle(*io_h);
+		*io_h = INVALID_HANDLE_VALUE;
+	}
+}
+
+
+// Create one pipe as a named pipe: nyamy owns the server end, the child
+// inherits an ordinary synchronous client handle.  Named rather than anonymous
+// because only a named pipe handle can be opened for overlapped I/O, which is
+// what lets a parked reader thread be stopped without killing the scripter.
+// Nothing changes on the child's side, so a foreign scripter launched through
+// the ini "cmdLine" setting is unaffected.
+//
+// Nothing else can connect: the name is unguessable, the create fails outright
+// if it is taken (FILE_FLAG_FIRST_PIPE_INSTANCE), only one instance exists, it
+// is consumed immediately below, and remote clients are rejected.
+static bool createNamedPipePair(bool i_serverReads, DWORD i_bufSize,
+                                HANDLE *o_hServer, HANDLE *o_hClient)
+{
+	*o_hServer = INVALID_HANDLE_VALUE;
+	*o_hClient = INVALID_HANDLE_VALUE;
+
+	DWORD sessionId = 0;
+	ProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
+	std::random_device rd;	// cryptographically strong on Windows
+
+	SECURITY_ATTRIBUTES saInherit = {};
+	saInherit.nLength        = sizeof(saInherit);
+	saInherit.bInheritHandle = TRUE;
+
+	for (int attempt = 0; attempt < 4; ++attempt) {
+		wchar_t name[128];
+		swprintf_s(name, L"\\\\.\\pipe\\GANAware\\nyamy\\%u-%u-%08x%08x",
+		           sessionId, GetCurrentProcessId(), rd(), rd());
+
+		// the server end is left non-inheritable (no SECURITY_ATTRIBUTES)
+		HANDLE hServer = CreateNamedPipe(
+			name,
+			(i_serverReads ? PIPE_ACCESS_INBOUND : PIPE_ACCESS_OUTBOUND) |
+				FILE_FLAG_FIRST_PIPE_INSTANCE,
+			PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT |
+				PIPE_REJECT_REMOTE_CLIENTS,
+			1, i_bufSize, i_bufSize, 0, NULL);
+		if (hServer == INVALID_HANDLE_VALUE)
+			continue;	// name already taken: try another one
+
+		// Opening the client end here fills the pipe's only instance, and
+		// leaves it connected - which is why no ConnectNamedPipe() is needed.
+		HANDLE hClient = CreateFile(
+			name, i_serverReads ? GENERIC_WRITE : GENERIC_READ, 0,
+			&saInherit, OPEN_EXISTING, 0, NULL);
+		if (hClient == INVALID_HANDLE_VALUE) {
+			CloseHandle(hServer);
+			return false;
+		}
+
+		*o_hServer = hServer;
+		*o_hClient = hClient;
+		return true;
+	}
+	return false;
+}
+
+
 bool ScripterManager::launchScripter(const wstringi &configName,
                                       const wstringi &configPath,
                                       const Symbols &syms)
@@ -266,42 +342,33 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	HANDLE hDataWrite = INVALID_HANDLE_VALUE;
 	// msg pipe:   scripter stdout+stderr (write) -> nyamy (read), merged
 	HANDLE hMsgWrite  = INVALID_HANDLE_VALUE;
-	// NUL device: used as scripter's stdin (reads return EOF immediately)
+	// NUL device: passed as STARTUPINFO.hStdInput below, but deliberately not
+	// inheritable, which leaves the child without a usable stdin.  That is the
+	// intent: control travels over its own pipe (NYS_CTRL), so there is nothing
+	// for stdin to carry and nothing should arrive through it.
 	HANDLE hNul       = INVALID_HANDLE_VALUE;
-
-	SECURITY_ATTRIBUTES sa = {};
-	sa.nLength        = sizeof(sa);
-	sa.bInheritHandle = TRUE;
 
 	hNul = CreateFile(L"NUL", GENERIC_READ,
 	                  FILE_SHARE_READ | FILE_SHARE_WRITE,
-	                  &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	                  NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
 	if (hNul == INVALID_HANDLE_VALUE ||
-	    !CreatePipe(&hCtrlRead,   &m_hCtrlWrite, &sa, 0) ||
-	    !CreatePipe(&m_hDataRead, &hDataWrite,   &sa, 0) ||
-	    !CreatePipe(&m_hMsgRead,  &hMsgWrite,    &sa, 0)) {
+	    !createNamedPipePair(false, kCtrlPipeBufSize, &m_hCtrlWrite, &hCtrlRead) ||
+	    !createNamedPipePair(true,  kDataPipeBufSize, &m_hDataRead,  &hDataWrite) ||
+	    !createNamedPipePair(true,  kMsgPipeBufSize,  &m_hMsgRead,   &hMsgWrite)) {
 		if (m_log) {
 			Acquire a(m_soLog, 0);
-			*m_log << L"ScripterManager: CreatePipe failed" << std::endl;
+			*m_log << L"ScripterManager: cannot create pipes" << std::endl;
 		}
-		if (hNul      != INVALID_HANDLE_VALUE) CloseHandle(hNul);
-		if (hCtrlRead != INVALID_HANDLE_VALUE) CloseHandle(hCtrlRead);
-		if (hDataWrite!= INVALID_HANDLE_VALUE) CloseHandle(hDataWrite);
-		if (hMsgWrite != INVALID_HANDLE_VALUE) CloseHandle(hMsgWrite);
+		closePipeHandle(&hNul);
+		closePipeHandle(&hCtrlRead);
+		closePipeHandle(&hDataWrite);
+		closePipeHandle(&hMsgWrite);
+		closePipeHandle(&m_hCtrlWrite);
+		closePipeHandle(&m_hDataRead);
+		closePipeHandle(&m_hMsgRead);
 		return false;
 	}
-
-	// nyamy-side handles must not be inherited by the child
-	SetHandleInformation(m_hCtrlWrite, HANDLE_FLAG_INHERIT, 0);
-	SetHandleInformation(m_hDataRead,  HANDLE_FLAG_INHERIT, 0);
-	SetHandleInformation(m_hMsgRead,   HANDLE_FLAG_INHERIT, 0);
-	// hNul is passed as STARTUPINFO.hStdInput below but deliberately kept
-	// non-inheritable, which leaves the child without a usable stdin.  That is
-	// the intent: control travels over its own pipe (NYS_CTRL), so there is
-	// nothing for stdin to carry and nothing should arrive through it.
-	SetHandleInformation(hNul,         HANDLE_FLAG_INHERIT, 0);
-	// hCtrlRead, hDataWrite, hMsgWrite are inherited (sa.bInheritHandle=TRUE)
 
 	// determine nyamy's home directory (used for ${NYAMY_HOME} and the default
 	// scripter path)
