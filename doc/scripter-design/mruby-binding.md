@@ -905,7 +905,9 @@ static mrb_value g_funcTable;  // mruby Hash: String => Proc (GC保護済み)
 ```
 
 `mrb_state*` は `MRubyContext` が保持する。スクリプトパスは `mruby_on_load_setting` 内で
-`ctx->argv[1]` または `nys_get_home_directories()` を使って解決する。
+`ctx->argv[1]` を `nys_resolve_config_path()` に渡して絶対パスへ解決する
+(相対パスは `NYAMY_CONFIG` → `NYAMY_ROOT` の順に探索。カレントディレクトリは見ない)。
+`argv[1]` が無いのは内部エラーで、`main()` が使用法を表示して終了コード 2 で先に弾く。
 
 ### コールバック
 

@@ -9,9 +9,9 @@
 #  include <vector>
 
 
-/// UTF-8 ini file access class (%LOCALAPPDATA%\NYamy\Config\nyamy.ini).
+/// UTF-8 ini file access class (nyamy.ini in NYamyPaths::config()).
 /// On first use, a nyamy.ini placed next to the executable (if any) is
-/// copied there as the seed; afterwards only the LOCALAPPDATA copy is used.
+/// copied there as the seed; afterwards only the per-user copy is used.
 /// The file is read as UTF-8 (an optional BOM is skipped) and written as
 /// UTF-8 with BOM, CRLF line endings.  Values live under the [nyamy] section;
 /// comments (; or #), blank lines and unknown lines are preserved on write.

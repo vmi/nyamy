@@ -1292,22 +1292,6 @@ NYS_API bool nys_scancode_map_entry(int idx, unsigned* from_word, unsigned* to_w
 // Path resolution API  (valid from on_load_setting and on_exec_user_func)
 //=============================================================================
 
-NYS_API NYsStrs* nys_get_home_directories(void)
-{
-	if (!checkInCallback("nys_get_home_directories")) return nullptr;
-	ConfigFiles cf;
-	HomeDirectories dirs;
-	cf.getHomeDirectories(&dirs);
-	NYsStrs* result = nys_strs_new();
-	if (!result) return nullptr;
-	for (const auto& d : dirs) {
-		std::string u = to_UTF8(std::wstring(d));
-		nys_strs_push(result, u.c_str(), u.size());
-	}
-	return result;
-}
-
-
 NYS_API bool nys_resolve_config_path(const char*  name,
                                     const char** out_path)
 {
@@ -1316,26 +1300,18 @@ NYS_API bool nys_resolve_config_path(const char*  name,
 	wstringi resolved;
 
 	if (name && *name) {
-		// named file: search home directories (no registry access)
+		// named file: absolute as is, relative through the search path
 		if (!cf.getFilename(from_UTF8(name), &resolved))
 			return setError(std::string("nys_resolve_config_path: not found: ") + name);
 	} else if (!g_configPath.empty()) {
-		// default: use path received from Engine
-		resolved = g_configPath;
-		if (!cf.isReadable(resolved))
+		// default: use path received from Engine, resolved the same way
+		if (!cf.getFilename(g_configPath, &resolved))
 			return setError("nys_resolve_config_path: path from Engine is not readable: "
-			                + to_UTF8(std::wstring(resolved)));
+			                + to_UTF8(std::wstring(g_configPath)));
 	} else {
-		// default: no registry config; search home directories for .mayu
-		HomeDirectories dirs;
-		cf.getHomeDirectories(&dirs);
-		bool found = false;
-		for (const auto &dir : dirs) {
-			resolved = dir + L"\\.mayu";
-			if (cf.isReadable(resolved, 0)) { found = true; break; }
-		}
-		if (!found)
-			return setError("nys_resolve_config_path: .mayu not found in home directories");
+		// default: search the config search path for .mayu
+		if (!cf.getFilename(L"", &resolved))
+			return setError("nys_resolve_config_path: .mayu not found in the config search path");
 	}
 
 	NYsStrs* buf = g_sessionAlloc->newStrs();

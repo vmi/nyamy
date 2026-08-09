@@ -33,6 +33,7 @@
     <ClCompile Include="..\keymap.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\layoutmanager.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\inifile.cpp"><Filter>Engine</Filter></ClCompile>
+    <ClCompile Include="..\nyamy_paths.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\setting_builder.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\stringtool.cpp"><Filter>Engine</Filter></ClCompile>
     <ClCompile Include="..\target.cpp"><Filter>Engine</Filter></ClCompile>

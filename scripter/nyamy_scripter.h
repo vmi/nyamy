@@ -265,19 +265,33 @@ NYS_API bool nys_is_nls_key_word(int word);
 
 
 //=============================================================================
-// Path resolution API  (valid from on_load_setting and on_exec_user_func)
+// Path API  (callable at any time)
 //=============================================================================
 
-/// Return the home directory list used for config file lookup (UTF-8 strings).
-/// Includes %USERPROFILE%\.config\nyamy, %LOCALAPPDATA%\NYamy\Config, and the
-/// executable directory, in that search order.
-/// Lifetime: managed by the callback session; do not free manually.
-NYS_API NYsStrs* nys_get_home_directories(void);
+/// NYamy's directory layout, as UTF-8 paths without a trailing separator.
+/// The values come from the NYAMY_ROOT / NYAMY_HOME / NYAMY_CONFIG environment
+/// variables that nyamy publishes before launching the scripter; running
+/// without nyamy above falls back to the executable directory and
+/// %LOCALAPPDATA%\NYamy.
+/// Lifetime: valid for the life of the process; never NULL.
+///
+///   root    directory holding nyamy.exe (distributed .mayu / .rb files)
+///   home    per-user data directory; "<home>\Lib" is on $LOAD_PATH
+///   config  per-user configuration directory (nyamy.ini, .mayu, .mayu.rb)
+///
+/// Config files are searched in config, then root.
+NYS_API const char* nys_paths_root(void);
+NYS_API const char* nys_paths_home(void);
+NYS_API const char* nys_paths_config(void);
 
 /// Resolve a config file name to an absolute path without compiling.
-/// name:     file name (NULL or "" resolves the default .mayu via registry then home dirs)
+/// name:     file name; an absolute path is only checked for readability, a
+///           relative one is searched in the config search path.
+///           NULL or "" resolves the path received from the Engine, or the
+///           default ".mayu".
 /// out_path: resolved absolute path (NULL to ignore) -- session lifetime
 /// Returns false if the file cannot be found; sets nys_last_error().
+/// Valid from on_load_setting and on_exec_user_func.
 NYS_API bool nys_resolve_config_path(const char*  name,
                                     const char** out_path);
 

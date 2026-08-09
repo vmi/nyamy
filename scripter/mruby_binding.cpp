@@ -1134,29 +1134,24 @@ bool mruby_on_load_setting(void* exeCtx)
 {
 	MRubyContext *ctx = static_cast<MRubyContext *>(exeCtx);
 
-	// 1. Resolve script path.
-	//    If argv[1] is supplied use it; otherwise search home directories for .mayu.rb.
-	const char *script = nullptr;
-	int argv_start = 2;
-	std::string scriptStorage;
-
-	if (ctx->argc >= 2) {
-		script = ctx->argv[1];
-	} else {
-		const char *found = nullptr;
-		if (nys_resolve_config_path(".mayu.rb", &found) && found) {
-			scriptStorage = found;
-			script = scriptStorage.c_str();
-		}
-		argv_start = 1;
-	}
-
-	if (!script) {
-		fprintf(stderr,
-			"error: script file required (or place .mayu.rb in a home directory)\n"
-			"usage: nyamy-scripter.exe path.rb [args...]\n");
+	// 1. Resolve the script to an absolute path.  A relative argv[1] is
+	//    searched in the config search path (NYAMY_CONFIG, then NYAMY_ROOT);
+	//    the current directory is never consulted, so where nyamy happened to
+	//    be started from cannot decide which configuration is loaded.
+	//    main() rejects a missing argv[1] before nys_start, so reaching this
+	//    without one is an internal error.
+	if (ctx->argc < 2) {
+		fprintf(stderr, "error: no script path was passed to on_load_setting\n");
 		return false;
 	}
+
+	const char *found = nullptr;
+	if (!nys_resolve_config_path(ctx->argv[1], &found) || !found) {
+		fprintf(stderr, "error: script not found: %s (searched: %s;%s)\n",
+			ctx->argv[1], nys_paths_config(), nys_paths_root());
+		return false;
+	}
+	std::string script = canonicalizePath(utf8ToWide(found));
 
 	// 2. Open mruby state and register DSL classes.
 	//    A second Start reloads in-process (the test harness does this; the
@@ -1175,32 +1170,32 @@ bool mruby_on_load_setting(void* exeCtx)
 	ctx->mrb = mrb;
 	nyamy_mruby_init_internal(mrb);
 
-	// 3. Set $LOAD_PATH to the script's directory followed by the home
-	//    directories, and $LOADED_FEATURES to an empty array.  DSL#load and
-	//    DSL#require search $LOAD_PATH when given a relative .rb path.
+	// 3. Set $LOAD_PATH to the script's own directory, the config directory,
+	//    the user library directory and the installation, and $LOADED_FEATURES
+	//    to an empty array.  DSL#load and DSL#require search $LOAD_PATH when
+	//    given a relative .rb path.
 	{
 		mrb_value load_path = mrb_ary_new(mrb);
-
-		std::string scriptDir;
-		std::string scriptAbs =
-			canonicalizePath(utf8ToWide(script, strlen(script)));
-		size_t sep = scriptAbs.find_last_of("\\/");
-		if (sep != std::string::npos && sep > 0) {
-			scriptDir = scriptAbs.substr(0, sep);
+		auto pushUnique = [&](const std::string &dir) {
+			if (dir.empty()) return;
+			mrb_int n = RARRAY_LEN(load_path);
+			for (mrb_int i = 0; i < n; ++i) {
+				mrb_value e = mrb_ary_ref(mrb, load_path, i);
+				std::string s(RSTRING_PTR(e), RSTRING_LEN(e));
+				if (_stricmp(s.c_str(), dir.c_str()) == 0)
+					return;
+			}
 			mrb_ary_push(mrb, load_path,
-				mrb_str_new(mrb, scriptDir.c_str(), scriptDir.size()));
-		}
+				mrb_str_new(mrb, dir.c_str(), dir.size()));
+		};
 
-		NYsStrs *dirs = nys_get_home_directories();
-		int n = dirs ? nys_strs_length(dirs) : 0;
-		for (int i = 0; i < n; ++i) {
-			const char *p = nullptr; size_t len = 0;
-			nys_strs_get(dirs, i, &p, &len);
-			if (p && len > 0 && scriptDir.compare(0, scriptDir.size(),
-					p, len) != 0)
-				mrb_ary_push(mrb, load_path,
-					mrb_str_new(mrb, p, (mrb_int)len));
-		}
+		size_t sep = script.find_last_of("\\/");
+		if (sep != std::string::npos && sep > 0)
+			pushUnique(script.substr(0, sep));
+		pushUnique(nys_paths_config());
+		pushUnique(std::string(nys_paths_home()) + "\\Lib");
+		pushUnique(nys_paths_root());
+
 		mrb_gv_set(mrb, mrb_intern_cstr(mrb, "$LOAD_PATH"), load_path);
 		mrb_gv_set(mrb, mrb_intern_cstr(mrb, "$LOADED_FEATURES"),
 			mrb_ary_new(mrb));
@@ -1208,12 +1203,12 @@ bool mruby_on_load_setting(void* exeCtx)
 
 	// 4. Set $0 to the script path.
 	mrb_gv_set(mrb, mrb_intern_cstr(mrb, "$0"),
-		mrb_str_new_cstr(mrb, script));
+		mrb_str_new(mrb, script.c_str(), script.size()));
 
 	// 5. Set ARGV constant from arguments after the script name.
 	{
 		mrb_value argv_val = mrb_ary_new(mrb);
-		for (int i = argv_start; i < ctx->argc; ++i)
+		for (int i = 2; i < ctx->argc; ++i)
 			mrb_ary_push(mrb, argv_val, mrb_str_new_cstr(mrb, ctx->argv[i]));
 		mrb_define_global_const(mrb, "ARGV", argv_val);
 	}
@@ -1231,7 +1226,8 @@ bool mruby_on_load_setting(void* exeCtx)
 		struct RClass *dsl_cls = mrb_class_get_under(mrb,
 			mrb_module_get(mrb, "NYamy"), "DSL");
 		mrb_value dsl = mrb_obj_new(mrb, dsl_cls, 0, nullptr);
-		mrb_funcall(mrb, dsl, "load", 1, mrb_str_new_cstr(mrb, script));
+		mrb_funcall(mrb, dsl, "load", 1,
+			mrb_str_new(mrb, script.c_str(), script.size()));
 	}
 
 	if (mrb->exc) {

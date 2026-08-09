@@ -68,6 +68,9 @@
     <ClCompile Include="..\scripter\config_files.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="..\scripter\nys_paths.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="..\scripter\ctrl_stream_reader.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

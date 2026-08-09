@@ -111,6 +111,7 @@
     <ClCompile Include="..\keymap.cpp" />
     <ClCompile Include="..\layoutmanager.cpp" />
     <ClCompile Include="..\inifile.cpp" />
+    <ClCompile Include="..\nyamy_paths.cpp" />
     <ClCompile Include="..\mayu.cpp" />
     <ClCompile Include="..\scripter_manager.cpp" />
     <ClCompile Include="..\setting_builder.cpp" />
@@ -147,6 +148,7 @@
     <ClInclude Include="..\pipe_streambuf.h" />
     <ClInclude Include="..\msgstream.h" />
     <ClInclude Include="..\inifile.h" />
+    <ClInclude Include="..\nyamy_paths.h" />
     <ClInclude Include="..\multithread.h" />
     <ClInclude Include="..\setting.h" />
     <ClInclude Include="..\cmd_stream.h" />

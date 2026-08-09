@@ -21,6 +21,7 @@
 #include "msgstream.h"
 #include "multithread.h"
 #include "inifile.h"
+#include "nyamy_paths.h"
 #include "setting.h"
 #include "scripter_manager.h"
 #include "target.h"
@@ -1083,15 +1084,6 @@ public:
 		CHECK_TRUE( Register_target() );
 		CHECK_TRUE( Register_tasktray() );
 
-		// change dir
-#if 0
-		HomeDirectories pathes;
-		getHomeDirectories(&pathes);
-		for (HomeDirectories::iterator i = pathes.begin(); i != pathes.end(); ++ i)
-			if (SetCurrentDirectory(i->c_str()))
-				break;
-#endif
-
 		// create windows, dialogs
 		wstringi title = loadString(IDS_mayu);
 		m_hwndTaskTray = CreateWindow(L"mayuTasktray", title.c_str(),
@@ -1366,6 +1358,10 @@ int WINAPI wWinMain(_In_ HINSTANCE i_hInstance, _In_opt_ HINSTANCE /* i_hPrevIns
 
 	// crash-safe hook cleanup
 	s_prevExceptionFilter = SetUnhandledExceptionFilter(crashExceptionFilter);
+
+	// resolve NYAMY_ROOT / NYAMY_HOME / NYAMY_CONFIG and publish them to the
+	// environment before anything reads nyamy.ini or starts the scripter
+	NYamyPaths::init();
 
 	// set locale
 	CHECK_TRUE(_wsetlocale(LC_ALL, L""));

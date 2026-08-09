@@ -118,6 +118,7 @@
     <ClCompile Include="..\keyboard.cpp" />
     <ClCompile Include="..\keymap.cpp" />
     <ClCompile Include="..\inifile.cpp" />
+    <ClCompile Include="..\nyamy_paths.cpp" />
     <ClCompile Include="..\layoutmanager.cpp" />
     <ClCompile Include="..\setting_builder.cpp" />
     <ClCompile Include="..\stringtool.cpp" />

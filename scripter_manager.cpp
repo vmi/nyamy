@@ -10,6 +10,7 @@
 #include "pipe_streambuf.h"
 #include "stringtool.h"
 #include "inifile.h"
+#include "nyamy_paths.h"
 #include "mayu.h"
 
 #include <process.h>
@@ -212,12 +213,13 @@ bool ScripterManager::start(const wstringi &configName, const wstringi &configPa
 }
 
 
-// Expand ${VAR} placeholders in s.
-// ${NYAMY_HOME} -> nyamyHome; others -> GetEnvironmentVariableW().
+// Expand ${VAR} placeholders in s from the environment.
+// NYAMY_ROOT / NYAMY_HOME / NYAMY_CONFIG need no special case: NYamyPaths has
+// published them to this process' environment already.
 // Unknown vars are left as-is and appended to *unknownVars if provided.
 // After each expansion, if the result ends with '\' and the next input char is also '\',
 // one backslash is consumed to prevent double separators.
-static std::wstring expandVars(const std::wstring &s, const std::wstring &nyamyHome,
+static std::wstring expandVars(const std::wstring &s,
                                std::vector<std::wstring> *unknownVars = nullptr)
 {
 	std::wstring result;
@@ -227,9 +229,7 @@ static std::wstring expandVars(const std::wstring &s, const std::wstring &nyamyH
 			size_t end = s.find(L'}', i + 2);
 			if (end == std::wstring::npos) { result += s[i++]; continue; }
 			std::wstring name = s.substr(i + 2, end - i - 2);
-			if (name == L"NYAMY_HOME") {
-				result += nyamyHome;
-			} else {
+			{
 				wchar_t buf[2048];
 				DWORD len = GetEnvironmentVariableW(name.c_str(), buf, 2048);
 				if (len > 0 && len < 2048) {
@@ -377,21 +377,12 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		return false;
 	}
 
-	// determine nyamy's home directory (used for ${NYAMY_HOME} and the default
-	// scripter path)
-	wchar_t exePath[GANA_MAX_PATH];
-	wchar_t exeDrive[GANA_MAX_PATH];
-	wchar_t exeDir[GANA_MAX_PATH];
-	GetModuleFileName(NULL, exePath, GANA_MAX_PATH);
-	_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH,
-	              NULL, 0, NULL, 0);
-	wstringi nyamyHome = exeDrive;
-	nyamyHome += exeDir;
-
 	// The ini value "cmdLine", if present, is the FULL command line
 	// (executable plus arguments) used to launch the scripter, so that any
 	// program speaking the scripter protocol can be substituted.  When absent,
-	// fall back to nyamy-scripter.exe next to nyamy.exe.
+	// fall back to nyamy-scripter.exe next to nyamy.exe.  The script argument
+	// belongs on the command line either way: the scripter has no default
+	// script of its own and exits with a usage message without one.
 	wstringi iniCmdLine;
 	{
 		IniFile ini;
@@ -401,7 +392,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	std::wstring cmdLineStr;
 	if (!iniCmdLine.empty()) {
 		std::vector<std::wstring> unknownVars;
-		cmdLineStr = expandVars(iniCmdLine, nyamyHome, &unknownVars);
+		cmdLineStr = expandVars(iniCmdLine, &unknownVars);
 		for (const auto &uv : unknownVars) {
 			if (m_log) {
 				Acquire a(m_soLog, 0);
@@ -409,7 +400,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 			}
 		}
 	} else {
-		cmdLineStr = L"\"" + std::wstring((nyamyHome + L"nyamy-scripter.exe").c_str()) + L"\"";
+		cmdLineStr = L"\"" + NYamyPaths::root() + L"\\nyamy-scripter.exe\" .mayu.rb";
 	}
 
 	// build an environment block that includes NYS_CTRL and NYS_CMD

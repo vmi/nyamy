@@ -93,6 +93,7 @@
     <ClCompile Include="..\scripter\mayu_compiler.cpp" />
     <ClCompile Include="..\scripter\cmd_stream_writer.cpp" />
     <ClCompile Include="..\scripter\config_files.cpp" />
+    <ClCompile Include="..\scripter\nys_paths.cpp" />
     <ClCompile Include="..\scripter\ctrl_stream_reader.cpp" />
     <ClCompile Include="..\compiler_specific_func.cpp" />
     <ClCompile Include="..\scripter\nyamy_scripter.cpp" />

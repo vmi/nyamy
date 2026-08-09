@@ -207,19 +207,29 @@ public:
 
 ---
 
-## nyamy.ini の将来の変更 (未実装)
-
-3 箇所 (ルート / Release / Debug) に以下のセクションを追加。
+## nyamy.ini の cmdLine と環境変数
 
 ```ini
-[nyamy-scripter]
-; scripter 起動コマンド。省略時: nyamy-scripter.exe を使用
-; 相対パス: nyamy.exe のあるディレクトリからの相対
-; ${VAR}: 環境変数展開
-; command=nyamy-scripter.exe
-; command=${LOCALAPPDATA}\MyApp\custom-scripter.exe --option
-; command=python ${APPDATA}\nyamy\myscripter.py
+[nyamy]
+; scripter の起動コマンドライン全体 (実行ファイル + 引数)
+; 省略時: "${NYAMY_ROOT}\nyamy-scripter.exe" .mayu.rb
+; ${VAR}: 環境変数展開 (未定義の変数はそのまま残り、警告がログに出る)
+cmdLine="${NYAMY_ROOT}\nyamy-scripter.exe .mayu.rb"
 ```
+
+nyamy は起動時に以下の 3 つを自身のプロセス環境に設定するので、scripter は
+通常の継承で受け取る (C API では `nys_paths_root()` / `_home()` / `_config()`)。
+既に設定済みの値があればそれを尊重するため、別インスタンスを外から別ツリーに
+向けられる。値に末尾のセパレータは付かない。
+
+| 環境変数 | 既定値 |
+|---|---|
+| `NYAMY_ROOT` | `nyamy.exe` のあるディレクトリ |
+| `NYAMY_HOME` | `%LOCALAPPDATA%\NYamy` |
+| `NYAMY_CONFIG` | `%NYAMY_HOME%\Config` |
+
+scripter は起動スクリプトを引数で受け取る (既定を持たない)。引数が無い場合は
+使用法を stderr に出して終了コード 2 で終了する。
 
 ---
 

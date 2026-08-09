@@ -140,17 +140,37 @@ const Modifier *firstActionModifier(const Keymap &i_keymap,
 int main()
 {
 	// Resolve our own directory; config / script files are copied next to us
-	// by the build.  Deliberately move the cwd away from it: relative .rb
-	// loads must resolve via $LOAD_PATH (script directory + home
-	// directories), never via the current directory.
+	// by the build.
 	wchar_t exePath[MAX_PATH] = {};
 	GetModuleFileNameW(nullptr, exePath, MAX_PATH);
 	std::wstring exeDir(exePath);
 	size_t slash = exeDir.find_last_of(L"\\/");
 	if (slash != std::wstring::npos) exeDir.resize(slash);
-	size_t parentSlash = exeDir.find_last_of(L"\\/");
-	if (parentSlash != std::wstring::npos)
-		SetCurrentDirectoryW(exeDir.substr(0, parentSlash).c_str());
+
+	// Pin the directory layout to scratch directories under it, so the tests
+	// neither read nor write the real per-user tree.  NYAMY_ROOT is our own
+	// directory because that is where the distributed .mayu / .rb files sit.
+	// The scripter reads these back through nys_paths_*, which caches on first
+	// use, so they have to be set before the first buildSetting().
+	std::wstring homeDir = exeDir + L"\\__home__";
+	std::wstring cfgDir  = homeDir + L"\\Config";
+	std::wstring libDir  = homeDir + L"\\Lib";
+	std::wstring cwdDir  = exeDir + L"\\__cwd__";
+	CreateDirectoryW(homeDir.c_str(), nullptr);
+	CreateDirectoryW(cfgDir.c_str(), nullptr);
+	CreateDirectoryW(libDir.c_str(), nullptr);
+	CreateDirectoryW(cwdDir.c_str(), nullptr);
+	SetEnvironmentVariableW(L"NYAMY_ROOT",   exeDir.c_str());
+	SetEnvironmentVariableW(L"NYAMY_HOME",   homeDir.c_str());
+	SetEnvironmentVariableW(L"NYAMY_CONFIG", cfgDir.c_str());
+
+	// Move the cwd to a directory holding nothing but decoys of the file names
+	// the tests load: no path resolution may go through the current directory.
+	writeUtf8File(cwdDir + L"\\.mayu.rb",
+		L"raise \"resolved through the current directory\"\n");
+	writeUtf8File(cwdDir + L"\\__lp_load_lib__.rb",
+		L"raise \"resolved through the current directory\"\n");
+	SetCurrentDirectoryW(cwdDir.c_str());
 
 	std::string exeDirU8 = wideToUtf8(exeDir);
 	std::string rbScript    = exeDirU8 + "\\dot.mayu.rb";
@@ -302,40 +322,54 @@ int main()
 		}
 	}
 
-	// Default-script probe: with no script argument the scripter searches
-	// the home directories for ".mayu.rb".  Point USERPROFILE / LOCALAPPDATA
-	// at scratch directories so the probe is hermetic, and verify that the
-	// probed script's own directory ends up in $LOAD_PATH.
+	// A relative script name resolves through the config search path, not the
+	// current directory: the cwd holds a ".mayu.rb" that raises when reached.
+	// The script loads a library next to itself, so its own directory has to
+	// be on $LOAD_PATH as well.
 	{
-		printf("[%d] .mayu.rb home directory probe ... ", idx + 3);
+		printf("[%d] relative script resolution ... ", idx + 3);
 		fflush(stdout);
 
-		std::wstring homeDir = exeDir + L"\\__home__";
-		std::wstring cfgDir  = homeDir + L"\\.config\\nyamy";
-		CreateDirectoryW(homeDir.c_str(), nullptr);
-		CreateDirectoryW((homeDir + L"\\.config").c_str(), nullptr);
-		CreateDirectoryW(cfgDir.c_str(), nullptr);
-		writeUtf8File(cfgDir + L"\\__probe_lib__.rb", L"$probe_loaded = true\n");
+		writeUtf8File(cfgDir + L"\\__cfg_lib__.rb", L"$cfg_loaded = true\n");
 		writeUtf8File(cfgDir + L"\\.mayu.rb",
-			L"load \"__probe_lib__.rb\"\n"
-			L"raise \"script-dir load failed\" unless $probe_loaded\n");
-
-		wchar_t oldProf[MAX_PATH] = {}, oldLocal[MAX_PATH] = {};
-		GetEnvironmentVariableW(L"USERPROFILE", oldProf, MAX_PATH);
-		GetEnvironmentVariableW(L"LOCALAPPDATA", oldLocal, MAX_PATH);
-		SetEnvironmentVariableW(L"USERPROFILE", homeDir.c_str());
-		SetEnvironmentVariableW(L"LOCALAPPDATA", (homeDir + L"\\AppData\\Local").c_str());
+			L"load \"__cfg_lib__.rb\"\n"
+			L"raise \"script-dir load failed\" unless $cfg_loaded\n");
 
 		Symbols syms;
-		std::shared_ptr<Setting> s = buildSetting(std::string(), syms);
-
-		SetEnvironmentVariableW(L"USERPROFILE", oldProf);
-		SetEnvironmentVariableW(L"LOCALAPPDATA", oldLocal);
-
+		std::shared_ptr<Setting> s = buildSetting(".mayu.rb", syms);
 		if (s) {
 			printf("OK\n");
 		} else {
-			printf("FAIL (probe failed or no commit)\n");
+			printf("FAIL (script not resolved, or it raised)\n");
+			++failures;
+		}
+	}
+
+	// "<NYAMY_HOME>\Lib" carries .rb libraries: it is on $LOAD_PATH, but not
+	// on the config search path, so a .mayu sitting there stays invisible to
+	// `load` / `include`.
+	{
+		printf("[%d] NYAMY_HOME\\Lib ... ", idx + 4);
+		fflush(stdout);
+
+		writeUtf8File(libDir + L"\\__home_lib__.rb", L"$home_lib_loaded = true\n");
+		writeUtf8File(libDir + L"\\__lib_only__.mayu", L"# lib only\n");
+		writeUtf8File(exeDir + L"\\__lib_ok__.rb",
+			L"require \"__home_lib__\"\n"
+			L"raise \"require from lib failed\" unless $home_lib_loaded\n");
+		writeUtf8File(exeDir + L"\\__lib_ng__.rb",
+			L"load \"__lib_only__.mayu\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> ok = buildSetting(exeDirU8 + "\\__lib_ok__.rb", syms);
+		std::shared_ptr<Setting> ng = buildSetting(exeDirU8 + "\\__lib_ng__.rb", syms);
+		if (ok && !ng) {
+			printf("OK\n");
+		} else if (!ok) {
+			printf("FAIL (require from lib failed)\n");
+			++failures;
+		} else {
+			printf("FAIL (.mayu in lib was reachable from include)\n");
 			++failures;
 		}
 	}
@@ -343,7 +377,7 @@ int main()
 	// parseScancodeMapBlob: exercise the registry-blob parser directly with
 	// hand-built blobs (independent of the machine's actual Scancode Map).
 	{
-		printf("[%d] parseScancodeMapBlob ... ", idx + 4);
+		printf("[%d] parseScancodeMapBlob ... ", idx + 5);
 		fflush(stdout);
 
 		auto makeBlob = [](std::vector<uint32_t> entries) {
@@ -396,7 +430,7 @@ int main()
 	// sc() / ScancodeMap DSL surface: a script that asserts the contract and
 	// raises on any mismatch.  buildSetting returns null if the script raised.
 	{
-		printf("[%d] sc() / ScancodeMap DSL ... ", idx + 5);
+		printf("[%d] sc() / ScancodeMap DSL ... ", idx + 6);
 		fflush(stdout);
 
 		writeUtf8File(exeDir + L"\\__sc_test__.rb",
@@ -441,7 +475,7 @@ int main()
 	// loader did it.  Without that, only rules written with an explicit `*'
 	// match or emit anything.
 	{
-		printf("[%d] modifier defaults ... ", idx + 6);
+		printf("[%d] modifier defaults ... ", idx + 7);
 		fflush(stdout);
 
 		writeUtf8File(exeDir + L"\\__mod_defaults__.mayu",
@@ -587,7 +621,7 @@ int main()
 	// below it.  The statement is gone and must be rejected, not read as an
 	// assignment to a key named "=".
 	{
-		printf("[%d] default modifier statement rejected ... ", idx + 7);
+		printf("[%d] default modifier statement rejected ... ", idx + 8);
 		fflush(stdout);
 
 		writeUtf8File(exeDir + L"\\__mod_stmt__.mayu",
@@ -611,7 +645,7 @@ int main()
 	// A modifier that the context does not allow is an error, as it was in the
 	// old text loader: R- belongs to the left side, not to an action.
 	{
-		printf("[%d] out-of-context modifier rejected ... ", idx + 8);
+		printf("[%d] out-of-context modifier rejected ... ", idx + 9);
 		fflush(stdout);
 
 		writeUtf8File(exeDir + L"\\__mod_bad__.mayu",
@@ -638,7 +672,7 @@ int main()
 	// whether Control is held; when it stays empty every key looks unmodified
 	// and a spurious modifier release is injected before it.
 	{
-		printf("[%d] keymap modifier assignments ... ", idx + 9);
+		printf("[%d] keymap modifier assignments ... ", idx + 10);
 		fflush(stdout);
 
 		writeUtf8File(exeDir + L"\\__mod_assign__.mayu",
@@ -704,7 +738,7 @@ int main()
 	// arrives, so the engine can synthesize one.  E0/E1 prefixed codes are
 	// stored as 0xE0nn / 0xE1nn.
 	{
-		printf("[%d] nls-keys option ... ", idx + 10);
+		printf("[%d] nls-keys option ... ", idx + 11);
 		fflush(stdout);
 
 		writeUtf8File(exeDir + L"\\__nls_keys__.mayu",
@@ -817,7 +851,7 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 10;
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 11;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

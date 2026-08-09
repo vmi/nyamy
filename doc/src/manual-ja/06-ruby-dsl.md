@@ -30,7 +30,16 @@ load "some.mayu"       # .mayu 形式のファイルも読み込める (拡張�
 require "mylib"        # load と同様だが、同じファイルは一度しか読み込まない
 ```
 
-相対パスは、実行中のスクリプトのあるフォルダ、続いて[ホームディレクトリ](#HOME)の順 (`$LOAD_PATH`) で検索されます。
+`.rb` の相対パスは `$LOAD_PATH` の順、すなわち
+
+1. 実行中のスクリプトのあるフォルダ
+2. `NYAMY_CONFIG` (`%LOCALAPPDATA%\NYamy\Config`)
+3. `NYAMY_HOME\Lib` (`%LOCALAPPDATA%\NYamy\Lib`)
+4. `NYAMY_ROOT` (`nyamy.exe` のあるフォルダ)
+
+で検索されます ([設定フォルダ](#HOME))。カレントディレクトリは検索されません。`$LOAD_PATH` はスクリプトから追加・変更できます。
+
+`.mayu` の読み込み (`load "some.mayu"` や `.mayu` 内の `include`) は `$LOAD_PATH` ではなく設定ファイルの検索順 (`NYAMY_CONFIG`、`NYAMY_ROOT`) に従います。`NYAMY_HOME\Lib` は `.rb` ライブラリ専用です。
 
 ### キーシーケンス定義 (`keyseq`) {#dsl_keyseq}
 

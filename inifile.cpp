@@ -4,6 +4,7 @@
 
 #include "misc.h"
 #include "inifile.h"
+#include "nyamy_paths.h"
 #include <fstream>
 
 
@@ -162,34 +163,13 @@ int findKeyLine(const std::vector<std::wstring> &i_lines,
 IniFile::IniFile()
 {
 	// seed: nyamy.ini next to the executable (read on first use only)
-	wchar_t exePath[GANA_MAX_PATH];
-	wchar_t exeDrive[GANA_MAX_PATH];
-	wchar_t exeDir[GANA_MAX_PATH];
-	GetModuleFileName(NULL, exePath, GANA_MAX_PATH);
-	_wsplitpath_s(exePath, exeDrive, GANA_MAX_PATH, exeDir, GANA_MAX_PATH,
-				  NULL, 0, NULL, 0);
-	std::wstring seedPath = exeDrive;
-	seedPath += exeDir;
-	seedPath += L"nyamy.ini";
+	std::wstring seedPath = NYamyPaths::root() + L"\\nyamy.ini";
+	m_path = NYamyPaths::config() + L"\\nyamy.ini";
 
-	wchar_t localAppData[GANA_MAX_PATH];
-	DWORD len = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData,
-										GANA_MAX_PATH);
-	if (len == 0 || GANA_MAX_PATH <= len) {
-		// no LOCALAPPDATA (should not happen): keep using the exe directory
-		m_path = seedPath;
-		return;
-	}
-
-	std::wstring dir = localAppData;
-	dir += L"\\NYamy";
-	CreateDirectoryW(dir.c_str(), NULL);
-	dir += L"\\Config";
-	CreateDirectoryW(dir.c_str(), NULL);
-	m_path = dir + L"\\nyamy.ini";
-
-	// first use: migrate the seed next to the executable, if any
-	if (GetFileAttributesW(m_path.c_str()) == INVALID_FILE_ATTRIBUTES &&
+	// first use: migrate the seed next to the executable, if any.
+	// The two are the same file when there is no per-user directory to use.
+	if (m_path != seedPath &&
+			GetFileAttributesW(m_path.c_str()) == INVALID_FILE_ATTRIBUTES &&
 			GetFileAttributesW(seedPath.c_str()) != INVALID_FILE_ATTRIBUTES)
 		CopyFileW(seedPath.c_str(), m_path.c_str(), TRUE);
 }

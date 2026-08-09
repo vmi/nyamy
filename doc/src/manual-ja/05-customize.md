@@ -9,7 +9,7 @@ NYamy の設定ファイルには 2 つの形式があります。
 
 この章では、キー・モディファイヤ・キーマップなどの概念と各機能を、`.mayu` 形式の文法で説明します。ここで説明する概念はどちらの形式でも共通で、Ruby DSL での対応する書き方は [Ruby DSL](#RUBYDSL) の章にまとめてあります。
 
-設定ファイルは[ホームディレクトリ](#HOME)から検索されます。
+設定ファイルは[設定フォルダ](#HOME)から検索されます。
 
 `.mayu` は上から下へ読まれていき、重複する記述があれば、より下に書かれているものが有効になります。コメントは `#` ではじめます。アルファベットの大文字と小文字は区別されません。詳しい文法は [`syntax.txt`](syntax.txt) を参照してください。
 
@@ -672,19 +672,21 @@ def option nls-keys = "0x29, 0x3a, 0x70, 0x7b"
 include ⟨ファイル名⟩
 ```
 
-と書くことによって、その行に*ファイル名* [文字列](#string)で示されるファイルを挿入することができます。*ファイル名*は[ホームディレクトリ](#HOME)から検索されます。(`.mayu.rb` からのファイル読み込みには [`load` / `require`](#dsl_load) を使用します)
+と書くことによって、その行に*ファイル名* [文字列](#string)で示されるファイルを挿入することができます。*ファイル名*は[設定フォルダ](#HOME)から検索されます。(`.mayu.rb` からのファイル読み込みには [`load` / `require`](#dsl_load) を使用します)
 
-#### ホームディレクトリ {#HOME}
+#### 設定フォルダ {#HOME}
 
-ホームディレクトリは、以下のフォルダです。上から順番に検索されます。
+NYamy は以下の 3 つのフォルダを使い分けます。それぞれ環境変数として `nyamy-scripter` にも渡されます。
 
-- `%USERPROFILE%\.config\nyamy`
-- `%LOCALAPPDATA%\NYamy\Config`
-- `nyamy.exe` のあるフォルダ
+| 環境変数 | フォルダ | 用途 |
+|---|---|---|
+| `NYAMY_ROOT` | `nyamy.exe` のあるフォルダ | 配布物 (`dot.mayu.rb` や `109.mayu` など) |
+| `NYAMY_CONFIG` | `%LOCALAPPDATA%\NYamy\Config` | 自分用の設定ファイル、`nyamy.ini` |
+| `NYAMY_HOME` | `%LOCALAPPDATA%\NYamy` | 自分用のデータ。`Lib` サブフォルダは `.rb` ライブラリ置き場 |
 
-自分用の設定ファイルは `%USERPROFILE%\.config\nyamy` に置くことをお勧めします。
+設定ファイルは `NYAMY_CONFIG`、`NYAMY_ROOT` の順に検索されます。<strong>カレントディレクトリは検索されません。</strong>自分用の設定ファイルは `%LOCALAPPDATA%\NYamy\Config` に置いてください。タスクトレイメニューの<span class="menu-item">(ホームディレクトリから)</span>は、このフォルダから `.mayu.rb` を読み込みます。
 
-なお、`.mayu.rb` の `load` / `require` は、上記に加えて実行中のスクリプトのあるフォルダを最優先で検索します。
+なお、`.mayu.rb` の `load` / `require` の検索順はこれとは少し異なります。詳しくは [`load` / `require`](#dsl_load) を参照してください。
 
 #### 設定ファイルの文字コード {#encoding}
 

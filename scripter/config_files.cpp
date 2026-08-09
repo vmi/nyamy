@@ -5,6 +5,10 @@
 #include "../misc.h"
 
 #include "config_files.h"
+// This file is part of the DLL, so the nys_paths_* it calls must be declared
+// as dllexport rather than dllimport - there is no import library for oneself.
+#define _NYAMY_SCRIPTER_IMPL
+#include "nyamy_scripter.h"
 #include "../mayu.h"
 #include "../windowstool.h"
 #include "../multithread.h"
@@ -20,17 +24,29 @@ ConfigFiles::ConfigFiles(SyncObject *i_soLog, std::wostream *i_log)
 }
 
 
-// get home directory path
-void ConfigFiles::getHomeDirectories(HomeDirectories *o_pathes) const
+// is the path absolute ?  "\foo" and "C:foo" are rooted on the current drive
+// resp. the drive's current directory, so neither counts as absolute here.
+static bool isAbsolutePath(const std::wstring &i_path)
 {
-	wchar_t buf[GANA_MAX_PATH];
+	if (3 <= i_path.size() && i_path[1] == L':' &&
+			(i_path[2] == L'\\' || i_path[2] == L'/'))
+		return true;
+	// UNC
+	return 2 <= i_path.size() &&
+		(i_path[0] == L'\\' || i_path[0] == L'/') &&
+		(i_path[1] == L'\\' || i_path[1] == L'/');
+}
 
-	if (GetEnvironmentVariable(L"USERPROFILE", buf, NUMBER_OF(buf)))
-		o_pathes->push_back(wstringi(std::wstring(buf) + L"\\.config\\nyamy"));
-	if (GetEnvironmentVariable(L"LOCALAPPDATA", buf, NUMBER_OF(buf)))
-		o_pathes->push_back(wstringi(std::wstring(buf) + L"\\NYamy\\Config"));
-	if (GetModuleFileName(GetModuleHandle(NULL), buf, NUMBER_OF(buf)))
-		o_pathes->push_back(pathRemoveFileSpec(buf));
+
+// get config file search path
+void ConfigFiles::getSearchDirectories(SearchDirectories *o_pathes) const
+{
+	wstringi config(from_UTF8(nys_paths_config()));
+	wstringi root(from_UTF8(nys_paths_root()));
+
+	o_pathes->push_back(config);
+	if (config != root)
+		o_pathes->push_back(root);
 }
 
 
@@ -177,16 +193,22 @@ bool ConfigFiles::getFilename(const wstringi &i_name, wstringi *o_path,
 	// the default filename is ".mayu"
 	const wstringi &name = i_name.empty() ? wstringi(L".mayu") : i_name;
 
+	// an absolute name names the file outright; nothing to search for
+	if (isAbsolutePath(name)) {
+		*o_path = name;
+		return isReadable(*o_path, i_debugLevel);
+	}
+
 	bool isFirstTime = true;
 
 	while (true) {
 		if (!isFirstTime)
 			return false;
 
-		// find file from home directory
-		HomeDirectories pathes;
-		getHomeDirectories(&pathes);
-		for (HomeDirectories::iterator i = pathes.begin(); i != pathes.end(); ++ i) {
+		// find file in the search path
+		SearchDirectories pathes;
+		getSearchDirectories(&pathes);
+		for (SearchDirectories::iterator i = pathes.begin(); i != pathes.end(); ++ i) {
 			*o_path = *i + L"\\" + name;
 			if (isReadable(*o_path, i_debugLevel))
 				return true;

@@ -77,11 +77,11 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	setHandleEnv(L"NYS_CTRL", ctrlR);   // scripter reads this end
 	setHandleEnv(L"NYS_CMD",  dataW);   // scripter writes this end
 
-	// Scripter context: argv = { program, scriptPath }.  An empty script
-	// path runs the no-argument form (home directory probe for .mayu.rb).
-	int argc = i_scriptPathUtf8.empty() ? 1 : 2;
+	// Scripter context: argv = { program, scriptPath }.  The script path may
+	// be relative; it is resolved against the config search path, never the
+	// current directory.
 	const char *argv[2] = { "nyamy-scripter-tests", i_scriptPathUtf8.c_str() };
-	MRubyContext ctx = { argc, argv, nullptr };
+	MRubyContext ctx = { 2, argv, nullptr };
 	NYsCallbacks cb = {};
 	cb.on_load_setting = mruby_on_load_setting;
 	cb.on_quit         = mruby_on_quit;

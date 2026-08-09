@@ -13,8 +13,8 @@
 #  include <functional>
 
 
-/// home directory path list
-using HomeDirectories = std::list<wstringi>;
+/// config file search path
+using SearchDirectories = std::list<wstringi>;
 
 
 /// file system operations for configuration files
@@ -27,8 +27,10 @@ public:
 public:
 	ConfigFiles(SyncObject *i_soLog = nullptr, std::wostream *i_log = nullptr);
 
-	/// get home directory path
-	void getHomeDirectories(HomeDirectories *o_path) const;
+	/// get the config file search path: NYAMY_CONFIG, then NYAMY_ROOT.
+	/// The current directory is deliberately not part of it, and neither is
+	/// "<NYAMY_HOME>\Lib", which carries .rb libraries for $LOAD_PATH only.
+	void getSearchDirectories(SearchDirectories *o_path) const;
 
 	/// read file contents
 	bool readFile(std::wstring *o_data, const wstringi &i_filename) const;
@@ -36,7 +38,8 @@ public:
 	/// is the filename readable ?
 	bool isReadable(const wstringi &i_filename, int i_debugLevel = 1) const;
 
-	/// get filename
+	/// get filename.  An absolute i_name is only checked for readability;
+	/// a relative one is searched in the search path
 	bool getFilename(const wstringi &i_name, wstringi *o_path,
 					 RetryCallback i_retry = nullptr,
 					 int i_debugLevel = 1) const;

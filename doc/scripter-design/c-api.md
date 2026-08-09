@@ -189,17 +189,23 @@ NYS_API bool nys_exec_keyseq(const char* actions);
 // on_load_setting 内でのみ有効
 NYS_API bool nys_include_mayu(const char* path);
 
-// ホームディレクトリ一覧を返す (設定ファイル探索の基準パス群, UTF-8 NYsStrs)
-// %USERPROFILE%\.config\nyamy, %LOCALAPPDATA%\NYamy\Config, 実行ファイルのディレクトリ
-// をこの探索順で含む
-// 返り値: コールバックセッションのライフタイムで管理。手動解放不要
-// on_load_setting / on_exec_user_func 内で有効
-NYS_API NYsStrs* nys_get_home_directories(void);
+// NYamy のディレクトリ構成 (UTF-8、末尾セパレータなし)
+// nyamy が起動前に環境変数 NYAMY_ROOT / NYAMY_HOME / NYAMY_CONFIG に設定した値。
+// nyamy を介さずに起動された場合は、実行ファイルのディレクトリと
+// %LOCALAPPDATA%\NYamy から導出する
+//   root   : nyamy.exe のあるディレクトリ (配布物の .mayu / .rb)
+//   home   : ユーザーデータ。"<home>\Lib" は $LOAD_PATH に載る
+//   config : ユーザー設定 (nyamy.ini, .mayu, .mayu.rb)
+// 設定ファイルは config → root の順に探索される
+// 返り値: プロセス寿命で有効。NULL にはならない。いつでも呼べる
+NYS_API const char* nys_paths_root(void);
+NYS_API const char* nys_paths_home(void);
+NYS_API const char* nys_paths_config(void);
 
 // 設定ファイル名を絶対パスに解決する (コンパイルなし)
 // name: ファイル名 (NULL または "" でデフォルト .mayu を探索)
-//       空の場合: レジストリ → ホームディレクトリの .mayu の順で探索
-//       指定の場合: ホームディレクトリ内で検索
+//       絶対パス: 読み取り可能かだけを確認
+//       相対パス: 設定ファイル探索パス (config → root) から検索
 // out_path: 解決した絶対パス (NULL 可) — 次回本関数呼び出しまで有効
 // 返り値: ファイルが見つかれば true (見つからない場合は nys_last_error() にエラーが入る)
 // on_load_setting / on_exec_user_func 内で有効
