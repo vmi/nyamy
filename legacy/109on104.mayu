@@ -20,5 +20,3 @@ def subst    *CloseBracket	= $LEFT_SQUARE_BRACKET
 def subst  S-*Semicolon		= $PLUS_SIGN
 def subst ~S-*Quote		= $COLON
 def subst  S-*Quote		= $ASTERISK
-# def subst ~S-*		= $RIGHT_SQUARE_BRACKET # for lack of key
-# def subst  S-*		= $RIGHT_CURLY_BRACKET	 # for lack of key

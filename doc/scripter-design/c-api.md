@@ -245,6 +245,16 @@ NYS_API const char* nys_last_error(void);
 > (末尾は null 終端なのでマッピング数は count-1)。各 DWORD は HIWORD=変換元・
 > LOWORD=変換先。不正な blob では false を返し out を空にする。
 
+> **自動定義シンボル**
+> scripter は Start コマンド受信時に Scancode Map を読み、`0x01` (Esc) /
+> `0x1D` (LControl) が変換元または変換先に現れていればシンボル
+> `SCM-REMAP-ESC` / `SCM-REMAP-LCTRL` を定義する (`defineScancodeMapSymbols()`)。
+> `on_load_setting` より前に確定するので `nys_has_symbol()` からも `.mayu` の
+> `if` からも参照できる。C API 自体の追加はない。
+> テスト用に、`NYAMY_TEST_HOOKS` 付きビルドでのみ環境変数 `NYAMY_SCANCODE_MAP`
+> (blob の 16 進表記) でレジストリ読み取りを差し替えられる。配布ビルドには
+> この分岐は含まれない。
+
 ### 初期化処理とイベントループ
 
 1. scripterプロセスが起動し、`nys_start(callbacks, exeCtx)` を呼ぶと、

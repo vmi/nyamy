@@ -5,12 +5,19 @@
 
 define KBD104on109
 
-def subst ~S-*半角/全角		= $GRAVE_ACCENT
-def subst  S-*半角/全角		= $TILDE
-def subst  A-半角/全角		= $ToggleIME
-def subst ~S-*E0半角/全角	= $GRAVE_ACCENT
-def subst  S-*E0半角/全角	= $TILDE
-def subst  A-E0半角/全角	= $ToggleIME
+if ( SunType4 )
+  if ( ! SCM-REMAP-ESC )
+    def subst *Esc		= *半角/全角
+    def subst *半角/全角	= *Esc
+  endif
+else
+  def subst ~S-*半角/全角	= $GRAVE_ACCENT
+  def subst  S-*半角/全角	= $TILDE
+  def subst  A-半角/全角	= $ToggleIME
+  def subst ~S-*E0半角/全角	= $GRAVE_ACCENT
+  def subst  S-*E0半角/全角	= $TILDE
+  def subst  A-E0半角/全角	= $ToggleIME
+endif
 def subst  S-*_2		= $COMMERCIAL_AT
 def subst  S-*_6		= $CIRCUMFLEX_ACCENT
 def subst  S-*_7		= $AMPERSAND
@@ -24,19 +31,17 @@ def subst ~S-*Atmark		= $LEFT_SQUARE_BRACKET
 def subst  S-*Atmark		= $LEFT_CURLY_BRACKET
 def subst ~S-*OpenBracket	= $RIGHT_SQUARE_BRACKET
 def subst  S-*OpenBracket	= $RIGHT_CURLY_BRACKET
-def subst ~S-*CloseBracket	= $REVERSE_SOLIDUS
-def subst  S-*CloseBracket	= $VERTICAL_LINE
+if ( SunType4 )
+  def subst ~S-*CloseBracket	= $GRAVE_ACCENT
+  def subst  S-*CloseBracket	= $TILDE
+else
+  def subst ~S-*CloseBracket	= $REVERSE_SOLIDUS
+  def subst  S-*CloseBracket	= $VERTICAL_LINE
+endif
 def subst  S-*Semicolon		= $COLON
 def subst ~S-*Colon		= $APOSTROPHE
 def subst  S-*Colon		= $QUOTATION_MARK
-def subst    *無変換		= *Space
-def subst    *E0無変換		= *Space
-def subst    *変換		= *Space
-def subst    *ひらがな		= *Space
-def subst    *E0ひらがな	= *Space
-def subst    *英数		= S-*英数
-def subst    *E0英数		= S-*英数
 def subst *ReverseSolidus	= *RightShift
 
 keymap Global
- mod shift += ReverseSolidus
+  mod shift += ReverseSolidus

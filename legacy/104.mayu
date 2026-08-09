@@ -158,11 +158,7 @@ def key ALLocalBrowser			= E0-0x6b # (N/A) My Computer
 def key ALEmailReader Email		= E0-0x6c
 def key ALConsumerControlConfiguration	= E0-0x6d # (N/A) Media Player
 
-
-
-
-
-# def overflow				=    0xff # overflow (ignore)
+def option nls-keys = "GraveAccent, CapsLock"
 
 def sync				=    0x7e # scan code used by &Sync
 

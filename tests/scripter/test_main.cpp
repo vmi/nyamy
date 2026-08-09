@@ -207,6 +207,17 @@ int main()
 		  { L"USE109", L"USEdefault", L"MAP-ESCAPE-TO-META" } },
 		{ "USE109 + USE104on109 + USEdefault + workaround", true,
 		  { L"USE109", L"USE104on109", L"USEdefault" } },
+		// The remaining branch symbols.  Each one guards a block that has to be
+		// spelled out twice, once per configuration language, so each needs a
+		// combination that actually enters it.
+		{ "USE109 + USEdefault + ZXCV",               false,
+		  { L"USE109", L"USEdefault", L"ZXCV" } },
+		{ "USE109 + USEdefault + EmacsMove/ShiftSelection", false,
+		  { L"USE109", L"USEdefault", L"EmacsMove/ShiftSelection" } },
+		{ "USE109 + USE104on109 + SunType4",          false,
+		  { L"USE109", L"USE104on109", L"SunType4" } },
+		{ "USE104 + USE109on104 + USEdefault + MAP-ESCAPE-TO-META", false,
+		  { L"USE104", L"USE109on104", L"USEdefault", L"MAP-ESCAPE-TO-META" } },
 	};
 
 	int failures = 0;
@@ -451,13 +462,28 @@ int main()
 			L"rescue ArgumentError\n"
 			L"  true\n"
 			L"end\n"
+			L"def expect_no_method\n"
+			L"  yield\n"
+			L"  false\n"
+			L"rescue NoMethodError\n"
+			L"  true\n"
+			L"end\n"
 			L"raise \"range err\"     unless expect_arg_error { sc(0x10000) }\n"
 			L"raise \"unknown name\"  unless expect_arg_error { sc(\"NoSuchKeyXYZ\") }\n"
-			L"raise \"to is array\"   unless ScancodeMap.to(0x1d).is_a?(Array)\n"
+			L"raise \"to is array\"   unless ScancodeMap.to[0x1d].is_a?(Array)\n"
+			L"raise \"to takes no arg\" unless expect_arg_error { ScancodeMap.to(0x1d) }\n"
+			L"raise \"from withdrawn\"  unless expect_no_method { ScancodeMap.from(0x1d) }\n"
 			L"m = ScancodeMap[0x3a]\n"
 			L"unless m.nil?\n"
-			L"  raise \"map/to consistency\" unless ScancodeMap.to(m).include?(0x3a)\n"
-			L"end\n");
+			L"  raise \"map/to consistency\" unless ScancodeMap.to[m].include?(0x3a)\n"
+			L"end\n"
+			// SCM-REMAP-*: defined exactly when the registry map touches that
+			// key in either direction.  Expected values come from the map
+			// itself, so this holds whatever the test machine has configured.
+			L"esc = !ScancodeMap[0x01].nil? || !ScancodeMap.to[0x01].empty?\n"
+			L"lc  = !ScancodeMap[0x1d].nil? || !ScancodeMap.to[0x1d].empty?\n"
+			L"raise \"SCM-REMAP-ESC\"   unless symbol_defined?(\"SCM-REMAP-ESC\")   == esc\n"
+			L"raise \"SCM-REMAP-LCTRL\" unless symbol_defined?(\"SCM-REMAP-LCTRL\") == lc\n");
 
 		Symbols syms;
 		std::shared_ptr<Setting> s =
@@ -831,9 +857,11 @@ int main()
 			check(s3->m_nlsKeys == s->m_nlsKeys,
 				  "DSL: same scan codes as the .mayu form");
 
-		// no option at all means no synthesized breaks anywhere
+		// no option at all means no synthesized breaks anywhere.  This cannot
+		// lean on 109.mayu: it names its own NLS keys, so the configuration has
+		// to be one that says nothing about them.
 		writeUtf8File(exeDir + L"\\__nls_none__.rb",
-			L"load \"109.mayu\"\n");
+			L"defkey \"ScNoneA\", scan: \"0x1e\"\n");
 		Symbols syms2;
 		std::shared_ptr<Setting> s2 =
 			buildSetting(exeDirU8 + "\\__nls_none__.rb", syms2);
@@ -851,7 +879,170 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 11;
+	// The SCM-REMAP-* symbols are derived from the registry Scancode Map before
+	// on_load_setting runs, so both configuration languages must see them: that
+	// is the whole point of deriving them in the scripter rather than in the
+	// Ruby DSL.  Whether they are actually defined depends on the machine, so
+	// this compares the two trees against each other instead of a fixed answer.
+	{
+		printf("[%d] SCM-REMAP-* symbols ... ", idx + 12);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__scm_sym__.mayu",
+			L"include \"109.mayu\"\n"
+			L"keymap Global\n"
+			L" if ( SCM-REMAP-ESC )\n"
+			L"   key A\t= B\n"
+			L" else\n"
+			L"   key A\t= C\n"
+			L" endif\n"
+			L" if ( SCM-REMAP-LCTRL )\n"
+			L"   key D\t= E\n"
+			L" else\n"
+			L"   key D\t= F\n"
+			L" endif\n");
+		writeUtf8File(exeDir + L"\\__scm_via_mayu__.rb",
+			L"load \"__scm_sym__.mayu\"\n");
+		writeUtf8File(exeDir + L"\\__scm_via_rb__.rb",
+			L"load \"109.mayu\"\n"
+			L"keymap \"Global\" do\n"
+			L"  key[\"A\"] = symbol_defined?(\"SCM-REMAP-ESC\")   ? \"B\" : \"C\"\n"
+			L"  key[\"D\"] = symbol_defined?(\"SCM-REMAP-LCTRL\") ? \"E\" : \"F\"\n"
+			L"end\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> a =
+			buildSetting(exeDirU8 + "\\__scm_via_mayu__.rb", syms);
+		std::shared_ptr<Setting> b =
+			buildSetting(exeDirU8 + "\\__scm_via_rb__.rb", syms);
+
+		if (!a || !b) {
+			printf("FAIL (load failed: %s%s)\n",
+			       a ? "" : ".mayu ", b ? "" : ".mayu.rb");
+			++failures;
+		} else {
+			std::wstring da = dumpSetting(*a);
+			std::wstring db = dumpSetting(*b);
+			if (da == db) {
+				printf("OK\n");
+			} else {
+				printf("FAIL (settings differ)\n");
+				reportFirstDiff(da, db);
+				++failures;
+			}
+		}
+	}
+
+	// Both SCM-REMAP-* branches.  Which way they go depends on the machine's
+	// registry, so the map is pinned through NYAMY_SCANCODE_MAP: without that
+	// the "not remapped" side of every guarded block goes untested on a machine
+	// that has a Scancode Map (and vice versa).  The variable is only honoured
+	// by a scripter DLL built with NYAMY_TEST_HOOKS, so a build without it can
+	// only skip this.
+	{
+		printf("[%d] SCM-REMAP-* branches ... ", idx + 13);
+		fflush(stdout);
+#ifndef NYAMY_TEST_HOOKS
+		printf("SKIPPED (built without NYAMY_TEST_HOOKS)\n");
+#else
+
+		// Raw registry blob as hex: header1, header2, count (including the
+		// null terminator), then one DWORD per mapping (HIWORD=from, LOWORD=to).
+		auto blobHex = [](std::vector<uint32_t> entries) {
+			std::vector<uint32_t> dwords = { 0, 0,
+				(uint32_t)(entries.size() + 1) };
+			for (uint32_t e : entries) dwords.push_back(e);
+			dwords.push_back(0);
+			std::wstring hex;
+			for (uint32_t d : dwords)
+				for (int b = 0; b < 4; ++b) {
+					wchar_t buf[3];
+					_snwprintf_s(buf, 3, _TRUNCATE, L"%02x",
+						(unsigned)((d >> (b * 8)) & 0xFF));
+					hex += buf;
+				}
+			return hex;
+		};
+
+		// 0x29 is Zenkaku/Hankaku, the key default.mayu swaps with Esc.
+		const uint32_t kZenkakuToEsc = 0x00290001u;  // 0x29 -> Esc
+		const uint32_t kEscToZenkaku = 0x00010029u;  // Esc -> 0x29
+		const uint32_t kCapsToLCtrl  = 0x003A001Du;  // CapsLock -> LControl
+		const uint32_t kLCtrlToCaps  = 0x001D003Au;  // LControl -> CapsLock
+
+		const struct {
+			const char *name;
+			std::vector<uint32_t> entries;
+			bool esc;
+			bool lctrl;
+		} maps[] = {
+			{ "empty map",        {},                          false, false },
+			{ "Esc swapped",      { kEscToZenkaku, kZenkakuToEsc }, true, false },
+			{ "Esc as target",    { kZenkakuToEsc },            true,  false },
+			{ "LControl as target", { kCapsToLCtrl },           false, true  },
+			{ "LControl as source", { kLCtrlToCaps },           false, true  },
+			{ "both swapped",     { kEscToZenkaku, kZenkakuToEsc,
+			                        kCapsToLCtrl, kLCtrlToCaps }, true, true },
+		};
+
+		// Symbol sets that between them enter every SCM-guarded block:
+		// default/emacsedit need USEdefault + MAP-ESCAPE-TO-META, 104on109
+		// needs SunType4.
+		const std::vector<const wchar_t *> symbolSets[] = {
+			{ L"USE109", L"USEdefault", L"MAP-ESCAPE-TO-META" },
+			{ L"USE109", L"USE104on109", L"SunType4" },
+		};
+
+		int bad = 0;
+		for (const auto &m : maps) {
+			SetEnvironmentVariableW(L"NYAMY_SCANCODE_MAP",
+				blobHex(m.entries).c_str());
+
+			// the symbols follow the pinned map
+			std::wstring probe =
+				std::wstring(L"raise \"esc\"   unless symbol_defined?(\"SCM-REMAP-ESC\")   == ") +
+				(m.esc ? L"true\n" : L"false\n") +
+				L"raise \"lctrl\" unless symbol_defined?(\"SCM-REMAP-LCTRL\") == " +
+				(m.lctrl ? L"true\n" : L"false\n");
+			writeUtf8File(exeDir + L"\\__scm_probe__.rb", probe);
+			Symbols none;
+			if (!buildSetting(exeDirU8 + "\\__scm_probe__.rb", none)) {
+				printf("\n  %s: symbols do not match the map", m.name);
+				++bad;
+			}
+
+			// and both configuration trees still agree under it
+			for (const auto &set : symbolSets) {
+				Symbols syms;
+				for (const wchar_t *s : set) syms.insert(wstringi(s));
+				std::shared_ptr<Setting> a = buildSetting(viaMayuPath, syms);
+				std::shared_ptr<Setting> b = buildSetting(rbScript, syms);
+				if (!a || !b) {
+					printf("\n  %s: load failed", m.name);
+					++bad;
+					continue;
+				}
+				std::wstring da = dumpSetting(*a);
+				std::wstring db = dumpSetting(*b);
+				if (da != db) {
+					printf("\n  %s: settings differ", m.name);
+					reportFirstDiff(da, db);
+					++bad;
+				}
+			}
+		}
+		SetEnvironmentVariableW(L"NYAMY_SCANCODE_MAP", nullptr);
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+#endif // NYAMY_TEST_HOOKS
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 13;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

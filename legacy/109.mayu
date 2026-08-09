@@ -218,7 +218,8 @@ def key LaunchMediaSelect ALConsumerControlConfiguration \
 
 def key Pause				= E1-0x1d 0x45 # Pause
 
-# def overflow				=    0xff # オーバーフロー (無視)
+def option nls-keys = "半角/全角, 英数, ひらがな, 無変換"
+
 def sync				=    0x7e # &Sync で使うスキャンコード
 
 def mod Shift	= LShift RShift

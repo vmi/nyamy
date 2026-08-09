@@ -3,12 +3,19 @@
 
 define "KBD104on109"
 
-defsubst "~S-*半角/全角",   to: "$GRAVE_ACCENT"
-defsubst "S-*半角/全角",    to: "$TILDE"
-defsubst "A-半角/全角",     to: "$ToggleIME"
-defsubst "~S-*E0半角/全角", to: "$GRAVE_ACCENT"
-defsubst "S-*E0半角/全角",  to: "$TILDE"
-defsubst "A-E0半角/全角",   to: "$ToggleIME"
+if symbol_defined? "SunType4"
+  if !symbol_defined? "SCM-REMAP-ESC"
+    defsubst "*Esc",         to: "*半角/全角"
+    defsubst "*半角/全角",   to: "*Esc"
+  end
+else
+  defsubst "~S-*半角/全角",    to: "$GRAVE_ACCENT"
+  defsubst  "S-*半角/全角",    to: "$TILDE"
+  defsubst  "A-半角/全角",     to: "$ToggleIME"
+  defsubst "~S-*E0半角/全角",  to: "$GRAVE_ACCENT"
+  defsubst  "S-*E0半角/全角",  to: "$TILDE"
+  defsubst  "A-E0半角/全角",   to: "$ToggleIME"
+end
 defsubst "S-*_2",           to: "$COMMERCIAL_AT"
 defsubst "S-*_6",           to: "$CIRCUMFLEX_ACCENT"
 defsubst "S-*_7",           to: "$AMPERSAND"
@@ -22,20 +29,18 @@ defsubst "~S-*Atmark",      to: "$LEFT_SQUARE_BRACKET"
 defsubst "S-*Atmark",       to: "$LEFT_CURLY_BRACKET"
 defsubst "~S-*OpenBracket", to: "$RIGHT_SQUARE_BRACKET"
 defsubst "S-*OpenBracket",  to: "$RIGHT_CURLY_BRACKET"
-defsubst "~S-*CloseBracket", to: "$REVERSE_SOLIDUS"
-defsubst "S-*CloseBracket", to: "$VERTICAL_LINE"
+if symbol_defined? "SunType4"
+  defsubst "~S-*CloseBracket", to: "$GRAVE_ACCENT"
+  defsubst "S-*CloseBracket",  to: "$TILDE"
+else
+  defsubst "~S-*CloseBracket", to: "$REVERSE_SOLIDUS"
+  defsubst "S-*CloseBracket",  to: "$VERTICAL_LINE"
+end
 defsubst "S-*Semicolon",    to: "$COLON"
 defsubst "~S-*Colon",       to: "$APOSTROPHE"
 defsubst "S-*Colon",        to: "$QUOTATION_MARK"
-defsubst "*無変換",         to: "*Space"
-defsubst "*E0無変換",       to: "*Space"
-defsubst "*変換",           to: "*Space"
-defsubst "*ひらがな",       to: "*Space"
-defsubst "*E0ひらがな",     to: "*Space"
-defsubst "*英数",           to: "S-*英数"
-defsubst "*E0英数",         to: "S-*英数"
 defsubst "*ReverseSolidus", to: "*RightShift"
 
 keymap "Global" do
-  mod[:shift] += "ReverseSolidus"
+    mod[:shift] += "ReverseSolidus"
 end

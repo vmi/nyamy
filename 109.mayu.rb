@@ -177,6 +177,9 @@ defkey "LaunchMail", "ALEmailReader", "Email", scan: "E0-0x6c"
 defkey "LaunchMediaSelect", "ALConsumerControlConfiguration", scan: "E0-0x6d"
 defkey "Pause",                         scan: ["E1-0x1d", "0x45"]
 
+# キー名で指定する場合は defkey の後に記述すること
+defoption "nls-keys", value: "半角/全角, 英数, ひらがな, 無変換"
+
 defsync "0x7e"
 
 defmod "Shift",   keys: ["LShift", "RShift"]

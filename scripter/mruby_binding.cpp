@@ -1009,7 +1009,7 @@ static mrb_value dsl_nls_key_p(mrb_state *mrb, mrb_value self)
 	return mrb_bool_value(nys_is_nls_key_word(scResolveArgOrRaise(mrb, v)));
 }
 
-// ScancodeMap[from] / ScancodeMap.from(from)  ->  remapped scan code or nil
+// ScancodeMap[from]  ->  remapped scan code or nil
 static mrb_value scancodemap_from(mrb_state *mrb, mrb_value self)
 {
 	(void)self;
@@ -1025,8 +1025,8 @@ static mrb_value scancodemap_from(mrb_state *mrb, mrb_value self)
 	return mrb_nil_value();
 }
 
-// ScancodeMap.to(to)  ->  [original scan code, ...]  (empty when unmapped)
-static mrb_value scancodemap_to(mrb_state *mrb, mrb_value self)
+// ScancodeMap.to[to]  ->  [original scan code, ...]  (empty when unmapped)
+static mrb_value scancodemap_to_index(mrb_state *mrb, mrb_value self)
 {
 	(void)self;
 	mrb_value v;
@@ -1040,6 +1040,18 @@ static mrb_value scancodemap_to(mrb_state *mrb, mrb_value self)
 			mrb_ary_push(mrb, ary, mrb_int_value(mrb, (mrb_int)f));
 	}
 	return ary;
+}
+
+// ScancodeMap.to  ->  the reverse-lookup module, so that both directions are
+// written the same way: ScancodeMap[x] and ScancodeMap.to[x].  self is the
+// ScancodeMap module itself, so the constant is fetched from it directly and
+// needs no separate GC root.
+static mrb_value scancodemap_to(mrb_state *mrb, mrb_value self)
+{
+	// Rejects the withdrawn ScancodeMap.to(x) form with an ArgumentError
+	// instead of quietly handing back the module.
+	mrb_get_args(mrb, "");
+	return mrb_const_get(mrb, self, mrb_intern_lit(mrb, "To"));
 }
 
 
@@ -1115,10 +1127,13 @@ static void nyamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, dsl_cls, "nls_key?",    dsl_nls_key_p,   MRB_ARGS_REQ(1));
 
 	// ScancodeMap: read-only view of the registry Scancode Map (top-level module).
+	// Forward lookup is ScancodeMap[x]; reverse lookup goes through the nested
+	// ScancodeMap::To module so that it reads as ScancodeMap.to[x].
 	struct RClass *scmap = mrb_define_module(mrb, "ScancodeMap");
+	struct RClass *scmapTo = mrb_define_module_under(mrb, scmap, "To");
+	mrb_define_module_function(mrb, scmapTo, "[]", scancodemap_to_index, MRB_ARGS_REQ(1));
 	mrb_define_module_function(mrb, scmap, "[]",   scancodemap_from, MRB_ARGS_REQ(1));
-	mrb_define_module_function(mrb, scmap, "from", scancodemap_from, MRB_ARGS_REQ(1));
-	mrb_define_module_function(mrb, scmap, "to",   scancodemap_to,   MRB_ARGS_REQ(1));
+	mrb_define_module_function(mrb, scmap, "to",   scancodemap_to,   MRB_ARGS_NONE());
 
 	// GC-protect the func table hash as a module constant
 	g_funcTable = mrb_hash_new(mrb);

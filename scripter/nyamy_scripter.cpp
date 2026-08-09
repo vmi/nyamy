@@ -621,6 +621,9 @@ NYS_API bool nys_strs_push(NYsStrs* ss, const char* value, size_t length)
 // nys_start -- main event loop
 //=============================================================================
 
+// Defined with the scan-code query API below, called once per Start command.
+static void defineScancodeMapSymbols();
+
 NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 {
 	if (!callbacks || !callbacks->on_load_setting) return 1;
@@ -719,6 +722,11 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 			g_symbols    = std::move(job.start.symbols);
 
 			resetQueue();
+			// Both .mayu and .mayu.rb branch on these, and the .mayu compiler
+			// reads the symbol set in flushQueue, so they have to be settled
+			// before on_load_setting runs.  resetQueue dropped the cached map,
+			// so this re-reads the registry for the new setting.
+			defineScancodeMapSymbols();
 			g_callbackState = CallbackState::LoadSetting;
 			g_lastError.clear();
 			{
@@ -1233,12 +1241,68 @@ NYS_API bool parseScancodeMapBlob(const unsigned char* data, size_t len,
 	return true;
 }
 
+#ifdef NYAMY_TEST_HOOKS
+// Test override: NYAMY_SCANCODE_MAP holds the raw registry blob as a hex
+// string, letting a test pin the map instead of depending on whatever the
+// machine happens to have configured.  Set but empty means "no Scancode Map".
+// Returns false when the variable is absent, so the registry is read instead.
+//
+// Compiled only when NYAMY_TEST_HOOKS is defined (the Debug configuration of
+// nyamy-scripter-dll, which is what the tests link).  A shipped build reads
+// the registry and nothing else, so no environment variable can redirect it.
+static bool loadScancodeMapFromEnv()
+{
+	std::wstring value;
+	{
+		const DWORD kStackChars = 512;
+		SetLastError(ERROR_SUCCESS);
+		wchar_t stack[kStackChars];
+		DWORD n = GetEnvironmentVariableW(L"NYAMY_SCANCODE_MAP",
+			stack, kStackChars);
+		if (n == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+			return false;
+		if (n >= kStackChars) {               // longer than the stack buffer
+			std::vector<wchar_t> heap(n);
+			n = GetEnvironmentVariableW(L"NYAMY_SCANCODE_MAP",
+				heap.data(), n);
+			value.assign(heap.data(), n);
+		} else {
+			value.assign(stack, n);
+		}
+	}
+
+	// Hex digits only; anything else (spaces, commas) is a separator.
+	std::vector<unsigned char> bytes;
+	int hi = -1;
+	for (wchar_t c : value) {
+		int d;
+		if (c >= L'0' && c <= L'9')      d = c - L'0';
+		else if (c >= L'a' && c <= L'f') d = c - L'a' + 10;
+		else if (c >= L'A' && c <= L'F') d = c - L'A' + 10;
+		else continue;
+		if (hi < 0) {
+			hi = d;
+		} else {
+			bytes.push_back(static_cast<unsigned char>((hi << 4) | d));
+			hi = -1;
+		}
+	}
+	if (!bytes.empty())
+		parseScancodeMapBlob(bytes.data(), bytes.size(), g_scancodeMap);
+	return true;
+}
+#endif // NYAMY_TEST_HOOKS
+
 // Read (and cache) the registry Scancode Map on first access.
 static void loadScancodeMapOnce()
 {
 	if (g_scancodeMapLoaded) return;
 	g_scancodeMapLoaded = true;
 	g_scancodeMap.clear();
+
+#ifdef NYAMY_TEST_HOOKS
+	if (loadScancodeMapFromEnv()) return;
+#endif
 
 	DWORD size = 0;
 	LSTATUS st = RegGetValueW(HKEY_LOCAL_MACHINE,
@@ -1253,6 +1317,35 @@ static void loadScancodeMapOnce()
 	if (st != ERROR_SUCCESS) return;
 
 	parseScancodeMapBlob(buf.data(), buf.size(), g_scancodeMap);
+}
+
+// Keys whose presence in the registry Scancode Map suppresses the matching
+// remapping in the configuration files.  Key names cannot be used here: the
+// name table is filled by nys_def_key, which runs long after the symbol set
+// has to be final, so these are the fixed set-1 scan codes.  0xE01D is
+// RightControl and is deliberately not part of SCM-REMAP-LCTRL.
+static const struct {
+	const wchar_t* symbol;
+	uint16_t       scan;
+} kScancodeMapSymbols[] = {
+	{ L"SCM-REMAP-ESC",   0x01 },
+	{ L"SCM-REMAP-LCTRL", 0x1D },
+};
+
+// Define SCM-REMAP-* for every key the registry Scancode Map touches, as
+// either the original or the remapped code.  A configuration file that sees
+// one of these defined leaves that key alone instead of remapping it twice.
+static void defineScancodeMapSymbols()
+{
+	loadScancodeMapOnce();
+	for (const auto& e : kScancodeMapSymbols) {
+		for (const auto& m : g_scancodeMap) {
+			if (m.first == e.scan || m.second == e.scan) {
+				g_symbols.insert(wstringi(e.symbol));
+				break;
+			}
+		}
+	}
 }
 
 NYS_API int nys_sc_resolve(const char* str)

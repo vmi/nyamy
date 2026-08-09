@@ -254,6 +254,11 @@ NYS_API int nys_scancode_map_length(void);
 /// Read one Scancode Map entry as WORD values (see nys_sc_resolve for the encoding).
 /// from_word: original scan code, to_word: remapped scan code (0 means disabled).
 /// Both out pointers may be NULL.  Returns false if idx is out of range.
+///
+/// On top of these queries, a Start command defines the symbols SCM-REMAP-ESC
+/// and SCM-REMAP-LCTRL when the map touches 0x01 / 0x1D in either direction,
+/// so that both .mayu and .mayu.rb can branch on it the same way.  They are in
+/// place before on_load_setting runs, hence visible to nys_has_symbol as well.
 NYS_API bool nys_scancode_map_entry(int idx, unsigned* from_word, unsigned* to_word);
 
 /// Return true if word (as resolved by nys_sc_resolve) is currently

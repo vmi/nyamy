@@ -101,7 +101,7 @@ keymap "EmacsEdit" do
   key["C-K"]        = "$EmacsEdit/kill-line"
   key["C-M"]        = "Return"
   key["C-O"]        = "Return Left"
-  key["C-T"]        = "$EmacsEdit/transpose-chars" unless symbol_defined?("GANA")
+  key["C-T"]        = "$EmacsEdit/transpose-chars"
   key["C-W"]        = "C-X"
   key["M-W"]        = "C-C"
   key["C-U"]        = "&Variable(0, 4) &Prefix(EmacsC-U)"
@@ -135,10 +135,13 @@ keymap2 "EmacsMark" do
   key["Right"]      = "S-Right   &Prefix(EmacsMark)"
   key["Down"]       = "S-Down    &Prefix(EmacsMark)"
   if symbol_defined?("MAP-ESCAPE-TO-META")
-    key["Escape"] = "&Prefix(EmacsMarkEscape) &EditNextModifier(M-)"
-    if symbol_defined?("KBD109") && !symbol_defined?("KBD104on109")
+    if symbol_defined?("KBD109") &&
+       !symbol_defined?("KBD104on109") &&
+       !symbol_defined?("SCM-REMAP-ESC")
       key["半角/全角"]   = "&Prefix(EmacsMarkEscape) &EditNextModifier(M-)"
       key["E0半角/全角"] = "&Prefix(EmacsMarkEscape) &EditNextModifier(M-)"
+    else
+      key["Esc"] = "&Prefix(EmacsMarkEscape) &EditNextModifier(M-)"
     end
   end
 end

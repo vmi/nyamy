@@ -10,6 +10,12 @@ else
   load "104on109.mayu.rb" if symbol_defined?("USE104on109")  # 109 keyboard as 104
 end
 
-load "default.mayu.rb" if symbol_defined?("USEdefault")
+if symbol_defined?("USEdefault")
+  load "default.mayu.rb"
+end
 
 keymap "Global"
+
+# このファイルをホームディレクトリにコピーしてから、
+# 以下に自分の好みのキーバインディングを設定するとよい。
+# このファイル自体を変更しないこと。

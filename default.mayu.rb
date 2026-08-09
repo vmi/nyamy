@@ -1,12 +1,15 @@
 # default.mayu.rb -- Ruby (mruby) version of default.mayu
 # Emacs-like general configuration.
 
-load "109.mayu.rb" unless symbol_defined?("KBD109") || symbol_defined?("KBD104")
+if !symbol_defined?("KBD109") && !symbol_defined?("KBD104")
+  load "109.mayu.rb"
+end
+
 if symbol_defined?("KBD104")
-  defalias "↑",   as: "Up"
-  defalias "↓",   as: "Down"
-  defalias "←",   as: "Left"
-  defalias "→",   as: "Right"
+  defalias "↑",  as: "Up"
+  defalias "↓",  as: "Down"
+  defalias "←",  as: "Left"
+  defalias "→",  as: "Right"
   defalias "Yen", as: "BackSlash"
 end
 
@@ -60,40 +63,30 @@ keymap "Global" do
     key["C-S-V"]          = "&WindowMoveVisibly"
   end
 
-  if symbol_defined?("KBD109") && !symbol_defined?("KBD104on109")
+  if symbol_defined?("KBD109") &&
+     !symbol_defined?("KBD104on109") &&
+     !symbol_defined?("SCM-REMAP-ESC")
     key["*半角/全角"]   = "*Esc"
     key["*E0半角/全角"] = "*Esc"
     key["*Esc"]         = "*半角/全角"
   end
 
-  if symbol_defined?("KBD109")
-    mod[:control] += "英数"
-    key["*英数"]   = "*LControl"
-    mod[:control] += "E0英数"
-    key["*E0英数"] = "*LControl"
-  else
-    mod[:control] += "CapsLock"
-    key["*CapsLock"] = "*LControl"
-    mod[:control] += "E0CapsLock"
-    key["*E0CapsLock"] = "*LControl"
-  end
-
-  if symbol_defined?("GANA")
+  if !symbol_defined?("SCM-REMAP-LCTRL")
     if symbol_defined?("KBD109")
-      mod[:alt] += "!!無変換"
-      mod[:alt] += "!!E0無変換"
-      key["*無変換"]   = "*無変換"
-      key["*E0無変換"] = "*無変換"
-      key["A-無変換"]  = "無変換"
-      key["A-E0無変換"] = "無変換"
-      key["IC-A-K"]    = "無変換"
-      key["*IC-変換"]  = "$ToggleIME"
+      if !nls_key?("英数")
+        mod[:control] += "英数"
+        key["*英数"]   = "*LControl"
+      end
+      mod[:control] += "E0英数"
+      key["*E0英数"] = "*LControl"
+    else
+      if !nls_key?("CapsLock")
+        mod[:control] += "CapsLock"
+        key["*CapsLock"] = "*LControl"
+      end
+      mod[:control] += "E0CapsLock"
+      key["*E0CapsLock"] = "*LControl"
     end
-    key["*ScrollLock"] = "$CapsLock"
-    key["C-↑"] = "W-↑"
-    key["C-↓"] = "W-↓"
-    key["C-←"] = "W-←"
-    key["C-→"] = "W-→"
   end
 end
 
@@ -105,35 +98,33 @@ end
 
 keymap "Global" do
   if symbol_defined?("MAP-ESCAPE-TO-META")
-    key["Escape"] = "&Prefix(GlobalEscape) &EditNextModifier(M-)"
-    if symbol_defined?("KBD109") && !symbol_defined?("KBD104on109")
+    if symbol_defined?("KBD109") &&
+       !symbol_defined?("KBD104on109") &&
+       !symbol_defined?("SCM-REMAP-ESC")
       key["半角/全角"] = "&Prefix(GlobalEscape) &EditNextModifier(M-)"
+    else
+      key["Esc"] = "&Prefix(GlobalEscape) &EditNextModifier(M-)"
     end
   end
 end
 
 # almost-everything default keymap
 keymap "KeymapDefault", default: "&Default" do
-  if symbol_defined?("KBD109")
-    mod[:control] += "英数"
-    key["*英数"]   = "*LControl"
-    mod[:control] += "E0英数"
-    key["*E0英数"] = "*LControl"
-  else
-    mod[:control] += "CapsLock"
-    key["*CapsLock"] = "*LControl"
-    mod[:control] += "E0CapsLock"
-    key["*E0CapsLock"] = "*LControl"
-  end
-  if symbol_defined?("GANA")
+  if !symbol_defined?("SCM-REMAP-LCTRL")
     if symbol_defined?("KBD109")
-      mod[:alt] += "!!無変換"
-      mod[:alt] += "!!E0無変換"
-      key["*無変換"]   = "*無変換"
-      key["*E0無変換"] = "*無変換"
-      key["A-無変換"]  = "無変換"
-      key["A-E0無変換"] = "無変換"
-      key["IC-A-K"]    = "無変換"
+      if !nls_key?("英数")
+        mod[:control] += "英数"
+        key["*英数"]   = "*LControl"
+      end
+      mod[:control] += "E0英数"
+      key["*E0英数"] = "*LControl"
+    else
+      if !nls_key?("CapsLock")
+        mod[:control] += "CapsLock"
+        key["*CapsLock"] = "*LControl"
+      end
+      mod[:control] += "E0CapsLock"
+      key["*E0CapsLock"] = "*LControl"
     end
   end
 end
@@ -193,13 +184,13 @@ window "MDI", class: ':MDIClient:', parent: "Global" do
   key["C-S-Q", "C-A-Q"] = "&Prefix(MDI-WindowOperation)"
 end
 
-# Mado Tsukai no Yuutsu
-window "MayuInvestigate", class: 'mayu\.exe:#32770:mayuFocus$', parent: "KeymapDefault"
-
-window "MayuLog", class: 'mayu\.exe:#32770:Button', title: 'ログ - 窓使いの憂鬱', parent: "Global" do
-  key["C-G"] = "$WindowClose"
-  key["Esc"] = "$WindowClose"
-end
+# # Mado Tsukai no Yuutsu
+# window "MayuInvestigate", class: 'mayu\.exe:#32770:mayuFocus$', parent: "KeymapDefault"
+# 
+# window "MayuLog", class: 'mayu\.exe:#32770:Button', title: 'ログ - 窓使いの憂鬱', parent: "Global" do
+#   key["C-G"] = "$WindowClose"
+#   key["Esc"] = "$WindowClose"
+# end
 
 # Console
 keyseq "$ConsoleWindowClass/copy",       "&PostMessage(ToItself, 274, 65520, 0)"
@@ -218,7 +209,7 @@ window "ConsoleWindowClass", class: '^ConsoleWindowClass$', parent: "Global" do
   key["S-~NL-Num3"]     = "$WM_VSCROLL/SB_PAGEDOWN"
 end
 
-# Explorer, Internet Explorer
+# Explorer (Windows11で機能するか要検証)
 keyseq "$Explorer/show-folder-bar", "&PostMessage(ToMainWindow, 273, 41525, 0)"
 
 window "ExplorerList", class: 'EXPLORER.*:SHELLDLL_DefView:.*SysListView32$', parent: "SysListView32" do
@@ -235,33 +226,22 @@ window "ExplorerTree", class: 'EXPLORER.*:BaseBar:.*SysTreeView32$', parent: "Sy
   key["M-E"]   = "$Explorer/show-folder-bar"
 end
 
-window "InternetExplorer", class: ':Internet Explorer_Server$', parent: "EmacsEdit" do
-  key["C-S-Z"] = "&Sync&WindowMaximize"
-  key["C-A-Z"] = "C-&WindowMaximize"
-end
-
-window "IEFrame", class: ':IEFrame', parent: "EmacsEdit"
-
-window "MicrosoftJava", class: ':Microsoft VM For Java\(TM\) Host Window Class:', parent: "EmacsEdit"
-
 # Emacs
 keymap "Emacsen", parent: "Global" do
   key["C-Yen"] = "&Default"
   if symbol_defined?("MAP-ESCAPE-TO-META")
-    if symbol_defined?("KBD109") && !symbol_defined?("KBD104on109")
+    if symbol_defined?("KBD109") &&
+       !symbol_defined?("KBD104on109") &&
+       !symbol_defined?("SCM-REMAP-ESC")
       key["*半角/全角"]   = "*Esc"
       key["*E0半角/全角"] = "*Esc"
       key["*Esc"]         = "*半角/全角"
     else
-      key["Escape"] = "&Default"
+      key["Esc"] = "&Default"
     end
   end
 end
 
-window "Meadow", class: ':Meadow$', parent: "Emacsen" do
-  key["IC-M-X"] = "$ToggleIME M-X"
-end
-window "MULE", class: ':MULE$', parent: "Emacsen"
 window "Emacs", class: ':Emacs$', parent: "Emacsen"
 
 # Notepad
@@ -282,23 +262,6 @@ window "Notepad", class: ':Notepad:Edit$', parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(NotepadC-X)" unless symbol_defined?("ZXCV")
   key["C-S"] = "F3"
   key["M-J"] = "C-G"
-end
-
-# ASTEC-X
-keyseq "$ASTEC-X/copy-to-x", "&PostMessage(ToItself, 274, 16, 0)"
-
-window "ASTEC-X", class: ':ASTEC-X$', parent: "Global" do
-  key["C-Yen"]        = "&Default"
-  key["*IC-IL-C-Yen"] = "$ToggleIME"
-end
-
-# Becky! Internet Mail
-window "BeckyInternetMail", class: 'Rebecca\.exe:BeckyComposeFrameClass:', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
-end
-
-window "BeckyInternetMail2", class: 'B2\.exe:Becky2ComposeFrame:', parent: "EmacsEdit" do
-  key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft PowerPoint
@@ -329,32 +292,6 @@ window "MicrosoftExcel", class: 'EXCEL\.EXE:XLMAIN:', parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
-# Microsoft Pinball
-window "MSPinball", class: 'PINBALL\.EXE:1c7c22a0-9576-11ce-bf80-444553540000$', parent: "Global" do
-  key["A-Enter"] = "F4"
-end
-
-# Netscape Navigator
-window "NetscapeNavigator", class: 'Netscape\.exe:', parent: "Global" do
-  key["C-H"] = "BackSpace"
-  key["C-S"] = "C-F"
-end
-
-# Mozilla
-window "Mozilla", class: ':MozillaWindowClass$', parent: "EmacsEdit"
-
-# Personal Dictionary
-window "PersonalDictionary", class: 'PDICW32\.EXE:PDICW:ComboBox:Edit', parent: "EmacsEdit" do
-  key["C-K"] = "S-End S-Delete"
-  key["C-Y"] = "S-Insert"
-end
-
-# Real Player
-window "RealPlayer", class: 'realplay.exe:PNGUIClass', parent: "Global" do
-  key["A-Enter"] = "LAlt V Z F"
-  key["C-R"]     = "C-P"
-end
-
 # TeraTerm
 window "TeraTerm", class: 'TTermPRO\.exe:VTWin32$', parent: "Global" do
   key["C-Slash"]      = "C-S-HyphenMinus"
@@ -366,86 +303,9 @@ window "TeraTerm", class: 'TTermPRO\.exe:VTWin32$', parent: "Global" do
   end
 end
 
-# Waffle
-keyseq "$WaffleMark/cancel", "Left Right"
-
-window "Waffle", class: 'WITALK2\.EXE:.*:RichEdit(20A)?$', parent: "Global"
-keymap2 "WaffleMark", parent: "Waffle", default: "$WaffleMark/cancel &KeymapParent"
-
-keymap "Waffle" do
-  key["Home"]      = "&Default"
-  key["End"]       = "&Default"
-  key["C-Space"]   = "&Prefix(WaffleMark)"
-  key["C-A"]       = "&Default"
-  key["C-B"]       = "&Default"
-  key["C-C"]       = "&Default"
-  key["M-B"]       = "&Default"
-  key["C-D"]       = "&Default"
-  key["M-D"]       = "&Default"
-  key["C-E"]       = "&Default"
-  key["C-F"]       = "&Default"
-  key["M-F"]       = "&Default"
-  key["C-G"]       = "&Default"
-  key["C-H"]       = "&Default"
-  key["C-J"]       = "&Default"
-  key["C-K"]       = "&Default"
-  key["M-L"]       = "&Default"
-  key["C-M"]       = "&Default"
-  key["C-N"]       = "&Default"
-  key["C-O"]       = "&Default"
-  key["C-P"]       = "&Default"
-  key["C-Q"]       = "&Prefix(KeymapDefault)"
-  key["C-S"]       = "&Default"
-  key["C-T"]       = "&Default"
-  key["C-V"]       = "Next"
-  key["M-V"]       = "&Default"
-  key["C-W"]       = "&Default"
-  key["M-W"]       = "&Default"
-  key["C-Y"]       = "&Default"
-  key["M-U"]       = "&Default"
-  key["S-Home"]    = "&Default"
-  key["S-End"]     = "&Default"
-  key["S-M-Comma"] = "&Default"
-  key["S-M-Period"] = "&Default"
-  key["M-BackSpace"] = "&Default"
-  key["C-Slash"]   = "&Default"
-end
-
-keymap2 "WaffleMark" do
-  key["Home"]      = "S-C-Home  &Prefix(WaffleMark)"
-  key["End"]       = "S-C-End   &Prefix(WaffleMark)"
-  key["C-A"]       = "S-Home    &Prefix(WaffleMark)"
-  key["C-B"]       = "S-Left    &Prefix(WaffleMark)"
-  key["M-B"]       = "S-C-Left  &Prefix(WaffleMark)"
-  key["C-E"]       = "S-End     &Prefix(WaffleMark)"
-  key["C-F"]       = "S-Right   &Prefix(WaffleMark)"
-  key["M-F"]       = "S-C-Right &Prefix(WaffleMark)"
-  key["C-G"]       = "$WaffleMark/cancel &Undefined"
-  key["C-N"]       = "S-Down    &Prefix(WaffleMark)"
-  key["C-P"]       = "S-Up      &Prefix(WaffleMark)"
-  key["C-V"]       = "S-Next    &Prefix(WaffleMark)"
-  key["M-V"]       = "S-Prior   &Prefix(WaffleMark)"
-  key["C-W"]       = "C-W Left Right"
-  key["M-W"]       = "M-W Left Right"
-  key["S-M-Comma"] = "S-C-Home  &Prefix(WaffleMark)"
-  key["S-M-Period"] = "S-C-End  &Prefix(WaffleMark)"
-  key["Left"]      = "S-Left    &Prefix(WaffleMark)"
-  key["Up"]        = "S-Up      &Prefix(WaffleMark)"
-  key["Right"]     = "S-Right   &Prefix(WaffleMark)"
-  key["Down"]      = "S-Down    &Prefix(WaffleMark)"
-end
-
 # Xyzzy
 window "Xyzzy", class: 'xyzzy\.exe:', parent: "Global" do
   key["C-S-K", "C-A-K"] = "C-X C-C"
-end
-
-# Windows Media Player
-window "WindowsMediaPlayer", class: 'mplayer2.*:(Media Player 2|VideoRenderer)', parent: "Global" do
-  key["C-A"] = "Space"
-  key["C-R"] = "Space"
-  key["C-P"] = "Space"
-  key["C-S"] = "Period"
 end
 
 # Windows Mine Sweeper
@@ -467,21 +327,11 @@ window "WindowsMineSweeper", class: 'winmine.exe:マインスイーパ$', parent
   key["Num9"] = "&MouseMove(16, -16)"
 end
 
-# ICQ2000
-if symbol_defined?("GANA")
-  window "ICQMessageSession", class: 'ICQ\.exe:#32770:Edit$', title: 'Message Session', parent: "EmacsEdit" do
-    key["Enter"] = "M-S"
-  end
-end
-
 # Acrobat Reader
 window "AcrobatReader", class: 'AcroRd32.exe:.*:MDIClient:', parent: "EmacsMove" do
   key["Space"] = "PageDown"
   key["BS"]    = "PageUp"
 end
-
-# Edmax
-window "EdMax-edit", class: 'edmax\.exe:.*Afx:400000:b:0:1900010:0$', parent: "EmacsEdit"
 
 # VisualBasic
 window "VBTextBox", class: ':ThunderRT6FormDC:(ThunderRT6TextBox|RichTextWndClass)$', parent: "EmacsEdit"

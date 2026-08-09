@@ -281,30 +281,35 @@ C API 対応: `nys_sc_resolve(str)` (整数の範囲検査はバインディン�
 
 ```ruby
 ScancodeMap[変換前]        # => 変換後スキャンコード整数 (マッピングなしは nil)
-ScancodeMap.from(変換前)   # => 同上 ([] のエイリアス)
-ScancodeMap.to(変換後)     # => [変換元スキャンコード整数, ...] (なければ空配列)
+ScancodeMap.to[変換後]     # => [変換元スキャンコード整数, ...] (なければ空配列)
 ```
 
 - 引数は整数・キー名 String・スキャンコード文字列いずれも可 (`sc()` と同じ解決)。
-- `.to` は複数の変換元が同じ変換先を持ちうるため配列を返す。
+- 順引き・逆引きとも `[]` で書く。`ScancodeMap.to` は逆引き用のネストモジュール
+  `ScancodeMap::To` を返すだけなので、単体では真偽判定に使えない (常に真)。
+- `.to[...]` は複数の変換元が同じ変換先を持ちうるため配列を返す。
 - 変換先 `0x0000` (キー無効化) は整数 `0` を返す (`nil` = マッピングなしと区別できる)。
 - レジストリ値なし / パース不能時は空マップ扱い。
 - 実レジストリ Scancode Map は E0 のみ対応するため、結果に E1 (`0xE1nn`) は現れない。
+- 旧仕様の `ScancodeMap.from(x)` は廃止 (`NoMethodError`)。
+  `ScancodeMap.to(x)` も引数を取らなくなったため `ArgumentError` になる
+  (`mrb_get_args(mrb, "")` で明示的に弾いている)。
 
 使用例:
 
 ```ruby
 # LAlt⇔RAlt: レジストリ Scancode Map で両キーが未使用のときのみ nyamy で入れ替え
-if ScancodeMap["LeftAlt"].nil?  && ScancodeMap.to("LeftAlt").empty? &&
-   ScancodeMap["RightAlt"].nil? && ScancodeMap.to("RightAlt").empty?
+if ScancodeMap["LeftAlt"].nil?  && ScancodeMap.to["LeftAlt"].empty? &&
+   ScancodeMap["RightAlt"].nil? && ScancodeMap.to["RightAlt"].empty?
   defsubst "*LAlt", to: "*RAlt"
   defsubst "*RAlt", to: "*LAlt"
 end
 ```
 
 `ScancodeMap["LeftAlt"].nil?` だけでは「他キー→LeftAlt へのマップ (LeftAlt が
-変換先として使われているケース)」を見落とすため、上記のように `.to(...).empty?` を
-併用する。
+変換先として使われているケース)」を見落とすため、上記のように `.to[...].empty?` を
+併用する。変換元・変換先のどちらか一方にでも現れていれば「レジストリ側で処理済み」と
+見なす、というのが判定の意味。
 
 C API 対応: `nys_scancode_map_length()` / `nys_scancode_map_entry(idx, from, to)`
 
@@ -312,6 +317,33 @@ C API 対応: `nys_scancode_map_length()` / `nys_scancode_map_entry(idx, from, t
   の `Scancode Map` 値 (`RegGetValueW`)。読み取りに管理者権限は不要。
 - 初回照会時に読んでキャッシュし、設定ロード (`resetQueue`) でキャッシュ破棄する
   (本番はリロード毎にプロセス再起動のため実質毎回読み直し)。
+- **テスト用フック**: `NYAMY_TEST_HOOKS` 付きでビルドした場合に限り、環境変数
+  `NYAMY_SCANCODE_MAP` が設定されていればレジストリの代わりにその値を読む。
+  値はレジストリ blob の 16 進表記 (16 進数字以外は区切りとして無視)。
+  マッピング 0 個の blob を渡せば「Scancode Map なし」を再現できる。
+  この定義は `nyamy-scripter-dll` の Debug 構成にのみ入るため、配布ビルドには
+  この分岐自体が存在せず、環境変数でレジストリ読み取りを差し替えることはできない。
+
+### 自動定義シンボル `SCM-REMAP-ESC` / `SCM-REMAP-LCTRL`
+
+`.mayu` には Scancode Map を照会する構文が無いため、`.mayu` と `.mayu.rb` を同じ
+ロジックで書けるよう、よく使う 2 キーの判定結果をシンボルとして供給する。
+
+| シンボル | 定義条件 |
+|---|---|
+| `SCM-REMAP-ESC` | `0x01` (Esc) が Scancode Map の変換元または変換先に現れる |
+| `SCM-REMAP-LCTRL` | `0x1D` (LControl) が変換元または変換先に現れる |
+
+- `SCM-` は予約接頭辞。`0xE01D` は RightControl なので `SCM-REMAP-LCTRL` には含めない。
+- 定義は `nyamy_scripter.cpp` の `defineScancodeMapSymbols()`。Start ジョブ処理の
+  `resetQueue()` 直後、`on_load_setting` の呼び出し前に `g_symbols` へ挿入する。
+  `.mayu` の `if` は `flushQueue()` 内の `MayuCompiler` が `g_symbols` を見て評価するので、
+  それより前に確定していなければならない。
+- **キー名では判定できない**: `nys_sc_resolve` が使う名前表は `nys_def_key`
+  (= `104.mayu` / `109.mayu` のロード) で初めて埋まるため、この時点では空。
+  よってスキャンコード直値で判定する。
+- `resetQueue()` がマップのキャッシュを捨てた後に呼ぶので、設定ロードのたびに
+  レジストリを読み直す。
 
 ### 対応範囲
 

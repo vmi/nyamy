@@ -152,6 +152,9 @@ defkey "ALLocalBrowser",                scan: "E0-0x6b"
 defkey "ALEmailReader", "Email",        scan: "E0-0x6c"
 defkey "ALConsumerControlConfiguration", scan: "E0-0x6d"
 
+# キー名で指定する場合は defkey の後に記述すること
+defoption "nls-keys", value: "GraveAccent, CapsLock"
+
 defsync "0x7e"
 
 defmod "Shift",   keys: ["LShift", "RShift"]

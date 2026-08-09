@@ -110,7 +110,7 @@ keymap	EmacsEdit
  key C-K		= $EmacsEdit/kill-line			# 行末まで削除
  key C-M		= Return				# RETURN
  key C-O		= Return Left				# 一行増やす
- if ( !GANA ) key C-T	= $EmacsEdit/transpose-chars		# 文字入れ替え
+ key C-T		= $EmacsEdit/transpose-chars		# 文字入れ替え
  key C-W		= C-X					# CUT
  key M-W		= C-C					# COPY
  key C-U		= &Variable(0, 4) &Prefix(EmacsC-U)
@@ -143,10 +143,11 @@ keymap2	EmacsMark
  key Right		= S-Right	&Prefix(EmacsMark)	# →
  key Down		= S-Down	&Prefix(EmacsMark)	# ↓
  if ( MAP-ESCAPE-TO-META )
-   key Escape		= &Prefix(EmacsMarkEscape) &EditNextModifier(M-)
-   if ( KBD109 ) and ( ! KBD104on109 )
+   if ( KBD109 ) and ( ! KBD104on109 ) and ( ! SCM-REMAP-ESC )
      key 半角/全角	= &Prefix(EmacsMarkEscape) &EditNextModifier(M-)
      key E0半角/全角	= &Prefix(EmacsMarkEscape) &EditNextModifier(M-)
+   else
+     key Escape		= &Prefix(EmacsMarkEscape) &EditNextModifier(M-)
    endif
  endif
 

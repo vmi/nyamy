@@ -197,7 +197,7 @@ end
 load "default.mayu.rb" if symbol_defined?("USEdefault")
 ```
 
-シンボルは「[設定(<u>S</u>)...](#menu-s)」の `-Dシンボル名` で定義されたものと、設定ファイル内で `define` したものの集合です。
+シンボルは「[設定(<u>S</u>)...](#menu-s)」の `-Dシンボル名` で定義されたものと、設定ファイル内で `define` したものの集合です。これに加えて、NYamy が設定の読み込み開始時に自動で定義するシンボルがあります ([Scancode Map の照会](#dsl_scancodemap) を参照)。`SCM-` で始まる名前は NYamy の予約接頭辞なので、`define` で使わないでください。
 
 ### Scancode Map の照会 (`sc` / `ScancodeMap`) {#dsl_scancodemap}
 
@@ -207,17 +207,38 @@ load "default.mayu.rb" if symbol_defined?("USEdefault")
 sc("LShift")           # キー名 → スキャンコード整数 (0x2a)
 sc("E1-0x0f")          # スキャンコード文字列 → 整数 (0xE10F)
 
-ScancodeMap["CapsLock"]      # 変換後のスキャンコード整数。マッピングがなければ nil
-ScancodeMap.to("LeftControl") # この変換先を持つ変換元の配列。なければ空配列
+ScancodeMap["CapsLock"]         # 変換後のスキャンコード整数。マッピングがなければ nil
+ScancodeMap.to["LeftControl"]   # この変換先を持つ変換元の配列。なければ空配列
 ```
+
+順引き・逆引きとも `[]` で書きます。`ScancodeMap.to` 単体は逆引き用のオブジェクトを返すだけなので、`if ScancodeMap.to` のように真偽判定に使わないでください (常に真になります)。
 
 使用例: レジストリ側で [[CapsLock]] が入れ替え済みなら NYamy 側の入れ替えをスキップする。
 
 ```mayu
-if ScancodeMap["CapsLock"].nil? && ScancodeMap.to("CapsLock").empty?
+if ScancodeMap["CapsLock"].nil? && ScancodeMap.to["CapsLock"].empty?
   defsubst "*CapsLock", to: "*LControl"
 end
 ```
+
+変換元・変換先のどちらか一方にでも現れていれば「レジストリ側で処理済み」と見なすため、上の例のように 2 つの条件を `&&` で並べます。
+
+#### 自動定義シンボル `SCM-REMAP-ESC` / `SCM-REMAP-LCTRL` {#dsl_scm_symbols}
+
+よく使う 2 つのキーについては、NYamy が設定の読み込み開始時に判定してシンボルを定義します。`.mayu` からも `.mayu.rb` からも同じように参照できるので、両形式の設定ファイルを同じロジックで書けます。
+
+| シンボル | 定義される条件 |
+|---|---|
+| `SCM-REMAP-ESC` | [[Esc]] (`0x01`) が Scancode Map の変換元または変換先に現れる |
+| `SCM-REMAP-LCTRL` | [[LControl]] (`0x1D`) が Scancode Map の変換元または変換先に現れる |
+
+```mayu
+unless symbol_defined?("SCM-REMAP-ESC")
+  key["*Esc"] = "*半角/全角"       # レジストリ側が Esc を触っていない時だけ
+end
+```
+
+`.mayu` からは `if ( ! SCM-REMAP-ESC )` と書きます。
 
 ### ユーザー定義関数 (`deffunc`) {#dsl_deffunc}
 
