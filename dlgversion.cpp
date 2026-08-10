@@ -41,8 +41,6 @@ public:
 #ifndef NDEBUG
 				   L" (DEBUG)"
 #endif // !NDEBUG
-				   L" (UNICODE)"
-				   L" (PRIVATE VERSION)"
 				   ,
 				   loadString(IDS_homepage).c_str(),
 				   (WIDEN(LOGNAME) L"@" + toLower(WIDEN(COMPUTERNAME))).c_str(),
