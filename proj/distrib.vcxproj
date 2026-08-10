@@ -83,6 +83,22 @@
     <None Include="..\s\install.ps1" />
     <None Include="..\s\uninstall.cmd" />
     <None Include="..\s\uninstall.ps1" />
+    <None Include="..\legacy\104.mayu" />
+    <None Include="..\legacy\104on109.mayu" />
+    <None Include="..\legacy\109.mayu" />
+    <None Include="..\legacy\109on104.mayu" />
+    <None Include="..\legacy\default.mayu" />
+    <None Include="..\legacy\dot.mayu" />
+    <None Include="..\legacy\emacsedit.mayu" />
+    <None Include="..\legacy\mayu-settings.txt" />
+    <None Include="..\legacy\workaround.mayu" />
+    <None Include="..\legacy\contrib\98x1.mayu" />
+    <None Include="..\legacy\contrib\109onAX.mayu" />
+    <None Include="..\legacy\contrib\ax.mayu" />
+    <None Include="..\legacy\contrib\dvorak.mayu" />
+    <None Include="..\legacy\contrib\dvorak109.mayu" />
+    <None Include="..\legacy\contrib\DVORAKon109.mayu" />
+    <None Include="..\legacy\contrib\keitai.mayu" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\tools\makedistrib.ps1">

@@ -46,5 +46,5 @@ echo ERROR: PowerShell executable not found.>&2
 exit /b 1
 
 :run
-"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%install.ps1"
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%install.ps1" %*
 exit /b %ERRORLEVEL%

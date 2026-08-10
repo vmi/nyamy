@@ -78,6 +78,24 @@ $payload = @(
     @{ Source = "s\install.ps1";             Dest = "install.ps1" }
     @{ Source = "s\uninstall.cmd";           Dest = "uninstall.cmd" }
     @{ Source = "s\uninstall.ps1";           Dest = "uninstall.ps1" }
+    # legacy/: mayu-era .mayu assets, kept under their own subfolder so they
+    # don't collide with the .mayu.rb files of the same base name above.
+    @{ Source = "legacy\104.mayu";                 Dest = "legacy\104.mayu" }
+    @{ Source = "legacy\104on109.mayu";            Dest = "legacy\104on109.mayu" }
+    @{ Source = "legacy\109.mayu";                 Dest = "legacy\109.mayu" }
+    @{ Source = "legacy\109on104.mayu";            Dest = "legacy\109on104.mayu" }
+    @{ Source = "legacy\default.mayu";             Dest = "legacy\default.mayu" }
+    @{ Source = "legacy\dot.mayu";                 Dest = "legacy\dot.mayu" }
+    @{ Source = "legacy\emacsedit.mayu";           Dest = "legacy\emacsedit.mayu" }
+    @{ Source = "legacy\mayu-settings.txt";        Dest = "legacy\mayu-settings.txt" }
+    @{ Source = "legacy\workaround.mayu";          Dest = "legacy\workaround.mayu" }
+    @{ Source = "legacy\contrib\98x1.mayu";        Dest = "legacy\contrib\98x1.mayu" }
+    @{ Source = "legacy\contrib\109onAX.mayu";     Dest = "legacy\contrib\109onAX.mayu" }
+    @{ Source = "legacy\contrib\ax.mayu";          Dest = "legacy\contrib\ax.mayu" }
+    @{ Source = "legacy\contrib\dvorak.mayu";      Dest = "legacy\contrib\dvorak.mayu" }
+    @{ Source = "legacy\contrib\dvorak109.mayu";   Dest = "legacy\contrib\dvorak109.mayu" }
+    @{ Source = "legacy\contrib\DVORAKon109.mayu"; Dest = "legacy\contrib\DVORAKon109.mayu" }
+    @{ Source = "legacy\contrib\keitai.mayu";      Dest = "legacy\contrib\keitai.mayu" }
 )
 
 foreach ($item in $payload) {

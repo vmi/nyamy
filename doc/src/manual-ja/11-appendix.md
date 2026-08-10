@@ -19,6 +19,10 @@ NYamy に付属するサンプル設定です。いずれも Ruby DSL (`.mayu.rb
 
 - [`syntax.txt`](syntax.txt)
 
-### 窓使いの憂鬱時代の資産 {#appendix_contrib}
+### 窓使いの憂鬱時代の資産 {#appendix_legacy}
 
-「窓使いの憂鬱」用の `.mayu` 形式の設定ファイル (旧サンプル設定一式や、Dvorak 配列・AX キーボード用の設定など) は、NYamy でも `.mayu.rb` から `load` することでそのまま利用できます。これらはソースリポジトリの `legacy/` フォルダ (Dvorak 配列などは `legacy/contrib/`) に収録しています (配布 zip には含まれません)。
+「窓使いの憂鬱」用の `.mayu` 形式の設定ファイルは NYamy でも `.mayu.rb` から `load` することでそのまま利用できます。
+
+インストール先の `legacy\` フォルダ (Dvorak 配列などは `legacy\contrib\`) に同梱されていますので、必要に応じて設定フォルダにコピーして利用してください。(`legacy\` フォルダは設定ファイルの検索対象外です)
+
+なお、`.mayu.rb` 形式のサンプル設定に対応する `.mayu` 形式のファイル(`109.mayu.rb`に対応する`109.mayu`など)は、同一の内容になるよう修正を加えていますので、調整不要です。
