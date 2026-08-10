@@ -1075,7 +1075,11 @@ public:
 			m_isSettingDialogOpened(false),
 			m_sessionState(0),
 			m_engine(m_log) {
-		m_hNotifyMailslot = CreateMailslot(NOTIFY_MAILSLOT_NAME, 0, MAILSLOT_WAIT_FOREVER, (SECURITY_ATTRIBUTES *)NULL);
+		// addSessionId(): mailslot names live in \Device\Mailslot, which has
+		// no per session split of its own, so without it a second logged on
+		// user's nyamy would find the name taken.  Everything else shared
+		// with the hooks is named this way already.
+		m_hNotifyMailslot = CreateMailslot(addSessionId(NOTIFY_MAILSLOT_NAME).c_str(), 0, MAILSLOT_WAIT_FOREVER, (SECURITY_ATTRIBUTES *)NULL);
 		ASSERT(m_hNotifyMailslot != INVALID_HANDLE_VALUE);
 		int err;
 		if (checkWindowsVersion(6, 0) != FALSE) { // enableToWriteByUser() is available only Vista or later

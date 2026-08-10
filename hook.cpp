@@ -23,6 +23,14 @@
 #define HOOK_DATA_NAME_ARCH L"{716A5DEB-CB02-4438-ABC8-D00E48673E45}" WIDEN(VERSION)
 #endif // !_WIN64
 
+/** how long to leave the mailslot alone after failing to open it.
+
+    Only reached while no nyamy is running, which the hooks normally outlive
+    by moments; this just keeps a nyamy that died without unhooking from
+    costing every hooked process an open on every notification.
+*/
+static const DWORD kMailslotRetryMillisec = 500;
+
 // Some applications use different values for below messages
 // when double click of title bar.
 #define SC_MAXIMIZE2 (SC_MAXIMIZE + 2)
@@ -78,6 +86,7 @@ struct Globals {
 	Engine *m_engine;
 	HWND m_hwndTaskTray;				///
 	HANDLE m_hMailslot;
+	DWORD m_mailslotRetryAt;			/// tick a failed reopen may be retried at
 	bool m_isInitialized;
 #ifdef HOOK_LOG_TO_FILE
 	HANDLE m_logFile;
@@ -97,6 +106,7 @@ static Globals g;
 
 static void notifyThreadDetach();
 static void notifyShow(NotifyShow::Show i_show, bool i_isMDI);
+static bool openMailslot();
 static bool mapHookData(bool i_isYamy);
 static void unmapHookData();
 static bool initialize(bool i_isYamy);
@@ -143,17 +153,10 @@ bool initialize(bool i_isYamy)
 		OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 #endif // HOOK_LOG_TO_FILE
 	WriteToLog("try to open mailslot\r\n");
-	g.m_hMailslot =
-		CreateFile(NOTIFY_MAILSLOT_NAME, GENERIC_WRITE,
-				   FILE_SHARE_READ | FILE_SHARE_WRITE,
-				   (SECURITY_ATTRIBUTES *)NULL, OPEN_EXISTING,
-				   FILE_ATTRIBUTE_NORMAL, (HANDLE)NULL);
-	if (g.m_hMailslot == INVALID_HANDLE_VALUE) {
-		HOOK_RPT2("MAYU: %S create mailslot failed(0x%08x)\r\n", g.m_moduleName, GetLastError());
-		WriteToLog("open mailslot NG\r\n");
-	} else {
-		HOOK_RPT1("MAYU: %S create mailslot successed\r\n", g.m_moduleName);
+	if (openMailslot()) {
 		WriteToLog("open mailslot OK\r\n");
+	} else {
+		WriteToLog("open mailslot NG\r\n");
 	}
 	if (!mapHookData(i_isYamy))
 		return false;
@@ -182,6 +185,10 @@ BOOL WINAPI DllMain(HINSTANCE i_hInstDLL, DWORD i_fdwReason,
 #endif // !NDEBUG
 		g.m_isInitialized = false;
 		g.m_hInstDLL = i_hInstDLL;
+		// zero initialized statics would read as a valid handle here, and a
+		// thread detaching before initialize() does reach notify()
+		g.m_hMailslot = INVALID_HANDLE_VALUE;
+		g.m_mailslotRetryAt = 0;
 		break;
 	}
 	case DLL_THREAD_ATTACH:
@@ -258,35 +265,90 @@ static void unmapHookData()
 }
 
 
-/// notify
+/** open the client side of nyamy's mailslot.
+
+    Also used to pick up the mailslot of a *new* nyamy: this DLL outlives the
+    nyamy that got it injected, because Windows unloads a global hook DLL only
+    when its process next retrieves a message.
+*/
+static bool openMailslot()
+{
+	if (g.m_hMailslot != INVALID_HANDLE_VALUE)
+		return true;
+
+	// A nyamy that is simply not running would otherwise have every hooked
+	// process attempt this on every notification.
+	DWORD now = GetTickCount();
+	if (g.m_mailslotRetryAt != 0 &&
+			static_cast<LONG>(now - g.m_mailslotRetryAt) < 0)
+		return false;
+
+	g.m_hMailslot =
+		CreateFile(addSessionId(NOTIFY_MAILSLOT_NAME).c_str(), GENERIC_WRITE,
+				   FILE_SHARE_READ | FILE_SHARE_WRITE,
+				   (SECURITY_ATTRIBUTES *)NULL, OPEN_EXISTING,
+				   FILE_ATTRIBUTE_NORMAL, (HANDLE)NULL);
+	if (g.m_hMailslot == INVALID_HANDLE_VALUE) {
+		HOOK_RPT2("MAYU: %S open mailslot failed(0x%08x)\r\n",
+				  g.m_moduleName, GetLastError());
+		g.m_mailslotRetryAt = now + kMailslotRetryMillisec;
+		return false;
+	}
+	HOOK_RPT1("MAYU: %S open mailslot successed\r\n", g.m_moduleName);
+	g.m_mailslotRetryAt = 0;
+	return true;
+}
+
+
+/** notify
+
+    This runs inside the message hook of whatever process we are injected in,
+    so it must not block.  A local mailslot write does not.  WM_COPYDATA is
+    what is left for a process that could not open the mailslot at all, and it
+    is a synchronous send - hence the timeout on it, and hence it not being
+    the first choice.
+*/
 bool notify(void *i_data, size_t i_dataSize)
 {
 	COPYDATASTRUCT cd;
 	DWORD_PTR result;
 
 	DWORD len;
-	if (g.m_hMailslot != INVALID_HANDLE_VALUE) {
-		BOOL ret;
-		ret = WriteFile(g.m_hMailslot, i_data, (DWORD) i_dataSize, &len, NULL);
-#ifndef NDEBUG
-		if (ret == 0) {
-			HOOK_RPT2("MAYU: %S WriteFile to mailslot failed(0x%08x)\r\n", g.m_moduleName, GetLastError());
-		} else {
-			HOOK_RPT1("MAYU: %S WriteFile to mailslot successed\r\n", g.m_moduleName);
-		}
-#endif // !NDEBUG
-	} else {
-		cd.dwData = reinterpret_cast<Notify *>(i_data)->m_type;
-		cd.cbData = static_cast<DWORD>(i_dataSize);
-		cd.lpData = i_data;
-		if (g.m_hwndTaskTray == 0 || cd.dwData == Notify::Type_threadDetach)
-			return false;
-		if (!SendMessageTimeout(reinterpret_cast<HWND>(g.m_hwndTaskTray),
-								WM_COPYDATA, NULL, reinterpret_cast<LPARAM>(&cd),
-								SMTO_ABORTIFHUNG | SMTO_NORMAL, 5000, &result)) {
-			_RPT0(_CRT_WARN, "MAYU: SendMessageTimeout() timeouted\r\n");
-			return false;
-		}
+	if (openMailslot()) {
+		if (WriteFile(g.m_hMailslot, i_data, (DWORD) i_dataSize, &len, NULL))
+			return true;
+
+		// The nyamy that owned this mailslot has gone.  Its successor made a
+		// new one under the same name, which our handle knows nothing about -
+		// so drop the handle, take the new one and send this message again.
+		// Without the resend the first notification after a restart is lost,
+		// and notifySetFocus() only fires on a change, so the focus would
+		// stay wrong until the user moved away from that window and back.
+		HOOK_RPT2("MAYU: %S WriteFile to mailslot failed(0x%08x), reopening\r\n",
+				  g.m_moduleName, GetLastError());
+		CloseHandle(g.m_hMailslot);
+		g.m_hMailslot = INVALID_HANDLE_VALUE;
+		g.m_mailslotRetryAt = 0;		// a restart is worth an attempt now
+		if (openMailslot() &&
+				WriteFile(g.m_hMailslot, i_data, (DWORD) i_dataSize, &len, NULL))
+			return true;
+		// fall through to WM_COPYDATA: there may be a nyamy with no mailslot
+	}
+
+	cd.dwData = reinterpret_cast<Notify *>(i_data)->m_type;
+	cd.cbData = static_cast<DWORD>(i_dataSize);
+	cd.lpData = i_data;
+	// Read the window back rather than trust what initialize() saw: a nyamy
+	// that started after us has a different one, and HookData is where it
+	// publishes it.
+	HWND hwndTaskTray = g_hookData ? g_hookData->getHwndTaskTray() : NULL;
+	if (hwndTaskTray == NULL || cd.dwData == Notify::Type_threadDetach)
+		return false;
+	if (!SendMessageTimeout(hwndTaskTray,
+							WM_COPYDATA, NULL, reinterpret_cast<LPARAM>(&cd),
+							SMTO_ABORTIFHUNG | SMTO_NORMAL, 5000, &result)) {
+		_RPT0(_CRT_WARN, "MAYU: SendMessageTimeout() timeouted\r\n");
+		return false;
 	}
 	return true;
 }
