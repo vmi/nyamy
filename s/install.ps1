@@ -6,6 +6,11 @@ $sourceDir = $PSScriptRoot
 # Destination directory
 $targetDir = Join-Path $env:LOCALAPPDATA 'Programs\NYamy'
 
+# Previous versions are renamed to a sibling directory with this prefix and
+# deleted afterwards; whatever cannot be deleted yet is retried on the next run.
+$installRoot = Split-Path $targetDir -Parent
+$stashPrefix = 'NYamy.old-'
+
 # Per-user Startup shortcut, fixed name so re-running --startup overwrites it
 $shortcutPath = Join-Path ([Environment]::GetFolderPath('Startup')) 'NYamy.lnk'
 
@@ -66,6 +71,113 @@ function Remove-StartupShortcut([string]$Dir) {
     Write-Host "Startup shortcut removed: $shortcutPath"
 }
 
+function Get-BlockingProcesses([string]$Dir) {
+    # Processes that still have a module mapped from $Dir.  A mapped image
+    # cannot be deleted, so this is what a failed cleanup should report.
+    $prefix = $Dir.TrimEnd('\') + '\'
+    $found = @()
+    foreach ($process in Get-Process) {
+        try {
+            foreach ($module in $process.Modules) {
+                if ($module.FileName -and
+                    $module.FileName.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $found += "$($process.ProcessName) (PID $($process.Id)) holds $(Split-Path $module.FileName -Leaf)"
+                }
+            }
+        }
+        catch {
+            # The process exited, or its module list is not readable from here.
+        }
+    }
+    $found | Sort-Object -Unique
+}
+
+function Assert-NyamyNotRunning([string]$Dir) {
+    # Renaming works on running binaries too, so the file system no longer
+    # tells us that NYamy is still up.  Ask the process list instead.
+    $prefix = $Dir.TrimEnd('\') + '\'
+    $running = @()
+    foreach ($process in Get-Process -Name 'nyamy', 'nyamy-scripter', 'nyamyd32' -ErrorAction SilentlyContinue) {
+        # An inaccessible path means an elevated instance: assume it is ours.
+        $exePath = $null
+        try { $exePath = $process.Path } catch { }
+        if (-not $exePath -or $exePath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $running += "$($process.ProcessName) (PID $($process.Id))"
+        }
+    }
+    if ($running) {
+        throw ("NYamy is still running. Quit it and run install again:`n  " + ($running -join "`n  "))
+    }
+}
+
+function Move-InstalledFilesAside([string]$Dir) {
+    if (-not (Get-ChildItem -LiteralPath $Dir -Force)) {
+        return
+    }
+
+    $stash = Join-Path `
+        $installRoot `
+        ($stashPrefix + [System.Guid]::NewGuid().ToString('N').Substring(0, 8))
+
+    # A file mapped into a running process cannot be deleted, but it can still
+    # be renamed, and so can a directory containing one.  Global hook DLLs stay
+    # mapped in other processes for a while after NYamy exits, which is why
+    # deleting the old files outright is not reliable.
+    try {
+        Move-Item -LiteralPath $Dir -Destination $stash -ErrorAction Stop
+        New-Item -ItemType Directory -Path $Dir -Force | Out-Null
+        return
+    }
+    catch {
+        # The directory itself is held open - a shell sitting in it, say.
+        # Fall back to moving its entries one by one.
+        Write-Host "Could not move the directory aside as a whole; moving its contents instead."
+    }
+
+    New-Item -ItemType Directory -Path $stash -Force | Out-Null
+    $moved = @()
+    foreach ($item in Get-ChildItem -LiteralPath $Dir -Force) {
+        $destination = Join-Path $stash $item.Name
+        try {
+            Move-Item -LiteralPath $item.FullName -Destination $destination -ErrorAction Stop
+            $moved += , @($destination, $item.FullName)
+        }
+        catch {
+            # Put back what was already moved, so a failed install changes nothing.
+            foreach ($pair in $moved) {
+                Move-Item -LiteralPath $pair[0] -Destination $pair[1] -ErrorAction SilentlyContinue
+            }
+            Remove-Item $stash -Recurse -Force -ErrorAction SilentlyContinue
+
+            $blocking = Get-BlockingProcesses $Dir
+            $hint = ''
+            if ($blocking) {
+                $hint = "`nStill in use by:`n  " + ($blocking -join "`n  ")
+            }
+            throw "Cannot move aside: $($item.FullName)`n$($_.Exception.Message)$hint"
+        }
+    }
+}
+
+function Remove-Stashes([string]$Root) {
+    # Delete every leftover stash, including the one just created.  Files that
+    # are still mapped elsewhere survive; the next install picks them up.
+    $leftovers = @()
+    foreach ($stash in @(Get-ChildItem -Path $Root -Directory -Force -Filter "$stashPrefix*" -ErrorAction SilentlyContinue)) {
+        Remove-Item $stash.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path $stash.FullName) {
+            $leftovers += $stash.FullName
+        }
+    }
+    if ($leftovers) {
+        Write-Host "The previous version is still mapped into running processes;"
+        Write-Host "these leftovers are harmless and will be removed by the next install:"
+        foreach ($leftover in $leftovers) {
+            Write-Host "  $leftover"
+        }
+    }
+}
+
 #
 # Argument parsing
 #
@@ -101,49 +213,21 @@ if ($startupOnly -and -not (Test-Path (Join-Path $targetDir 'nyamy.exe'))) {
 if (-not $startupOnly) {
     Write-Phase "Installation started: $targetDir"
 
+    if ($sourceDir.TrimEnd('\').Equals($targetDir.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase) -or
+        $sourceDir.StartsWith($targetDir.TrimEnd('\') + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Run install from the distribution folder, not from inside $targetDir."
+    }
+
+    Assert-NyamyNotRunning $targetDir
+
     # Create destination directory if it does not exist
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 
     #
-    # Verify that all existing files/directories can be be deleted
+    # Rename the previous version out of the way instead of deleting it
     #
-    Write-Phase "Checking deletable files..."
-    $items = Get-ChildItem -Path $targetDir -Recurse -Force -ErrorAction Stop
-
-    foreach ($item in $items) {
-        try {
-            if ($item.PSIsContainer) {
-                # Verify write access to the directory
-                $testFile = Join-Path $item.FullName ([System.Guid]::NewGuid().ToString() + '.tmp')
-                [System.IO.File]::WriteAllText($testFile, '')
-                Remove-Item $testFile -Force
-            }
-            else {
-                # Verify that the file is not locked
-                $stream = [System.IO.File]::Open(
-                    $item.FullName,
-                    [System.IO.FileMode]::Open,
-                    [System.IO.FileAccess]::ReadWrite,
-                    [System.IO.FileShare]::None
-                )
-                $stream.Dispose()
-            }
-        }
-        catch {
-            throw "Cannot delete file or directory: $($item.FullName)`n$($_.Exception.Message)"
-        }
-    }
-    Write-Phase "All files are deletable."
-
-    #
-    # Remove all existing contents
-    #
-    Write-Phase "Removing existing files..."
-    Get-ChildItem -Path $targetDir -Force |
-        ForEach-Object {
-            Write-Host "Removing: $($_.Name)"
-            Remove-Item $_.FullName -Recurse -Force
-        }
+    Write-Phase "Moving the previous version aside..."
+    Move-InstalledFilesAside $targetDir
 
     #
     # Copy all files except install.*
@@ -163,6 +247,12 @@ if (-not $startupOnly) {
             Write-Host "Copying: $relativePath"
             Copy-Item $_.FullName $destination -Force
         }
+
+    #
+    # Delete the previous version, plus anything left over from earlier runs
+    #
+    Write-Phase "Removing the previous version..."
+    Remove-Stashes $installRoot
 
     Write-Phase "Installation completed: $targetDir"
 }

@@ -46,5 +46,12 @@ echo ERROR: PowerShell executable not found.>&2
 exit /b 1
 
 :run
+
+rem A directory cannot be renamed or removed while any process has it as its
+rem current directory, and double-clicking this file puts us right inside the
+rem one we are about to delete.  Step out before handing over to PowerShell,
+rem which inherits this working directory.
+cd /d "%TEMP%"
+
 "%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%uninstall.ps1" %*
 exit /b %ERRORLEVEL%
