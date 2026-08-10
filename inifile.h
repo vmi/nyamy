@@ -41,6 +41,11 @@ public:
 	/// write LOGFONT
 	bool write(const std::wstring &i_name, const LOGFONT &i_value) const;
 
+	/// read WINDOWPLACEMENT; o_value is left untouched when it is absent
+	bool read(const std::wstring &i_name, WINDOWPLACEMENT *o_value) const;
+	/// write WINDOWPLACEMENT
+	bool write(const std::wstring &i_name, const WINDOWPLACEMENT &i_value) const;
+
 	/// remove the value; returns false if it did not exist
 	bool remove(const std::wstring &i_name) const;
 };

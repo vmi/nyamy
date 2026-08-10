@@ -235,5 +235,20 @@ extern std::wostream &operator<<(std::wostream &i_ost, const wregex_stored &i_da
 /// get lower string
 extern std::wstring toLower(const std::wstring &i_str);
 
+/** Spell out control characters in a window title so that they survive a
+    single-font edit control: TAB, LF and CR by name, anything else as
+    &lt;XX&gt; (or &lt;U+XXXX&gt; above 0xFF).
+
+    The result is not only displayed, it is what "window /class/ /title/"
+    matches against, so the spelling has to be typable in a regexp.  That rules
+    out backslash escapes - these strings always carry backslashes from the
+    module path, so "\n" could not be told apart from a literal one - and caret
+    notation, since '^' is an anchor.  '&lt;' and '&gt;' are literal in
+    ECMAScript regexps and practically never occur in a title.
+
+    Every path that produces a title has to use this, or the same window would
+    match differently depending on which path saw it. */
+extern std::wstring escapeControlChars(const std::wstring &i_str);
+
 
 #endif // !_STRINGTOOL_H

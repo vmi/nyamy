@@ -259,9 +259,14 @@ void editInsertTextAtLast(HWND i_hwnd, const std::wstring &i_text,
 	size_t len = editGetTextBytes(i_hwnd);
 
 	if (i_threshold < len) {
-		Edit_SetSel(i_hwnd, 0, len / 3 * 2);
+		// Drop the oldest third-plus, but on a line boundary: cutting at a raw
+		// character offset leaves a truncated line at the top of the log.
+		int cut = Edit_LineFromChar(i_hwnd, static_cast<int>(len / 3 * 2));
+		int index = Edit_LineIndex(i_hwnd, cut);
+		if (index <= 0)
+			index = static_cast<int>(len / 3 * 2);
+		Edit_SetSel(i_hwnd, 0, index);
 		Edit_ReplaceSel(i_hwnd, L"");
-		editDeleteLine(i_hwnd, 0);
 		len = editGetTextBytes(i_hwnd);
 	}
 

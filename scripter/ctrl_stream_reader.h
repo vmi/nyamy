@@ -16,6 +16,7 @@ struct CtrlArgsStart {
 	wstringi configName;  // config profile name (may be empty)
 	wstringi configPath;  // config file path (may be empty)
 	Symbols  symbols;
+	LogLevel logLevel;    // threshold in force when nyamy launched us
 };
 
 
@@ -44,6 +45,9 @@ public:
 
 	/// Read the payload of an ExecUserFunc command (call after readNext returns ExecUserFunc)
 	CtrlArgsExecUserFunc readExecUserFunc();
+
+	/// Read the payload of a SetLogLevel command
+	LogLevel readSetLogLevel();
 
 private:
 	std::istream &m_in;

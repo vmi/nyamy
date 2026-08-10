@@ -292,6 +292,49 @@ bool IniFile::read(const std::wstring &i_name, LOGFONT *o_value,
 }
 
 
+// read WINDOWPLACEMENT
+//
+// Only showCmd and rcNormalPosition are stored: the rest of the structure is
+// either derived (rcNormalPosition already is in workspace coordinates, so the
+// taskbar needs no accounting) or meaningless once the window is gone.
+bool IniFile::read(const std::wstring &i_name, WINDOWPLACEMENT *o_value) const
+{
+	std::wstring buf;
+	if (!read(i_name, &buf))
+		return false;
+
+	wregex_stored re(L"^(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$");
+	std::wsmatch what;
+	if (!std::regex_match(buf, what, re))
+		return false;
+
+	o_value->length = sizeof(*o_value);
+	o_value->flags = 0;
+	o_value->showCmd = static_cast<UINT>(_wtoi(what.str(1).c_str()));
+	o_value->rcNormalPosition.left   = _wtoi(what.str(2).c_str());
+	o_value->rcNormalPosition.top    = _wtoi(what.str(3).c_str());
+	o_value->rcNormalPosition.right  = _wtoi(what.str(4).c_str());
+	o_value->rcNormalPosition.bottom = _wtoi(what.str(5).c_str());
+	if (o_value->rcNormalPosition.right <= o_value->rcNormalPosition.left ||
+			o_value->rcNormalPosition.bottom <= o_value->rcNormalPosition.top)
+		return false;
+	return true;
+}
+
+
+// write WINDOWPLACEMENT
+bool IniFile::write(const std::wstring &i_name,
+					const WINDOWPLACEMENT &i_value) const
+{
+	wchar_t buf[128];
+	_snwprintf(buf, NUMBER_OF(buf), L"%u,%d,%d,%d,%d",
+			   i_value.showCmd,
+			   i_value.rcNormalPosition.left, i_value.rcNormalPosition.top,
+			   i_value.rcNormalPosition.right, i_value.rcNormalPosition.bottom);
+	return write(i_name, std::wstring(buf));
+}
+
+
 // write LOGFONT
 bool IniFile::write(const std::wstring &i_name, const LOGFONT &i_value) const
 {

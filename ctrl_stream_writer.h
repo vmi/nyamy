@@ -20,10 +20,14 @@ class CtrlStreamWriter
 public:
 	explicit CtrlStreamWriter(std::ostream &out);
 
-	/// Send a start request with config name, path, and symbol set
+	/// Send a start request with config name, path, symbol set and log threshold
 	void writeStart(const wstringi &configName,
 	                const wstringi &configPath,
-	                const Symbols  &syms);
+	                const Symbols  &syms,
+	                LogLevel        logLevel);
+
+	/// Send a new log threshold
+	void writeSetLogLevel(LogLevel logLevel);
 
 	/// Send a quit request
 	void writeQuit();

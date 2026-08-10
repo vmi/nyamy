@@ -389,6 +389,47 @@ std::wstring toLower(const std::wstring &i_str)
 }
 
 
+// spell out control characters; see the header for why this spelling
+std::wstring escapeControlChars(const std::wstring &i_str)
+{
+	static const wchar_t hex[] = L"0123456789ABCDEF";
+	std::wstring o;
+	o.reserve(i_str.size());
+	for (size_t i = 0; i < i_str.size(); ++ i) {
+		wchar_t c = i_str[i];
+		if (!iswcntrl(c)) {
+			o += c;
+			continue;
+		}
+		switch (c) {
+		case L'\t':
+			o += L"<TAB>";
+			break;
+		case L'\n':
+			o += L"<LF>";
+			break;
+		case L'\r':
+			o += L"<CR>";
+			break;
+		default: {
+			unsigned u = static_cast<unsigned>(c);
+			o += L'<';
+			if (0xFF < u) {
+				o += L"U+";
+				o += hex[(u >> 12) & 0xF];
+				o += hex[(u >> 8) & 0xF];
+			}
+			o += hex[(u >> 4) & 0xF];
+			o += hex[u & 0xF];
+			o += L'>';
+			break;
+		}
+		}
+	}
+	return o;
+}
+
+
 // convert wstring to UTF-8
 std::string to_UTF8(const std::wstring &i_str)
 {

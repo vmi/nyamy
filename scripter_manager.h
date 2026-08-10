@@ -17,6 +17,7 @@
 #  include "symbols.h"
 #  include "setting.h"
 #  include "multithread.h"
+#  include <atomic>
 #  include <future>
 #  include <functional>
 #  include <memory>
@@ -37,7 +38,11 @@ public:
 	/// Sends CtrlId::Start with config name, path, and symbols after the process is ready.
 	/// If a previous start is still in progress, returns false and does nothing.
 	bool start(const wstringi &configName, const wstringi &configPath,
-	           const Symbols &syms);
+	           const Symbols &syms, LogLevel logLevel);
+
+	/// Tell the scripter the new log threshold (non-blocking; ignored if the
+	/// scripter is not running yet - the next start() carries it instead).
+	void setLogLevel(LogLevel logLevel);
 
 	/// signal quit to scripter process (non-blocking; idempotent)
 	void sendQuit();
@@ -121,7 +126,9 @@ private:
 	// async start/restart
 	std::future<bool> m_startFuture;
 	bool launchScripter(const wstringi &configName, const wstringi &configPath,
-	                    const Symbols &syms);
+	                    const Symbols &syms, LogLevel logLevel);
+	/// most recent threshold, so a restart can carry it
+	std::atomic<LogLevel> m_logLevel;
 
 	// background thread entry points
 	static unsigned __stdcall dataThread(void *param);

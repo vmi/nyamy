@@ -321,18 +321,20 @@ static void getClassNameTitleName(HWND i_hwnd, bool i_isInMenu,
 		else
 			className = wstringi(buf) + L":" + className;
 
-		// get title name
+		// get title name.  When i_hwnd is NULL, buf still holds the module file
+		// name the class name step just fetched, which needs no escaping.
+		std::wstring title;
 		if (i_hwnd) {
 			GetWindowText(i_hwnd, buf, NUMBER_OF(buf));
 			buf[NUMBER_OF(buf) - 1] = L'\0';
-			for (wchar_t *b = buf; *b; ++ b)
-				if (iswcntrl(*b))
-					*b = L'?';
+			title = escapeControlChars(buf);
+		} else {
+			title = buf;
 		}
 		if (isTheFirstTime)
-			titleName = buf;
+			titleName = title;
 		else
-			titleName = std::wstring(buf) + L":" + titleName;
+			titleName = title + L":" + titleName;
 
 		// next loop or exit
 		if (!i_hwnd)

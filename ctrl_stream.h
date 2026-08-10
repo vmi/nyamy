@@ -6,6 +6,7 @@
 #  define _CTRL_STREAM_H
 
 
+#  include "log_level.h"
 #  include "scripter_types.h"
 #  include "trigger_info.h"
 #  include "symbols.h"
@@ -16,6 +17,7 @@
 enum class CtrlId : uint8_t {
 	Start       = 0x01,  ///< (Re)compile with the given symbols; sent on every scripter startup
 	ExecUserFunc = 0x02, ///< Engine -> scripter: invoke user-defined function
+	SetLogLevel = 0x03,  ///< New log threshold (one LogLevel byte); sent when "detail" is toggled
 	Quit        = 0xFF,  ///< Terminate scripter
 };
 

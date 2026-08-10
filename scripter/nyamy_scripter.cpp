@@ -77,25 +77,102 @@
 // Logging helpers
 //=============================================================================
 
-static void logLine(const std::wstring& msg)
+// Two thresholds, kept apart on purpose.  nyamy publishes one whenever the
+// "detail" box is toggled; the script sets the other through log.level=.  The
+// effective threshold is whichever is stricter, recomputed on every call, so a
+// script that logs at debug can still be silenced and un-silenced from nyamy
+// without the script's own setting being lost.  Comparing two ints is far
+// below the noise floor of everything else here, so nothing is cached.
+static std::atomic<LogLevel> g_logLevelFromNyamy{kLogLevelNormal};
+static std::atomic<LogLevel> g_logLevelFromScript{LogLevel::Debug};
+
+
+NYS_API LogLevel nysEffectiveLogLevel()
 {
-	std::string utf8 = to_UTF8(msg);
+	LogLevel a = g_logLevelFromNyamy.load(std::memory_order_relaxed);
+	LogLevel b = g_logLevelFromScript.load(std::memory_order_relaxed);
+	return (a < b) ? a : b;
+}
+
+
+NYS_API void nysSetLogLevelFromNyamy(LogLevel level)
+{
+	g_logLevelFromNyamy.store(level, std::memory_order_relaxed);
+}
+
+
+NYS_API void nysSetLogLevelFromScript(LogLevel level)
+{
+	g_logLevelFromScript.store(level, std::memory_order_relaxed);
+}
+
+
+NYS_API bool nysWouldLog(LogLevel level)
+{
+	return level <= nysEffectiveLogLevel();
+}
+
+
+// Write one tagged line to stderr.  nyamy strips the tag, turns it back into a
+// level and prefixes the timestamp; an untagged line is taken as info, which
+// is what a bare puts from a user script produces.
+static void logLine(LogLevel level, const std::wstring& msg)
+{
+	if (!nysWouldLog(level))
+		return;
+	std::string utf8;
+	utf8 += static_cast<char>(logLevelChar(level));
+	utf8 += '|';
+	utf8 += to_UTF8(msg);
 	utf8 += '\n';
 	fwrite(utf8.c_str(), 1, utf8.size(), stderr);
 }
 
+
+static void logLine(const std::wstring& msg)
+{
+	logLine(LogLevel::Info, msg);
+}
+
+
+// Split on newlines so that every physical line carries its own tag; an mruby
+// backtrace arrives as a single multi-line string.
+NYS_API void nysLogUtf8(LogLevel level, const char* msg)
+{
+	if (!msg || !nysWouldLog(level))
+		return;
+	std::wstring w = from_UTF8(msg);
+	size_t begin = 0;
+	for (;;) {
+		size_t nl = w.find(L'\n', begin);
+		std::wstring line = w.substr(begin, (nl == std::wstring::npos)
+									 ? std::wstring::npos : nl - begin);
+		if (!line.empty() && line.back() == L'\r')
+			line.pop_back();
+		logLine(level, line);
+		if (nl == std::wstring::npos)
+			break;
+		begin = nl + 1;
+		if (begin >= w.size())
+			break;	// a trailing newline terminates, it is not a blank line
+	}
+}
+
+
 class Utf8LineWStreambuf : public std::wstreambuf
 {
 public:
+	explicit Utf8LineWStreambuf(LogLevel level = LogLevel::Info)
+			: m_level(level) {}
 	~Utf8LineWStreambuf() { flush(); }
 	void flush() {
-		if (!m_buf.empty()) { logLine(m_buf); m_buf.clear(); }
+		if (!m_buf.empty()) { logLine(m_level, m_buf); m_buf.clear(); }
 	}
 protected:
 	int_type overflow(int_type c) override {
 		if (c == traits_type::eof()) { flush(); return traits_type::eof(); }
 		wchar_t wc = static_cast<wchar_t>(c);
-		if (wc == L'\n') { logLine(m_buf); m_buf.clear(); }
+		if (wc == L'\n') { logLine(m_level, m_buf); m_buf.clear(); }
 		else              m_buf += wc;
 		return c;
 	}
@@ -104,6 +181,7 @@ protected:
 		return n;
 	}
 private:
+	LogLevel     m_level;
 	std::wstring m_buf;
 };
 
@@ -687,8 +765,14 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 					j.exec = ctrlReader.readExecUserFunc();
 					wstringi name = j.exec.name;
 					if (!queue.pushExec(std::move(j)))
-						logLine(L"[nys] job queue full; discarded ExecUserFunc("
-						        + std::wstring(name) + L")");
+						logLine(LogLevel::Warn,
+								L"[nys] job queue full; discarded ExecUserFunc("
+								+ std::wstring(name) + L")");
+				} else if (id == CtrlId::SetLogLevel) {
+					// Applied straight from the ctrl thread: it only stores an
+					// atomic, and going through the job queue would leave it
+					// waiting behind a running script.
+					nysSetLogLevelFromNyamy(ctrlReader.readSetLogLevel());
 				}
 			}
 		} catch (...) {
@@ -720,6 +804,10 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 			g_configName = std::move(job.start.configName);
 			g_configPath = std::move(job.start.configPath);
 			g_symbols    = std::move(job.start.symbols);
+			// The threshold rides along with Start because the log dialog
+			// restores its "detail" state from the ini, so detail can already
+			// be on before the scripter has written its first line.
+			nysSetLogLevelFromNyamy(job.start.logLevel);
 
 			resetQueue();
 			// Both .mayu and .mayu.rb branch on these, and the .mayu compiler
@@ -1471,4 +1559,32 @@ NYS_API bool nys_exec_keyseq(const char* actions)
 NYS_API const char* nys_last_error(void)
 {
 	return g_lastError.empty() ? nullptr : g_lastError.c_str();
+}
+
+
+//=============================================================================
+// Logging
+//=============================================================================
+
+NYS_API void nys_log(NYsLogLevel level, const char* msg)
+{
+	nysLogUtf8(logLevelFromByte(static_cast<uint8_t>(level)), msg);
+}
+
+
+NYS_API NYsLogLevel nys_log_level(void)
+{
+	return static_cast<NYsLogLevel>(nysEffectiveLogLevel());
+}
+
+
+NYS_API void nys_set_log_level(NYsLogLevel level)
+{
+	nysSetLogLevelFromScript(logLevelFromByte(static_cast<uint8_t>(level)));
+}
+
+
+NYS_API bool nys_would_log(NYsLogLevel level)
+{
+	return nysWouldLog(logLevelFromByte(static_cast<uint8_t>(level)));
 }

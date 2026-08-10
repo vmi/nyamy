@@ -5,14 +5,16 @@
 #ifndef _MULTITHREAD_H
 #  define _MULTITHREAD_H
 
+#  include "log_level.h"
+
 ///
 class SyncObject
 {
 public:
 	///
 	virtual void acquire() = 0;
-	///
-	virtual void acquire(int) {
+	/// begin writing a message of the given severity
+	virtual void acquire(LogLevel) {
 		acquire();
 	}
 	///
@@ -30,8 +32,8 @@ public:
 		m_so->acquire();
 	}
 	///
-	Acquire(SyncObject* i_so, int i_n) : m_so(i_so) {
-		m_so->acquire(i_n);
+	Acquire(SyncObject* i_so, LogLevel i_level) : m_so(i_so) {
+		m_so->acquire(i_level);
 	}
 	///
 	~Acquire() {

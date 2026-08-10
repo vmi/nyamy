@@ -352,6 +352,19 @@ public:
 	womsgstream &m_log;				/** log stream (output to log
                                                     dialog's edit) */
 
+private:
+	/** Nesting level of the detail log, in units of two spaces.  Only the
+	    keyboard handler thread touches these three.
+	*/
+	int m_logIndent;
+	/// true while generateModifierEvents() is running
+	bool m_isGeneratingModifiers;
+	/** True once the "Gen Modifiers" header has been written for the current
+	    block.  The header is deferred until a modifier is actually generated,
+	    because the block is empty most of the time.
+	*/
+	bool m_modifierHeaderWritten;
+
 public:
 	/// keyboard handler thread
 	static unsigned int WINAPI keyboardDetour(Engine *i_this, WPARAM i_wParam, LPARAM i_lParam);
@@ -381,9 +394,20 @@ private:
 	/// fix modifier key
 	bool fixModifierKey(ModifiedKey *io_mkey, Keymap::AssignMode *o_am);
 
-	/// output to log
+	/// write 2 spaces per nesting level; m_log must already be acquired
+	void logIndent(int i_level);
+	/// write one key line; m_log must already be acquired
+	void writeKeyLine(const Key *i_key, const ModifiedKey &i_mkey,
+					  const wchar_t *i_mark, const wchar_t *i_note);
+	/// write a "*" note line at the current nesting level
+	void logNote(LogLevel i_level, const wchar_t *i_text);
+	/// output one key to the log
 	void outputToLog(const Key *i_key, const ModifiedKey &i_mkey,
-					 int i_debugLevel);
+					 LogLevel i_level, const wchar_t *i_mark,
+					 const wchar_t *i_note = NULL);
+	/// output a physical key event; opens a new block in the log
+	void outputInputToLog(const Key *i_key, const ModifiedKey &i_mkey,
+						  LogLevel i_level);
 
 	/// genete modifier events
 	void generateModifierEvents(const Modifier &i_mod);
@@ -761,7 +785,7 @@ public:
 		// order is mutex then log, and reversing it here would be a deadlock
 		// waiting for the two to be taken at once.
 		Lock lock(this);
-		Acquire b(&m_log, 0);
+		Acquire b(&m_log, LogLevel::Info);
 		HWND hf = m_hwndFocus;
 		if (!hf)
 			return;

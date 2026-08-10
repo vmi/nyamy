@@ -26,7 +26,51 @@
 #include <cstring>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <windows.h>
+
+
+//=============================================================================
+// Logging helpers
+//=============================================================================
+
+// Render a Ruby value the way the script author wrote it.
+static std::string inspectToUtf8(mrb_state *mrb, mrb_value v)
+{
+	mrb_value s = mrb_funcall(mrb, v, "inspect", 0);
+	if (mrb->exc) {
+		mrb->exc = nullptr;	// inspect is best effort
+		return "?";
+	}
+	if (!mrb_string_p(s))
+		return "?";
+	return std::string(RSTRING_PTR(s), RSTRING_LEN(s));
+}
+
+/** Trace one DSL call at debug level, showing the arguments as written.
+
+    Nothing is built unless detail logging is on, since this sits on every
+    definition in the configuration.  The arguments are copied out of the VM
+    stack before the first inspect call: that call can grow the stack and move
+    the slots argv points at, but the mrb_values themselves stay valid.
+*/
+static void traceDslCall(mrb_state *mrb, const char *i_name)
+{
+	if (!nysWouldLog(LogLevel::Debug))
+		return;
+
+	mrb_value *argv = nullptr;
+	mrb_int argc = 0;
+	mrb_get_args(mrb, "*", &argv, &argc);
+	std::vector<mrb_value> args(argv, argv + argc);
+
+	std::string line = i_name;
+	for (size_t i = 0; i < args.size(); ++i) {
+		line += (i == 0) ? " " : ", ";
+		line += inspectToUtf8(mrb, args[i]);
+	}
+	nysLogUtf8(LogLevel::Debug, line.c_str());
+}
 
 
 //=============================================================================
@@ -153,6 +197,10 @@ static std::string resolveRbPath(mrb_state *mrb, const std::string &path)
 // on the DSL object.  A pending exception (mrb->exc) is left to the caller.
 static void evalRbFile(mrb_state *mrb, mrb_value self, const std::string &absPath)
 {
+	// The .mayu path reports every file it opens; without this a .rb-only
+	// configuration left no trace of what had actually been read.
+	nysLogUtf8(LogLevel::Info, ("  loading: " + absPath).c_str());
+
 	FILE *f = _wfopen(utf8ToWide(absPath).c_str(), L"rb");
 	if (!f)
 		mrb_raisef(mrb, E_RUNTIME_ERROR,
@@ -181,8 +229,10 @@ static void printPendingException(mrb_state *mrb, const char *prefix)
 	mrb->exc = nullptr;
 
 	mrb_value msg = mrb_funcall(mrb, exc, "inspect", 0);
-	fprintf(stderr, "%s: %s\n", prefix,
-		mrb_string_p(msg) ? mrb_string_cstr(mrb, msg) : "(unprintable exception)");
+	nysLogUtf8(LogLevel::Error,
+			   (std::string(prefix) + ": " +
+				(mrb_string_p(msg) ? mrb_string_cstr(mrb, msg)
+				 : "(unprintable exception)")).c_str());
 
 	mrb_value bt = mrb_funcall(mrb, exc, "backtrace", 0);
 	if (mrb_array_p(bt)) {
@@ -190,8 +240,9 @@ static void printPendingException(mrb_state *mrb, const char *prefix)
 		for (mrb_int i = 0; i < n; ++i) {
 			mrb_value line = mrb_ary_ref(mrb, bt, i);
 			if (mrb_string_p(line))
-				fprintf(stderr, "    from %s\n",
-					mrb_string_cstr(mrb, line));
+				nysLogUtf8(LogLevel::Error,
+						   (std::string("    from ") +
+							mrb_string_cstr(mrb, line)).c_str());
 		}
 	}
 	mrb->exc = nullptr;	// in case inspect/backtrace raised
@@ -369,6 +420,7 @@ static mrb_value keyseq_idx(mrb_state *mrb, mrb_value self)
 
 static mrb_value keymap_assign(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "key[...] =");
 	(void)self;
 	mrb_value *argv;
 	mrb_int argc;
@@ -403,6 +455,7 @@ static mrb_value keymap_assign(mrb_state *mrb, mrb_value self)
 
 static mrb_value eventmap_assign(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "event[...] =");
 	(void)self;
 	mrb_value name_v, rhs;
 	mrb_get_args(mrb, "oo", &name_v, &rhs);
@@ -491,6 +544,7 @@ static mrb_value modmap_get(mrb_state *mrb, mrb_value self)
 
 static mrb_value modmap_set(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "mod[...] =");
 	mrb_value name_v, value_v;
 	mrb_get_args(mrb, "oo", &name_v, &value_v);
 
@@ -530,6 +584,7 @@ static mrb_value modmap_set(mrb_state *mrb, mrb_value self)
 // mod.prefix(prefixes) -> new ModMap with the given prefix list
 static mrb_value modmap_prefix(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "mod.prefix");
 	(void)self;
 	mrb_value pfx;
 	mrb_get_args(mrb, "o", &pfx);
@@ -622,6 +677,7 @@ static mrb_value dsl_load_mayu(mrb_state *mrb, mrb_value self)
 
 static mrb_value dsl_keyseq(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "keyseq");
 	(void)self;
 	mrb_value arg1, arg2 = mrb_nil_value();
 	mrb_get_args(mrb, "o|o", &arg1, &arg2);
@@ -667,6 +723,7 @@ static mrb_value dsl_keyseq(mrb_state *mrb, mrb_value self)
 
 static mrb_value dsl_defkey(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "defkey");
 	(void)self;
 	mrb_value *argv;
 	mrb_int argc;
@@ -708,6 +765,7 @@ static mrb_value dsl_defkey(mrb_state *mrb, mrb_value self)
 
 static mrb_value dsl_defmod(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "defmod");
 	(void)self;
 	mrb_value name_v, kw_hash = mrb_nil_value();
 	mrb_get_args(mrb, "o|H", &name_v, &kw_hash);
@@ -729,6 +787,7 @@ static mrb_value dsl_defmod(mrb_state *mrb, mrb_value self)
 
 static mrb_value dsl_defsync(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "defsync");
 	(void)self;
 	mrb_value v;
 	mrb_get_args(mrb, "o", &v);
@@ -740,6 +799,7 @@ static mrb_value dsl_defsync(mrb_state *mrb, mrb_value self)
 
 static mrb_value dsl_defalias(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "defalias");
 	(void)self;
 	mrb_value alias_v, kw_hash = mrb_nil_value();
 	mrb_get_args(mrb, "o|H", &alias_v, &kw_hash);
@@ -761,6 +821,7 @@ static mrb_value dsl_defalias(mrb_state *mrb, mrb_value self)
 
 static mrb_value dsl_defsubst(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "defsubst");
 	(void)self;
 	mrb_value lhs_v, kw_hash = mrb_nil_value();
 	mrb_get_args(mrb, "o|H", &lhs_v, &kw_hash);
@@ -783,6 +844,7 @@ static mrb_value dsl_defsubst(mrb_state *mrb, mrb_value self)
 
 static mrb_value dsl_defoption(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "defoption");
 	(void)self;
 	mrb_value name_v, kw_hash = mrb_nil_value();
 	mrb_get_args(mrb, "o|H", &name_v, &kw_hash);
@@ -852,16 +914,19 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 
 static mrb_value dsl_keymap(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "keymap");
 	return dsl_begin_keymap(mrb, self, "keymap");
 }
 
 static mrb_value dsl_keymap2(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "keymap2");
 	return dsl_begin_keymap(mrb, self, "keymap2");
 }
 
 static mrb_value dsl_window(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "window");
 	return dsl_begin_keymap(mrb, self, "window");
 }
 
@@ -907,9 +972,102 @@ static mrb_value dsl_mod(mrb_state *mrb, mrb_value self)
 	return mm;
 }
 
+//=============================================================================
+// NYamy::Log
+//=============================================================================
+
+// Symbol / string <-> LogLevel.  Named after Ruby's Logger so that the method
+// names are the ones a Ruby author already expects.
+static bool logLevelFromRuby(mrb_state *mrb, mrb_value v, LogLevel *o_level)
+{
+	std::string s;
+	if (mrb_symbol_p(v)) {
+		mrb_int len = 0;
+		const char *p = mrb_sym_name_len(mrb, mrb_symbol(v), &len);
+		s.assign(p, static_cast<size_t>(len));
+	} else if (mrb_string_p(v)) {
+		s.assign(RSTRING_PTR(v), RSTRING_LEN(v));
+	} else {
+		return false;
+	}
+	if (s == "error") { *o_level = LogLevel::Error; return true; }
+	if (s == "warn")  { *o_level = LogLevel::Warn;  return true; }
+	if (s == "info")  { *o_level = LogLevel::Info;  return true; }
+	if (s == "debug") { *o_level = LogLevel::Debug; return true; }
+	return false;
+}
+
+static mrb_value logLevelToRuby(mrb_state *mrb, LogLevel i_level)
+{
+	const char *name = "info";
+	switch (i_level) {
+	case LogLevel::Error: name = "error"; break;
+	case LogLevel::Warn:  name = "warn";  break;
+	case LogLevel::Debug: name = "debug"; break;
+	default: break;
+	}
+	return mrb_symbol_value(mrb_intern_cstr(mrb, name));
+}
+
+// Shared body of log.error / log.warn / log.info / log.debug
+static mrb_value logWrite(mrb_state *mrb, LogLevel i_level)
+{
+	mrb_value msg;
+	mrb_get_args(mrb, "o", &msg);
+	if (!nysWouldLog(i_level))
+		return mrb_nil_value();
+	nysLogUtf8(i_level, toStdStr(mrb, msg).c_str());
+	return mrb_nil_value();
+}
+
+static mrb_value log_error(mrb_state *mrb, mrb_value) { return logWrite(mrb, LogLevel::Error); }
+static mrb_value log_warn (mrb_state *mrb, mrb_value) { return logWrite(mrb, LogLevel::Warn);  }
+static mrb_value log_info (mrb_state *mrb, mrb_value) { return logWrite(mrb, LogLevel::Info);  }
+static mrb_value log_debug(mrb_state *mrb, mrb_value) { return logWrite(mrb, LogLevel::Debug); }
+
+static mrb_value log_error_p(mrb_state *, mrb_value) { return mrb_bool_value(nysWouldLog(LogLevel::Error)); }
+static mrb_value log_warn_p (mrb_state *, mrb_value) { return mrb_bool_value(nysWouldLog(LogLevel::Warn));  }
+static mrb_value log_info_p (mrb_state *, mrb_value) { return mrb_bool_value(nysWouldLog(LogLevel::Info));  }
+static mrb_value log_debug_p(mrb_state *, mrb_value) { return mrb_bool_value(nysWouldLog(LogLevel::Debug)); }
+
+// Reader and writer are deliberately asymmetric: the reader answers "what
+// actually gets through", which is the stricter of nyamy's threshold and this
+// one, while the writer only sets this one.
+static mrb_value log_level_get(mrb_state *mrb, mrb_value)
+{
+	return logLevelToRuby(mrb, nysEffectiveLogLevel());
+}
+
+static mrb_value log_level_set(mrb_state *mrb, mrb_value)
+{
+	mrb_value v;
+	mrb_get_args(mrb, "o", &v);
+	LogLevel level;
+	if (!logLevelFromRuby(mrb, v, &level))
+		mrb_raise(mrb, E_ARGUMENT_ERROR,
+				  "log level must be :error, :warn, :info or :debug");
+	nysSetLogLevelFromScript(level);
+	return v;
+}
+
+// log -> NYamy::Log singleton on the DSL instance
+static mrb_value dsl_log(mrb_state *mrb, mrb_value self)
+{
+	mrb_sym iv = mrb_intern_lit(mrb, "@__log__");
+	mrb_value lg = mrb_iv_get(mrb, self, iv);
+	if (mrb_nil_p(lg)) {
+		struct RClass *cls = mrb_class_get_under(mrb,
+			mrb_module_get(mrb, "NYamy"), "Log");
+		lg = mrb_obj_new(mrb, cls, 0, nullptr);
+		mrb_iv_set(mrb, self, iv, lg);
+	}
+	return lg;
+}
+
 // deffunc(name) { |trigger, *args| ... }
 static mrb_value dsl_deffunc(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "deffunc");
 	(void)self;
 	mrb_value name_v, blk = mrb_nil_value();
 	mrb_get_args(mrb, "o&", &name_v, &blk);
@@ -930,6 +1088,7 @@ static mrb_value dsl_deffunc(mrb_state *mrb, mrb_value self)
 // DSL#define(name)  ->  define <name>   (adds symbol to the current set)
 static mrb_value dsl_define(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "define");
 	(void)self;
 	mrb_value name_v;
 	mrb_get_args(mrb, "o", &name_v);
@@ -952,6 +1111,7 @@ static mrb_value dsl_symbol_defined_p(mrb_state *mrb, mrb_value self)
 // DSL#exec_keyseq(actions)  (runtime API; valid from on_exec_user_func)
 static mrb_value dsl_exec_keyseq(mrb_state *mrb, mrb_value self)
 {
+	traceDslCall(mrb, "exec_keyseq");
 	(void)self;
 	const char *actions = nullptr;
 	mrb_get_args(mrb, "z", &actions);
@@ -1125,6 +1285,20 @@ static void nyamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, dsl_cls, "exec_keyseq", dsl_exec_keyseq, MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, dsl_cls, "sc",          dsl_sc,          MRB_ARGS_REQ(1));
 	mrb_define_method(mrb, dsl_cls, "nls_key?",    dsl_nls_key_p,   MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, dsl_cls, "log",         dsl_log,         MRB_ARGS_NONE());
+
+	struct RClass *log_cls = mrb_define_class_under(mrb, nyamy, "Log",
+		mrb->object_class);
+	mrb_define_method(mrb, log_cls, "error",  log_error,     MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, log_cls, "warn",   log_warn,      MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, log_cls, "info",   log_info,      MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, log_cls, "debug",  log_debug,     MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, log_cls, "error?", log_error_p,   MRB_ARGS_NONE());
+	mrb_define_method(mrb, log_cls, "warn?",  log_warn_p,    MRB_ARGS_NONE());
+	mrb_define_method(mrb, log_cls, "info?",  log_info_p,    MRB_ARGS_NONE());
+	mrb_define_method(mrb, log_cls, "debug?", log_debug_p,   MRB_ARGS_NONE());
+	mrb_define_method(mrb, log_cls, "level",  log_level_get, MRB_ARGS_NONE());
+	mrb_define_method(mrb, log_cls, "level=", log_level_set, MRB_ARGS_REQ(1));
 
 	// ScancodeMap: read-only view of the registry Scancode Map (top-level module).
 	// Forward lookup is ScancodeMap[x]; reverse lookup goes through the nested
@@ -1156,14 +1330,17 @@ bool mruby_on_load_setting(void* exeCtx)
 	//    main() rejects a missing argv[1] before nys_start, so reaching this
 	//    without one is an internal error.
 	if (ctx->argc < 2) {
-		fprintf(stderr, "error: no script path was passed to on_load_setting\n");
+		nysLogUtf8(LogLevel::Error,
+				   "no script path was passed to on_load_setting");
 		return false;
 	}
 
 	const char *found = nullptr;
 	if (!nys_resolve_config_path(ctx->argv[1], &found) || !found) {
-		fprintf(stderr, "error: script not found: %s (searched: %s;%s)\n",
-			ctx->argv[1], nys_paths_config(), nys_paths_root());
+		nysLogUtf8(LogLevel::Error,
+				   (std::string("script not found: ") + ctx->argv[1] +
+					" (searched: " + nys_paths_config() + ";" +
+					nys_paths_root() + ")").c_str());
 		return false;
 	}
 	std::string script = canonicalizePath(utf8ToWide(found));
@@ -1179,7 +1356,7 @@ bool mruby_on_load_setting(void* exeCtx)
 	}
 	mrb_state *mrb = mrb_open();
 	if (!mrb) {
-		fprintf(stderr, "error: failed to initialise mruby\n");
+		nysLogUtf8(LogLevel::Error, "failed to initialise mruby");
 		return false;
 	}
 	ctx->mrb = mrb;
@@ -1281,8 +1458,9 @@ void mruby_on_exec_user_func(void *exeCtx, const char *func_name,
 	mrb_value key = mrb_str_new_cstr(mrb, func_name);
 	mrb_value blk = mrb_hash_get(mrb, g_funcTable, key);
 	if (mrb_nil_p(blk)) {
-		fprintf(stderr, "[mruby] no handler registered for func: %s\n",
-			func_name);
+		nysLogUtf8(LogLevel::Warn,
+				   (std::string("[mruby] no handler registered for func: ") +
+					func_name).c_str());
 		return;
 	}
 

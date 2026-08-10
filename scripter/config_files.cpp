@@ -164,20 +164,20 @@ bool ConfigFiles::readFile(std::wstring *o_data, const wstringi &i_filename) con
 
 // is the filename readable ?
 bool ConfigFiles::isReadable(const wstringi &i_filename,
-							 int i_debugLevel) const
+							 LogLevel i_level) const
 {
 	if (i_filename.empty())
 		return false;
 	std::wifstream ist(to_string(i_filename).c_str());
 	if (ist.good()) {
 		if (m_log && m_soLog) {
-			Acquire a(m_soLog, 0);
+			Acquire a(m_soLog, LogLevel::Info);
 			*m_log << L"  loading: " << i_filename << std::endl;
 		}
 		return true;
 	} else {
 		if (m_log && m_soLog) {
-			Acquire a(m_soLog, i_debugLevel);
+			Acquire a(m_soLog, i_level);
 			*m_log << L"not found: " << i_filename << std::endl;
 		}
 		return false;
@@ -188,7 +188,7 @@ bool ConfigFiles::isReadable(const wstringi &i_filename,
 // get filename
 bool ConfigFiles::getFilename(const wstringi &i_name, wstringi *o_path,
 							  RetryCallback i_retry,
-							  int i_debugLevel) const
+							  LogLevel i_level) const
 {
 	// the default filename is ".mayu"
 	const wstringi &name = i_name.empty() ? wstringi(L".mayu") : i_name;
@@ -196,7 +196,7 @@ bool ConfigFiles::getFilename(const wstringi &i_name, wstringi *o_path,
 	// an absolute name names the file outright; nothing to search for
 	if (isAbsolutePath(name)) {
 		*o_path = name;
-		return isReadable(*o_path, i_debugLevel);
+		return isReadable(*o_path, i_level);
 	}
 
 	bool isFirstTime = true;
@@ -210,7 +210,7 @@ bool ConfigFiles::getFilename(const wstringi &i_name, wstringi *o_path,
 		getSearchDirectories(&pathes);
 		for (SearchDirectories::iterator i = pathes.begin(); i != pathes.end(); ++ i) {
 			*o_path = *i + L"\\" + name;
-			if (isReadable(*o_path, i_debugLevel))
+			if (isReadable(*o_path, i_level))
 				return true;
 		}
 

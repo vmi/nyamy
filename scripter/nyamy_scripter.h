@@ -320,6 +320,43 @@ NYS_API bool nys_exec_keyseq(const char* actions);
 NYS_API const char* nys_last_error(void);
 
 
+//=============================================================================
+// Logging
+//
+// Output goes to stderr, one line per call, tagged with the level so that
+// nyamy can filter and timestamp it.  Embedded newlines are split into
+// separate tagged lines.
+//
+// Two thresholds are tracked separately: the one nyamy publishes (the "detail"
+// checkbox) and the one the script sets through nys_set_log_level().  A
+// message is emitted when its level passes BOTH, i.e. against the stricter of
+// the two.  A script that logs at debug can therefore be silenced and
+// un-silenced from nyamy without losing its own setting.
+//=============================================================================
+
+/// Log severity; the values match nyamy's LogLevel.
+typedef enum {
+	NYS_LOG_ERROR = 0,
+	NYS_LOG_WARN  = 1,
+	NYS_LOG_INFO  = 2,
+	NYS_LOG_DEBUG = 3,
+} NYsLogLevel;
+
+/// Write one message.  Does nothing when the level does not pass.
+NYS_API void nys_log(NYsLogLevel level, const char* msg);
+
+/// The effective threshold (the stricter of the two).
+NYS_API NYsLogLevel nys_log_level(void);
+
+/// Set the script-side threshold.  Values coarser than nyamy's have no effect
+/// on what is emitted, but they are remembered.
+NYS_API void nys_set_log_level(NYsLogLevel level);
+
+/// Would a message of this level be emitted ?  Use it to skip building an
+/// expensive message.
+NYS_API bool nys_would_log(NYsLogLevel level);
+
+
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
@@ -332,6 +369,18 @@ NYS_API const char* nys_last_error(void);
 #ifdef __cplusplus
 #include <vector>
 #include <utility>
+#include "log_level.h"
+
+/// Log one UTF-8 message, splitting embedded newlines into tagged lines.
+NYS_API void nysLogUtf8(LogLevel level, const char* msg);
+/// The stricter of nyamy's threshold and the script's.
+NYS_API LogLevel nysEffectiveLogLevel();
+/// Store the threshold nyamy published (Start / SetLogLevel).
+NYS_API void nysSetLogLevelFromNyamy(LogLevel level);
+/// Store the threshold the script asked for.
+NYS_API void nysSetLogLevelFromScript(LogLevel level);
+/// Would a message of this level be emitted ?
+NYS_API bool nysWouldLog(LogLevel level);
 
 /// Parse a raw registry "Scancode Map" REG_BINARY blob into (from, to) WORD
 /// pairs.  Layout: header1(4) + header2(4) + count(4) + count*DWORD entries,

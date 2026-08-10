@@ -36,13 +36,14 @@ public:
 	bool readFile(std::wstring *o_data, const wstringi &i_filename) const;
 
 	/// is the filename readable ?
-	bool isReadable(const wstringi &i_filename, int i_debugLevel = 1) const;
+	bool isReadable(const wstringi &i_filename,
+					LogLevel i_level = LogLevel::Debug) const;
 
 	/// get filename.  An absolute i_name is only checked for readability;
 	/// a relative one is searched in the search path
 	bool getFilename(const wstringi &i_name, wstringi *o_path,
 					 RetryCallback i_retry = nullptr,
-					 int i_debugLevel = 1) const;
+					 LogLevel i_level = LogLevel::Debug) const;
 
 private:
 	SyncObject *m_soLog;

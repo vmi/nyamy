@@ -86,6 +86,9 @@ public:
 				 Origin i_originTop = ORIGIN_TOP_EDGE,
 				 Origin i_originRight = ORIGIN_LEFT_EDGE,
 				 Origin i_originBottom = ORIGIN_TOP_EDGE);
+	/** Forget an item.  Needed by anyone who destroys and recreates a child
+	    window, since the item would otherwise keep a dangling HWND. */
+	bool removeItem(HWND i_hwnd);
 	///
 	void adjust() const;
 

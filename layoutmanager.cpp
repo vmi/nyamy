@@ -73,6 +73,17 @@ bool LayoutManager::addItem(HWND i_hwnd, Origin i_originLeft,
 }
 
 //
+bool LayoutManager::removeItem(HWND i_hwnd)
+{
+	for (Items::iterator i = m_items.begin(); i != m_items.end(); ++ i)
+		if (i->m_hwnd == i_hwnd) {
+			m_items.erase(i);
+			return true;
+		}
+	return false;
+}
+
+//
 void LayoutManager::adjust() const
 {
 	for (Items::const_iterator i = m_items.begin(); i != m_items.end(); ++ i) {

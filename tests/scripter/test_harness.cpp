@@ -118,7 +118,8 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	std::ostream ctrlOut(&ctrlBuf);
 	CtrlStreamWriter ctrlWriter(ctrlOut);
 	for (int i = 0; i < i_loadCount; ++i)
-		ctrlWriter.writeStart(wstringi(L"test"), wstringi(L""), i_symbols);
+		ctrlWriter.writeStart(wstringi(L"test"), wstringi(L""), i_symbols,
+							  kLogLevelNormal);
 	// Quit goes right behind the Start commands: the ctrl stream is processed in
 	// order, so every load runs first.  Quitting closes dataW, which gives the
 	// consumer EOF even when a load failed and no Commit is coming.

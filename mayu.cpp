@@ -129,7 +129,7 @@ private:
 				// rest of the session - as it did before, but silently.  Say so
 				// rather than leave a nyamy that quietly stops following focus.
 				if (!m_notifyReaderStop && err != ERROR_OPERATION_ABORTED) {
-					Acquire a(&m_log, 0);
+					Acquire a(&m_log, LogLevel::Error);
 					m_log << L"internal error: cannot read notifications (0x"
 					<< std::hex << err << std::dec
 					<< L"); focus and lock state will no longer follow."
@@ -210,16 +210,16 @@ private:
 								  n->m_className, n->m_titleName, false);
 
 			{
-				Acquire a(&m_log, 1);
-				m_log << L"HWND:\t" << std::hex
+				Acquire a(&m_log, LogLevel::Debug);
+				m_log << L"HWND:     " << std::hex
 				<< n->_m_hwnd /* always 32bit width when log outout */
 				<< std::dec << std::endl;
-				m_log << L"THREADID:" << static_cast<int>(n->m_threadId)
+				m_log << L"THREADID: " << static_cast<int>(n->m_threadId)
 				<< std::endl;
 			}
-			Acquire a(&m_log, (n->m_type == Notify::Type_name) ? 0 : 1);
-			m_log << L"CLASS:\t" << n->m_className << std::endl;
-			m_log << L"TITLE:\t" << n->m_titleName << std::endl;
+			Acquire a(&m_log, (n->m_type == Notify::Type_name) ? LogLevel::Info : LogLevel::Debug);
+			m_log << L"CLASS:    " << n->m_className << std::endl;
+			m_log << L"TITLE:   \"" << n->m_titleName << L"\"" << std::endl;
 
 			bool isMDI = true;
 			HWND hwnd = getToplevelWindow(n->getHwnd(), &isMDI);
@@ -258,7 +258,7 @@ private:
 								  n->m_isImeLockToggled,
 								  n->m_isImeCompToggled);
 #if 0
-			Acquire a(&m_log, 0);
+			Acquire a(&m_log, LogLevel::Info);
 			if (n->m_isKanaLockToggled) {
 				m_log << L"Notify::Type_lockState Kana on  : ";
 			} else {
@@ -319,7 +319,7 @@ private:
 		}
 
 		case Notify::Type_log: {
-			Acquire a(&m_log, 1);
+			Acquire a(&m_log, LogLevel::Debug);
 			NotifyLog *n = (NotifyLog *)cd->lpData;
 			m_log << L"hook log: " << n->m_msg << std::endl;
 			break;
@@ -421,8 +421,11 @@ private:
 #ifdef LOG_TO_FILE
 				This->m_logFile << str << std::flush;
 #endif // LOG_TO_FILE
+				// Appending to the edit control is by far the most expensive
+				// thing on the log path, and the cost grows with how much the
+				// control already holds, so the buffer is kept modest.
 				editInsertTextAtLast(GetDlgItem(This->m_hwndLog, IDC_EDIT_log),
-									 str, 65000);
+									 str, kLogEditMaxChars);
 				log->releaseString();
 				return 0;
 			}
@@ -521,15 +524,15 @@ private:
 						This->load();
 						break;
 					case ID_MENUITEM_investigate: {
+						// The log window used to be parked directly below the
+						// investigate dialog, taking that dialog's width.  The
+						// investigate dialog is DS_CENTERMOUSE, so with the
+						// pointer low on the screen the log window ended up
+						// hanging off the bottom - and its own size and
+						// position, which are now remembered across sessions,
+						// were overwritten every time.
 						ShowWindow(This->m_hwndLog, SW_SHOW);
 						ShowWindow(This->m_hwndInvestigate, SW_SHOW);
-
-						RECT rc1, rc2;
-						GetWindowRect(This->m_hwndInvestigate, &rc1);
-						GetWindowRect(This->m_hwndLog, &rc2);
-
-						MoveWindow(This->m_hwndLog, rc1.left, rc1.bottom,
-								   rcWidth(&rc1), rcHeight(&rc2), TRUE);
 
 						SetForegroundWindow(This->m_hwndLog);
 						SetForegroundWindow(This->m_hwndInvestigate);
@@ -654,7 +657,7 @@ private:
 					// FIXME: completely useless. why ?
 					setForegroundWindow(reinterpret_cast<HWND>(i_lParam));
 					{
-						Acquire a(&This->m_log, 1);
+						Acquire a(&This->m_log, LogLevel::Debug);
 						This->m_log << L"setForegroundWindow(0x"
 						<< std::hex << i_lParam << std::dec << L")"
 						<< std::endl;
@@ -674,6 +677,10 @@ private:
 				switch (i_wParam) {
 				case DlgLogNotify_logCleared:
 					This->showBanner(true);
+					break;
+				case DlgLogNotify_thresholdChanged:
+					This->setLogThreshold(
+						logLevelFromByte(static_cast<uint8_t>(i_lParam)));
 					break;
 				default:
 					break;
@@ -698,10 +705,10 @@ private:
 			default:
 				if (i_message == This->m_WM_TaskbarRestart) {
 					if (This->showTasktrayIcon(true)) {
-						Acquire a(&This->m_log, 0);
+						Acquire a(&This->m_log, LogLevel::Info);
 						This->m_log << L"Tasktray icon is updated." << std::endl;
 					} else {
-						Acquire a(&This->m_log, 1);
+						Acquire a(&This->m_log, LogLevel::Debug);
 						This->m_log << L"Tasktray icon is not ready yet; retrying."
 						<< std::endl;
 					}
@@ -712,11 +719,11 @@ private:
 						This->m_engine.enable(!!i_lParam);
 						This->showTasktrayIcon();
 						if (i_lParam) {
-							Acquire a(&This->m_log, 1);
+							Acquire a(&This->m_log, LogLevel::Debug);
 							This->m_log << L"Enabled by another application."
 							<< std::endl;
 						} else {
-							Acquire a(&This->m_log, 1);
+							Acquire a(&This->m_log, LogLevel::Debug);
 							This->m_log << L"Disabled by another application."
 							<< std::endl;
 						}
@@ -789,7 +796,18 @@ private:
 		}
 
 		// Start (or restart) scripter asynchronously; result notified via WM_APP_scripterSettingReady.
-		m_scripter->start(configName, configPath, initialSymbols);
+		// The threshold goes with the Start: the log dialog restores its
+		// "detail" state from the ini before the first load, so the scripter
+		// can be launched into detail mode from the very first line it writes.
+		m_scripter->start(configName, configPath, initialSymbols,
+						  m_log.getThreshold());
+	}
+
+	/// the log dialog toggled "detail"
+	void setLogThreshold(LogLevel i_level) {
+		m_log.setThreshold(i_level);
+		if (m_scripter)
+			m_scripter->setLogLevel(i_level);
 	}
 
 	// show message (a baloon from the task tray icon)
@@ -844,30 +862,26 @@ private:
 	void onTasktrayIconRetryTimer() {
 		if (tryAddTasktrayIcon()) {
 			KillTimer(m_hwndTaskTray, ID_TaskTrayIconRetryTimer);
-			Acquire a(&m_log, 1);
+			Acquire a(&m_log, LogLevel::Debug);
 			m_log << L"Tasktray icon is added." << std::endl;
 			return;
 		}
 		if (-- m_tasktrayIconRetries <= 0) {
 			KillTimer(m_hwndTaskTray, ID_TaskTrayIconRetryTimer);
-			Acquire a(&m_log, 0);
-			m_log << L"warning: gave up adding the tasktray icon." << std::endl;
+			Acquire a(&m_log, LogLevel::Warn);
+			m_log << L"gave up adding the tasktray icon." << std::endl;
 		}
 	}
 
 	void showBanner(bool i_isCleared) {
-		time_t now;
-		time(&now);
+		// Every log line already carries hh:mm:ss.SSS, and a bare [YYYY-MM-DD]
+		// line is emitted whenever the date changes, so the banner only needs
+		// the wall clock time - and no ruled lines to separate it.
+		wchar_t starttimebuf[64];
+		wcsftime(starttimebuf, NUMBER_OF(starttimebuf), L"%H:%M:%S",
+				 localtime(&m_startTime));
 
-		wchar_t starttimebuf[1024];
-		wchar_t timebuf[1024];
-
-		wcsftime(timebuf, NUMBER_OF(timebuf), L"%#c", localtime(&now));
-		wcsftime(starttimebuf, NUMBER_OF(starttimebuf), L"%#c",
-				  localtime(&m_startTime));
-
-		Acquire a(&m_log, 0);
-		m_log << L"------------------------------------------------------------" << std::endl;
+		Acquire a(&m_log, LogLevel::Info);
 		m_log << loadString(IDS_mayu) << L" " WIDEN(VERSION);
 #ifndef NDEBUG
 		m_log << L" (DEBUG)";
@@ -882,15 +896,10 @@ private:
 		wchar_t modulebuf[1024];
 		CHECK_TRUE( GetModuleFileName(g_hInst, modulebuf,
 									  NUMBER_OF(modulebuf)) );
-		m_log << L"started at " << starttimebuf << std::endl;
-		m_log << modulebuf << std::endl;
-		m_log << L"------------------------------------------------------------" << std::endl;
-
-		if (i_isCleared) {
-			m_log << L"log was cleared at " << timebuf << std::endl;
-		} else {
-			m_log << L"log begins at " << timebuf << std::endl;
-		}
+		m_log << L"  started at " << starttimebuf << std::endl;
+		m_log << L"  " << modulebuf << std::endl;
+		m_log << (i_isCleared ? L"log was cleared." : L"log begins.")
+		<< std::endl;
 	}
 
 	int errorDialogWithCode(UINT ids, int code, UINT style = MB_OK | MB_ICONSTOP)

@@ -78,6 +78,7 @@ ScripterManager::ScripterManager(SyncObject *i_soLog, std::wostream *i_log,
 	, m_hMsgThread(NULL)
 	, m_hReaderStop(CreateEvent(NULL, TRUE, FALSE, NULL))
 	, m_quitSent(false)
+	, m_logLevel(kLogLevelNormal)
 {
 }
 
@@ -114,7 +115,7 @@ void ScripterManager::sendQuit()
 			if (m_ctrlStreambuf && m_ctrlStreambuf->wasBlocked()) {
 				m_ctrlStreambuf->clearBlocked();
 				if (m_log) {
-					Acquire a(m_soLog, 0);
+					Acquire a(m_soLog, LogLevel::Warn);
 					*m_log << L"ScripterManager: ctrl pipe full; Quit not "
 					          L"delivered (closing the pipe still signals it)"
 					       << std::endl;
@@ -159,7 +160,7 @@ void ScripterManager::forceStop(DWORD i_graceMillisec)
 	// held alive by an error dialog.  Kill it rather than let it outlive nyamy.
 	if (m_hScripterProcess) {
 		if (m_log) {
-			Acquire a(m_soLog, 0);
+			Acquire a(m_soLog, LogLevel::Warn);
 			*m_log << L"ScripterManager: scripter did not exit; terminating."
 			       << std::endl;
 		}
@@ -198,18 +199,34 @@ void ScripterManager::closeHandles()
 
 
 bool ScripterManager::start(const wstringi &configName, const wstringi &configPath,
-                             const Symbols &syms)
+                             const Symbols &syms, LogLevel logLevel)
 {
 	// If a previous async start is still running, skip
 	if (m_startFuture.valid() &&
 	    m_startFuture.wait_for(std::chrono::seconds(0)) == std::future_status::timeout)
 		return false;
 
+	m_logLevel.store(logLevel, std::memory_order_relaxed);
 	m_startFuture = std::async(std::launch::async,
-		[this, configName, configPath, syms]() {
-			return launchScripter(configName, configPath, syms);
+		[this, configName, configPath, syms, logLevel]() {
+			return launchScripter(configName, configPath, syms, logLevel);
 		});
 	return true;
+}
+
+
+void ScripterManager::setLogLevel(LogLevel logLevel)
+{
+	m_logLevel.store(logLevel, std::memory_order_relaxed);
+
+	std::lock_guard<std::mutex> lock(m_ctrlMutex);
+	if (!m_ctrlWriter)
+		return;
+	try { m_ctrlWriter->writeSetLogLevel(logLevel); } catch (...) {}
+	// A dropped threshold change is not worth reporting: the scripter keeps
+	// using the previous one, and the next reload carries the current value.
+	if (m_ctrlStreambuf && m_ctrlStreambuf->wasBlocked())
+		m_ctrlStreambuf->clearBlocked();
 }
 
 
@@ -331,7 +348,8 @@ static bool createNamedPipePair(bool i_serverReads, DWORD i_bufSize,
 
 bool ScripterManager::launchScripter(const wstringi &configName,
                                       const wstringi &configPath,
-                                      const Symbols &syms)
+                                      const Symbols &syms,
+                                      LogLevel logLevel)
 {
 	// Stop existing scripter if running.  This runs on the async start task,
 	// which ~ScripterManager waits for, so an unbounded wait here would hang
@@ -364,7 +382,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 	    !createNamedPipePair(true,  kDataPipeBufSize, &m_hDataRead,  &hDataWrite) ||
 	    !createNamedPipePair(true,  kMsgPipeBufSize,  &m_hMsgRead,   &hMsgWrite)) {
 		if (m_log) {
-			Acquire a(m_soLog, 0);
+			Acquire a(m_soLog, LogLevel::Error);
 			*m_log << L"ScripterManager: cannot create pipes" << std::endl;
 		}
 		closePipeHandle(&hNul);
@@ -395,8 +413,8 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		cmdLineStr = expandVars(iniCmdLine, &unknownVars);
 		for (const auto &uv : unknownVars) {
 			if (m_log) {
-				Acquire a(m_soLog, 0);
-				*m_log << L"warning: cmdLine: unknown variable: ${" << uv << L"}" << std::endl;
+				Acquire a(m_soLog, LogLevel::Warn);
+				*m_log << L"cmdLine: unknown variable: ${" << uv << L"}" << std::endl;
 			}
 		}
 	} else {
@@ -472,7 +490,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 
 	if (!result) {
 		if (m_log) {
-			Acquire a(m_soLog, 0);
+			Acquire a(m_soLog, LogLevel::Error);
 			*m_log << L"ScripterManager: failed to start " << cmdLineStr
 			       << L" (error " << lastErr << L")" << std::endl;
 		}
@@ -497,7 +515,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		m_hMsgThread  = (HANDLE)_beginthreadex(NULL, 0, msgThread,  this, 0, &tid);
 
 		if (m_log) {
-			Acquire a(m_soLog, 0);
+			Acquire a(m_soLog, LogLevel::Info);
 			*m_log << L"ScripterManager: started " << cmdLineStr << std::endl;
 		}
 
@@ -505,7 +523,7 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		// This runs while the pipe is still blocking, so the (possibly large)
 		// Start message is delivered reliably before we switch to drop-on-full.
 		if (m_ctrlWriter) {
-			try { m_ctrlWriter->writeStart(configName, configPath, syms); } catch (...) {}
+			try { m_ctrlWriter->writeStart(configName, configPath, syms, logLevel); } catch (...) {}
 		}
 
 		// From now on, ctrl writes (ExecUserFunc from the engine thread) must not
@@ -540,7 +558,7 @@ void ScripterManager::execUserFunc(const wstringi &name,
 	if (m_ctrlStreambuf && m_ctrlStreambuf->wasBlocked()) {
 		m_ctrlStreambuf->clearBlocked();
 		if (m_log) {
-			Acquire a(m_soLog, 0);
+			Acquire a(m_soLog, LogLevel::Warn);
 			*m_log << L"ScripterManager: ctrl pipe full; discarded "
 			          L"ExecUserFunc(" << name << L")" << std::endl;
 		}
@@ -603,9 +621,21 @@ void ScripterManager::runMsgReader()
 
 	while (std::getline(is, line)) {
 		if (!line.empty() && line.back() == '\r') line.pop_back();
-		std::wstring wline = from_UTF8(line);
+
+		// Strip the "{Lev}|" tag the scripter puts in front of every line and
+		// turn it back into a level.  An untagged line is a bare puts from a
+		// user script (or from the mruby runtime), which counts as info.
+		LogLevel level = LogLevel::Info;
+		size_t body = 0;
+		if (2 <= line.size() && line[1] == '|' &&
+				logLevelFromChar(static_cast<wchar_t>(line[0]), &level))
+			body = 2;
+
+		std::wstring wline = from_UTF8(line.substr(body));
 		if (m_log) {
-			Acquire a(m_soLog, 0);
+			// Filtered again here: the scripter drops what it can, but a line
+			// written before it saw SetLogLevel is already on its way.
+			Acquire a(m_soLog, level);
 			*m_log << L"[scripter] " << wline << std::endl;
 		}
 	}

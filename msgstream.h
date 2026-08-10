@@ -8,6 +8,9 @@
 #  include "misc.h"
 #  include "stringtool.h"
 #  include "multithread.h"
+#  include "log_level.h"
+#  include <algorithm>
+#  include <atomic>
 #  include <mutex>
 
 
@@ -25,7 +28,14 @@
     When the window (<code>hwnd</code>) get the message, you can get
     the string containd in the omsgbuf by calling
     <code>acquireString()</code>.  After calling
-    <code>acquireString()</code>, you must / call releaseString().</p>
+    <code>acquireString()</code>, you must call releaseString().</p>
+
+    <p>Every line that survives the level filter is prefixed with
+    <code>hh:mm:ss.SSS|L|</code>, and a bare <code>[YYYY-MM-DD]</code> line is
+    inserted whenever the date changes.  The prefix is produced here rather
+    than at the call sites because one line is often written by several
+    separate acquire()/release() pairs, and one pair often writes several
+    lines.</p>
 
 */
 
@@ -37,6 +47,9 @@ public:
 	using String = std::basic_string<T, TR, A>;	///
 	using Super = std::basic_streambuf<T, TR>;	///
 
+	/// characters in "hh:mm:ss.SSS|L|"
+	static const size_t PREFIX_LENGTH = 15;
+
 private:
 	HWND m_hwnd;					/** window handle for
 						    notification */
@@ -46,11 +59,28 @@ private:
 	String m_str;					/// for notification
 	std::recursive_mutex m_mutex;			/// lock
 
-	/** debug level.
-	    if ( m_msgDebugLevel &lt;= m_debugLevel ), message is displayed
+	/** Message is kept when ( m_msgLevel <= m_threshold ).  m_threshold is
+	    written by the UI thread and read by the writing threads, hence atomic.
 	*/
-	int m_debugLevel;
-	int m_msgDebugLevel;				///
+	std::atomic<LogLevel> m_threshold;
+	LogLevel m_msgLevel;				/// level of the message being written
+
+	/** True when the tail of m_str is a line boundary, so the next kept
+	    character starts a new line and needs a prefix.  Discarded text does
+	    not move it: m_str is all the reader ever sees.
+	*/
+	bool m_atLineStart;
+
+	/// true while a notification has been posted but not yet drained
+	bool m_notifyPending;
+
+	// time cache; hh:mm:ss and the date are recomputed only when the second
+	// rolls over, which keeps the per-line cost to a clock read and 3 digits
+	unsigned long long m_cachedSecond;		/// seconds since the epoch
+	T m_cachedHMS[8];				/// "hh:mm:ss", not terminated
+	WORD m_cachedYear;				///
+	WORD m_cachedMonth;				///
+	WORD m_cachedDay;				///
 
 private:
 	basic_msgbuf(const basic_msgbuf &) = delete;		/// disable copy constructor
@@ -64,9 +94,16 @@ public:
 			: m_hwnd(i_hwnd),
 			m_messageId(i_messageId),
 			m_buf(m_allocator.allocate(SIZE)),
-			m_debugLevel(0),
-			m_msgDebugLevel(0) {
+			m_threshold(kLogLevelNormal),
+			m_msgLevel(LogLevel::Info),
+			m_atLineStart(true),
+			m_notifyPending(false),
+			m_cachedSecond(0),
+			m_cachedYear(0),
+			m_cachedMonth(0),
+			m_cachedDay(0) {
 		ASSERT(m_buf);
+		std::fill_n(m_cachedHMS, NUMBER_OF(m_cachedHMS), static_cast<T>('0'));
 		this->setp(m_buf, m_buf + SIZE);
 	}
 
@@ -81,8 +118,7 @@ public:
 		std::lock_guard<std::recursive_mutex> lock(m_mutex);
 		ASSERT( !m_hwnd && i_hwnd );
 		m_hwnd = i_hwnd;
-		if (!m_str.empty())
-			PostMessage(m_hwnd, m_messageId, 0, (LPARAM)this);
+		notify();
 		return this;
 	}
 
@@ -113,18 +149,27 @@ public:
 	///
 	void releaseString() {
 		m_str.resize(0);
+		m_notifyPending = false;
 #pragma warning(suppress: 26110) // m_mutex is locked in acquireString() and releaseString() is called only after acquireString()
 		m_mutex.unlock();
 	}
 
-	/// set debug level
-	void setDebugLevel(int i_debugLevel) {
-		m_debugLevel = i_debugLevel;
+	/// set the threshold; messages above it are dropped as they are written
+	void setThreshold(LogLevel i_threshold) {
+		m_threshold.store(i_threshold, std::memory_order_relaxed);
 	}
 
 	///
-	int getDebugLevel() const {
-		return m_debugLevel;
+	LogLevel getThreshold() const {
+		return m_threshold.load(std::memory_order_relaxed);
+	}
+
+	/** Would a message of this level be kept ?  Call sites in the key input
+	    path use this to skip building a message that would only be thrown
+	    away: the ostream formatting runs even when the result is discarded.
+	*/
+	bool wouldLog(LogLevel i_level) const {
+		return i_level <= m_threshold.load(std::memory_order_relaxed);
 	}
 
 	// for stream
@@ -142,8 +187,9 @@ public:
 
 	// for stream
 	int sync() {
-		if (m_msgDebugLevel <= m_debugLevel)
-			m_str += String(this->pbase(), static_cast<size_t>(this->pptr() - this->pbase()));
+		if (m_msgLevel <= m_threshold.load(std::memory_order_relaxed))
+			appendChunk(this->pbase(),
+						static_cast<size_t>(this->pptr() - this->pbase()));
 		this->setp(m_buf, m_buf + SIZE);
 		return TR::not_eof(0);
 	}
@@ -153,21 +199,136 @@ public:
 	/// begin writing
 	virtual void acquire() {
 		m_mutex.lock();
+		m_msgLevel = LogLevel::Info;
 	}
 
 	/// begin writing
-	virtual void acquire(int i_msgDebugLevel) {
+	virtual void acquire(LogLevel i_level) {
 		m_mutex.lock();
-		m_msgDebugLevel = i_msgDebugLevel;
+		m_msgLevel = i_level;
 	}
 
 	/// end writing
 	virtual void release() {
-		if (!m_str.empty())
-			PostMessage(m_hwnd, m_messageId, 0, reinterpret_cast<LPARAM>(this));
-		m_msgDebugLevel = m_debugLevel;
+		notify();
+		m_msgLevel = LogLevel::Info;
 #pragma warning(suppress: 26110) // m_mutex is locked in acquire() and release() is called only after acquire()
 		m_mutex.unlock();
+	}
+
+private:
+	/** Post at most one outstanding notification.  Without the flag the
+	    detail mode posts a message per acquire()/release() pair - about six
+	    per keystroke - and all but the first find an empty string.
+	*/
+	void notify() {
+		if (m_str.empty() || m_notifyPending || !m_hwnd)
+			return;
+		if (PostMessage(m_hwnd, m_messageId, 0, reinterpret_cast<LPARAM>(this)))
+			m_notifyPending = true;
+	}
+
+	/// append text, starting each line with a prefix
+	void appendChunk(const T *i_p, size_t i_length) {
+		const T *end = i_p + i_length;
+		const T nl = static_cast<T>('\n');
+		while (i_p < end) {
+			if (m_atLineStart) {
+				if (*i_p == nl) {
+					// blank line: a prefix on its own would be noise
+					m_str += *i_p ++;
+					continue;
+				}
+				appendPrefix();
+				m_atLineStart = false;
+			}
+			const T *p = std::find(i_p, end, nl);
+			if (p == end) {
+				m_str.append(i_p, static_cast<size_t>(end - i_p));
+				i_p = end;
+			} else {
+				m_str.append(i_p, static_cast<size_t>(p - i_p) + 1);
+				i_p = p + 1;
+				m_atLineStart = true;
+			}
+		}
+	}
+
+	/// write two decimal digits
+	static void put2(T *&io_p, unsigned i_value) {
+		*io_p ++ = static_cast<T>('0' + (i_value / 10) % 10);
+		*io_p ++ = static_cast<T>('0' + i_value % 10);
+	}
+
+	/// "hh:mm:ss.SSS|L|", preceded by "[YYYY-MM-DD]\n" when the date changed
+	void appendPrefix() {
+		FILETIME ft;
+		// GetLocalTime() and GetSystemTime() are quantised to the timer tick,
+		// which is 15.625 ms by default - the milliseconds they report would
+		// be fiction.  This one is both finer and cheaper.
+		GetSystemTimePreciseAsFileTime(&ft);
+		unsigned long long t =
+			(static_cast<unsigned long long>(ft.dwHighDateTime) << 32) |
+			ft.dwLowDateTime;
+		unsigned long long millisec = t / 10000;
+		unsigned long long second = millisec / 1000;
+		if (second != m_cachedSecond) {
+			m_cachedSecond = second;
+			refreshTimeCache(ft);
+		}
+
+		T prefix[PREFIX_LENGTH];
+		T *p = prefix;
+		for (size_t i = 0; i < NUMBER_OF(m_cachedHMS); ++ i)
+			*p ++ = m_cachedHMS[i];
+		*p ++ = static_cast<T>('.');
+		unsigned ms = static_cast<unsigned>(millisec % 1000);
+		*p ++ = static_cast<T>('0' + ms / 100);
+		put2(p, ms);
+		*p ++ = static_cast<T>('|');
+		*p ++ = static_cast<T>(logLevelChar(m_msgLevel));
+		*p ++ = static_cast<T>('|');
+		m_str.append(prefix, PREFIX_LENGTH);
+	}
+
+	/// recompute hh:mm:ss and the date; called at most once per second
+	void refreshTimeCache(const FILETIME &i_ft) {
+		FILETIME lft;
+		SYSTEMTIME st;
+		// FileTimeToLocalFileTime() costs 7 ns; SystemTimeToTzSpecificLocalTime()
+		// costs 352 ns and is not needed for this
+		if (!FileTimeToLocalFileTime(&i_ft, &lft) ||
+				!FileTimeToSystemTime(&lft, &st))
+			return;
+
+		T *p = m_cachedHMS;
+		put2(p, st.wHour);
+		*p ++ = static_cast<T>(':');
+		put2(p, st.wMinute);
+		*p ++ = static_cast<T>(':');
+		put2(p, st.wSecond);
+
+		if (st.wYear == m_cachedYear && st.wMonth == m_cachedMonth &&
+				st.wDay == m_cachedDay)
+			return;
+		m_cachedYear = st.wYear;
+		m_cachedMonth = st.wMonth;
+		m_cachedDay = st.wDay;
+
+		// "[YYYY-MM-DD]" deliberately breaks the column layout of the normal
+		// lines: that is what makes a date change visible at a glance
+		T date[13];	// "[YYYY-MM-DD]" and the newline
+		T *d = date;
+		*d ++ = static_cast<T>('[');
+		put2(d, st.wYear / 100);
+		put2(d, st.wYear);
+		*d ++ = static_cast<T>('-');
+		put2(d, st.wMonth);
+		*d ++ = static_cast<T>('-');
+		put2(d, st.wDay);
+		*d ++ = static_cast<T>(']');
+		*d ++ = static_cast<T>('\n');
+		m_str.append(date, NUMBER_OF(date));
 	}
 };
 
@@ -220,14 +381,19 @@ public:
 		return m_streamBuf.is_open();
 	}
 
-	/// set debug level
-	void setDebugLevel(int i_debugLevel) {
-		m_streamBuf.setDebugLevel(i_debugLevel);
+	/// set the threshold
+	void setThreshold(LogLevel i_threshold) {
+		m_streamBuf.setThreshold(i_threshold);
 	}
 
 	///
-	int getDebugLevel() const {
-		return m_streamBuf.getDebugLevel();
+	LogLevel getThreshold() const {
+		return m_streamBuf.getThreshold();
+	}
+
+	/// would a message of this level be kept ?
+	bool wouldLog(LogLevel i_level) const {
+		return m_streamBuf.wouldLog(i_level);
 	}
 
 	/// acquire string and release the string
@@ -237,7 +403,7 @@ public:
 
 	///
 	void releaseString() {
-		m_streamBuf->releaseString();
+		m_streamBuf.releaseString();
 	}
 
 	// sync object
@@ -248,8 +414,8 @@ public:
 	}
 
 	/// begin writing
-	virtual void acquire(int i_msgDebugLevel) {
-		m_streamBuf.acquire(i_msgDebugLevel);
+	virtual void acquire(LogLevel i_level) {
+		m_streamBuf.acquire(i_level);
 	}
 
 	/// end writing

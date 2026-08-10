@@ -18,8 +18,16 @@ enum {
 	WM_APP_dlglogNotify = WM_APP + 115,
 };
 
+/** How much text the log edit control keeps.  Appending is O(buffer length):
+    measured 137 us at 10000 characters against 325 us at 60000, so this is a
+    direct trade of scrollback against the cost of every single log line. */
+const size_t kLogEditMaxChars = 20000;
+
 enum DlgLogNotify {
 	DlgLogNotify_logCleared,			///
+	/** The "detail" box was toggled.  lParam is the new LogLevel; the
+	    tasktray window forwards it to the scripter. */
+	DlgLogNotify_thresholdChanged,
 };
 
 /// parameters for "Investigate" dialog box

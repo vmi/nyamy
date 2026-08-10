@@ -35,6 +35,7 @@
 #define IDC_BUTTON_edit                 1008
 #define IDC_BUTTON_up                   1009
 #define IDC_CHECK_detail                1010
+#define IDC_CHECK_wordWrap              1029
 #define IDC_CUSTOM_scancode             1011
 #define IDC_CUSTOM_target               1012
 #define IDC_CUSTOM_vkey                 1013

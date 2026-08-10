@@ -83,14 +83,17 @@ public:
 				if (GetWindowText(i_hwndTarget, titleName, NUMBER_OF(titleName)) == 0)
 					titleName[0] = L'\0';
 				{
-					Acquire a(&m_data.m_engine->m_log, 1);
-					m_data.m_engine->m_log << L"HWND:\t" << std::hex
+					Acquire a(&m_data.m_engine->m_log, LogLevel::Debug);
+					m_data.m_engine->m_log << L"HWND:     " << std::hex
 					<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_hwndTarget))
 					<< std::dec << std::endl;
 				}
-				Acquire a(&m_data.m_engine->m_log, 0);
-				m_data.m_engine->m_log << L"CLASS:\t" << className << std::endl;
-				m_data.m_engine->m_log << L"TITLE:\t" << titleName << std::endl;
+				Acquire a(&m_data.m_engine->m_log, LogLevel::Info);
+				m_data.m_engine->m_log << L"CLASS:    " << className << std::endl;
+				// same escaping as the hook applies, so that the title reads
+				// the same whichever path reported it
+				m_data.m_engine->m_log << L"TITLE:   \""
+				<< escapeControlChars(titleName) << L"\"" << std::endl;
 				ok = true;
 			}
 		}
@@ -104,7 +107,7 @@ public:
 	BOOL wmVkeyNotify(int i_nVirtKey, int /* i_repeatCount */,
 					  BYTE /* i_scanCode */, bool i_isExtended,
 					  bool /* i_isAltDown */, bool i_isKeyup) {
-		Acquire a(&m_data.m_engine->m_log, 0);
+		Acquire a(&m_data.m_engine->m_log, LogLevel::Info);
 		m_data.m_engine->m_log
 		<< (i_isExtended ? L" E-" : L"   ")
 		<< L"0x" << std::hex << std::setw(2) << std::setfill(L'0')

@@ -44,7 +44,8 @@ void CtrlStreamWriter::writeString(const wstringi &s)
 
 void CtrlStreamWriter::writeStart(const wstringi &configName,
                                   const wstringi &configPath,
-                                  const Symbols  &syms)
+                                  const Symbols  &syms,
+                                  LogLevel        logLevel)
 {
 	writeU8(static_cast<uint8_t>(CtrlId::Start));
 	writeString(configName);
@@ -52,6 +53,15 @@ void CtrlStreamWriter::writeStart(const wstringi &configName,
 	writeU16(static_cast<uint16_t>(syms.size()));
 	for (const auto &sym : syms)
 		writeString(sym);
+	writeU8(static_cast<uint8_t>(logLevel));
+	m_out.flush();
+}
+
+
+void CtrlStreamWriter::writeSetLogLevel(LogLevel logLevel)
+{
+	writeU8(static_cast<uint8_t>(CtrlId::SetLogLevel));
+	writeU8(static_cast<uint8_t>(logLevel));
 	m_out.flush();
 }
 

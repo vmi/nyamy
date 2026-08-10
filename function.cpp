@@ -767,7 +767,7 @@ int Engine::EmacsEditKillLine::pred()
 void Engine::funcDefault(FunctionParam *i_param)
 {
 	{
-		Acquire a(&m_log, 1);
+		Acquire a(&m_log, LogLevel::Debug);
 		m_log << std::endl;
 		i_param->m_doesNeedEndl = false;
 	}
@@ -787,7 +787,7 @@ void Engine::funcKeymapParent(FunctionParam *i_param)
 	}
 
 	{
-		Acquire a(&m_log, 1);
+		Acquire a(&m_log, LogLevel::Debug);
 		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
 	}
 	i_param->m_doesNeedEndl = false;
@@ -829,7 +829,7 @@ void Engine::funcOtherWindowClass(FunctionParam *i_param)
 
 	c.m_keymap = *c.m_i;
 	{
-		Acquire a(&m_log, 1);
+		Acquire a(&m_log, LogLevel::Debug);
 		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
 	}
 	i_param->m_doesNeedEndl = false;
@@ -853,7 +853,7 @@ void Engine::funcPrefix(FunctionParam *i_param, const Keymap *i_keymap,
 	m_doesIgnoreModifierForPrefix = !!i_doesIgnoreModifiers;
 
 	{
-		Acquire a(&m_log, 1);
+		Acquire a(&m_log, LogLevel::Debug);
 		m_log << L"(" << i_keymap->getName() << L", "
 		<< (i_doesIgnoreModifiers ? L"true" : L"false") << L")";
 	}
@@ -865,7 +865,7 @@ void Engine::funcKeymap(FunctionParam *i_param, const Keymap *i_keymap)
 	Current c(i_param->m_c);
 	c.m_keymap = i_keymap;
 	{
-		Acquire a(&m_log, 1);
+		Acquire a(&m_log, LogLevel::Debug);
 		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
 		i_param->m_doesNeedEndl = false;
 	}
@@ -907,7 +907,7 @@ void Engine::funcSync(FunctionParam *i_param)
 	g_hookData->m_syncKey = 0;
 
 	if (r == WaitResult::Timeout) {
-		Acquire a(&m_log, 0);
+		Acquire a(&m_log, LogLevel::Info);
 		m_log << L" *FAILED*" << std::endl;
 	}
 }
@@ -1083,7 +1083,7 @@ void Engine::shellExecute()
 	std::wstring errorMessage(L"Unknown error.");
 	getTypeName(&errorMessage, r, errorTable, NUMBER_OF(errorTable));
 
-	Acquire b(&m_log, 0);
+	Acquire b(&m_log, LogLevel::Info);
 	m_log << L"error: " << fd << L": " << errorMessage << std::endl;
 }
 
@@ -1176,7 +1176,7 @@ void Engine::funcLoadSetting(FunctionParam *i_param, const StrExprArg &i_name)
 		}
 
 		{
-			Acquire a(&m_log, 0);
+			Acquire a(&m_log, LogLevel::Info);
 			m_log << L"unknown setting name: " << i_name << std::endl;
 		}
 		return;
@@ -1244,7 +1244,7 @@ void Engine::funcInvestigateCommand(FunctionParam *i_param)
 {
 	if (!i_param->m_isPressed)
 		return;
-	Acquire a(&m_log, 0);
+	Acquire a(&m_log, LogLevel::Info);
 	g_hookData->m_doesNotifyCommand = !g_hookData->m_doesNotifyCommand;
 	if (g_hookData->m_doesNotifyCommand)
 		m_log << L" begin" << std::endl;
@@ -1269,7 +1269,7 @@ void Engine::funcDescribeBindings(FunctionParam *i_param)
 	if (!i_param->m_isPressed)
 		return;
 	{
-		Acquire a(&m_log, 1);
+		Acquire a(&m_log, LogLevel::Debug);
 		m_log << std::endl;
 	}
 	describeBindings();
@@ -1658,14 +1658,17 @@ void Engine::funcWindowIdentify(FunctionParam *i_param)
 			if (GetWindowText(i_param->m_hwnd, titleName, NUMBER_OF(titleName)) == 0)
 				titleName[0] = L'\0';
 			{
-				Acquire a(&m_log, 1);
-				m_log << L"HWND:\t" << std::hex
+				Acquire a(&m_log, LogLevel::Debug);
+				m_log << L"HWND:     " << std::hex
 				<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_param->m_hwnd))
 				<< std::dec << std::endl;
 			}
-			Acquire a(&m_log, 0);
-			m_log << L"CLASS:\t" << className << std::endl;
-			m_log << L"TITLE:\t" << titleName << std::endl;
+			Acquire a(&m_log, LogLevel::Info);
+			m_log << L"CLASS:    " << className << std::endl;
+			// same escaping as the hook applies, so that the title reads the
+			// same whichever path reported it
+			m_log << L"TITLE:   \"" << escapeControlChars(titleName) << L"\""
+			<< std::endl;
 
 			HWND hwnd = getToplevelWindow(i_param->m_hwnd, NULL);
 			RECT rc;
@@ -1726,7 +1729,7 @@ void Engine::funcWindowSetAlpha(FunctionParam *i_param, int i_alpha)
 			i_alpha %= 101;
 			if (!setLayeredWindowAttributes(hwnd, 0,
 											(BYTE)(255 * i_alpha / 100), LWA_ALPHA)) {
-				Acquire a(&m_log, 0);
+				Acquire a(&m_log, LogLevel::Info);
 				m_log << L"error: &WindowSetAlpha(" << i_alpha
 				<< L") failed for HWND: " << std::hex
 				<< hwnd << std::dec << std::endl;
@@ -2008,14 +2011,14 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 	if (HANDLE hm = OpenMutex(MUTEX_ALL_ACCESS, FALSE, L"sakura"))
 		CloseHandle(hm);
 	else {
-		Acquire a(&m_log, 0);
+		Acquire a(&m_log, LogLevel::Info);
 		m_log << L" Error(1): Direct SSTP server does not exist." << std::endl;
 		return;
 	}
 
 	HANDLE hfm = OpenFileMapping(FILE_MAP_READ, FALSE, L"Sakura");
 	if (!hfm) {
-		Acquire a(&m_log, 0);
+		Acquire a(&m_log, LogLevel::Info);
 		m_log << L" Error(2): Direct SSTP server does not provide data." << std::endl;
 		return;
 	}
@@ -2024,7 +2027,7 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 		reinterpret_cast<char *>(MapViewOfFile(hfm, FILE_MAP_READ, 0, 0, 0));
 	if (!data) {
 		CloseHandle(hfm);
-		Acquire a(&m_log, 0);
+		Acquire a(&m_log, LogLevel::Info);
 		m_log << L" Error(3): Direct SSTP server does not provide data." << std::endl;
 		return;
 	}

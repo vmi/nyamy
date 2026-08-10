@@ -68,7 +68,14 @@ CtrlArgsStart CtrlStreamReader::readStart()
 	uint16_t count = readU16();
 	for (uint16_t i = 0; i < count; ++i)
 		data.symbols.insert(readString());
+	data.logLevel = logLevelFromByte(readU8());
 	return data;
+}
+
+
+LogLevel CtrlStreamReader::readSetLogLevel()
+{
+	return logLevelFromByte(readU8());
 }
 
 
