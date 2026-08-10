@@ -78,6 +78,9 @@ $payload = @(
     @{ Source = "s\install.ps1";             Dest = "install.ps1" }
     @{ Source = "s\uninstall.cmd";           Dest = "uninstall.cmd" }
     @{ Source = "s\uninstall.ps1";           Dest = "uninstall.ps1" }
+    # nyamy-installer.psm1 is deliberately not named install.*: it has to be
+    # copied to the install directory, where uninstall.ps1 imports it.
+    @{ Source = "s\nyamy-installer.psm1";    Dest = "nyamy-installer.psm1" }
     # legacy/: mayu-era .mayu assets, kept under their own subfolder so they
     # don't collide with the .mayu.rb files of the same base name above.
     @{ Source = "legacy\104.mayu";                 Dest = "legacy\104.mayu" }

@@ -83,6 +83,7 @@
     <None Include="..\s\install.ps1" />
     <None Include="..\s\uninstall.cmd" />
     <None Include="..\s\uninstall.ps1" />
+    <None Include="..\s\nyamy-installer.psm1" />
     <None Include="..\legacy\104.mayu" />
     <None Include="..\legacy\104on109.mayu" />
     <None Include="..\legacy\109.mayu" />
