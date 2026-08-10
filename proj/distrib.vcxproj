@@ -61,7 +61,8 @@
     <None Include="..\emacsedit.mayu.rb" />
     <None Include="..\workaround.mayu.rb" />
     <None Include="..\workaround.reg" />
-    <None Include="..\nyamy.ini" />
+    <None Include="..\nyamy-ja.ini" />
+    <None Include="..\nyamy-en.ini" />
     <None Include="..\LICENSE.txt" />
     <None Include="..\README.md" />
     <None Include="..\doc\README-ja.html" />

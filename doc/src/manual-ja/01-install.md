@@ -14,7 +14,7 @@
 
 ### 設定の保存先 {#install_config}
 
-NYamy の設定 (選択中の設定ファイルなど) は `%LOCALAPPDATA%\NYamy\Config\nyamy.ini` に保存されます。初回起動時に `nyamy.exe` と同じフォルダにある `nyamy.ini` が雛形として取り込まれます。レジストリは使用しません。
+NYamy の設定 (選択中の設定ファイルなど) は `%LOCALAPPDATA%\NYamy\Config\nyamy.ini` に保存されます。初回起動時に `nyamy.exe` と同じフォルダにある `nyamy-ja.ini` / `nyamy-en.ini` のうち、Windows の既定言語に合う方が雛形として取り込まれます。レジストリは使用しません。
 
 ### 管理者権限について {#install_admin}
 

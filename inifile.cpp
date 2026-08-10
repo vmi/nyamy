@@ -162,14 +162,19 @@ int findKeyLine(const std::vector<std::wstring> &i_lines,
 //
 IniFile::IniFile()
 {
-	// seed: nyamy.ini next to the executable (read on first use only)
-	std::wstring seedPath = NYamyPaths::root() + L"\\nyamy.ini";
+	// seed: nyamy-ja.ini or nyamy-en.ini next to the executable, picked by
+	// the user's default locale (read on first use only).  This mirrors the
+	// LANGUAGE blocks in mayu.rc, which fall back on the same locale.
+	const wchar_t *seedName =
+		PRIMARYLANGID(GetUserDefaultLangID()) == LANG_JAPANESE ?
+			L"\\nyamy-ja.ini" : L"\\nyamy-en.ini";
+	std::wstring seedPath = NYamyPaths::root() + seedName;
 	m_path = NYamyPaths::config() + L"\\nyamy.ini";
 
-	// first use: migrate the seed next to the executable, if any.
-	// The two are the same file when there is no per-user directory to use.
-	if (m_path != seedPath &&
-			GetFileAttributesW(m_path.c_str()) == INVALID_FILE_ATTRIBUTES &&
+	// first use: copy the locale-appropriate seed into place, if any.  The
+	// seed and the per-user copy always have different file names, so this
+	// also works when there is no per-user directory to use (config == root).
+	if (GetFileAttributesW(m_path.c_str()) == INVALID_FILE_ATTRIBUTES &&
 			GetFileAttributesW(seedPath.c_str()) != INVALID_FILE_ATTRIBUTES)
 		CopyFileW(seedPath.c_str(), m_path.c_str(), TRUE);
 }

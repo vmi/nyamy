@@ -54,7 +54,8 @@ $payload = @(
     @{ Source = "emacsedit.mayu.rb";         Dest = "emacsedit.mayu.rb" }
     @{ Source = "workaround.mayu.rb";        Dest = "workaround.mayu.rb" }
     @{ Source = "workaround.reg";            Dest = "workaround.reg" }
-    @{ Source = "nyamy.ini";                 Dest = "nyamy.ini" }
+    @{ Source = "nyamy-ja.ini";              Dest = "nyamy-ja.ini" }
+    @{ Source = "nyamy-en.ini";              Dest = "nyamy-en.ini" }
     @{ Source = "LICENSE.txt";               Dest = "LICENSE.txt" }
     @{ Source = "README.md";                 Dest = "README.md" }
     @{ Source = "scripter\nyamy_scripter.h"; Dest = "nyamy_scripter.h" }

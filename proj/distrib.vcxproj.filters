@@ -42,7 +42,10 @@
     <None Include="..\workaround.reg">
       <Filter>リソース ファイル</Filter>
     </None>
-    <None Include="..\nyamy.ini">
+    <None Include="..\nyamy-ja.ini">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="..\nyamy-en.ini">
       <Filter>リソース ファイル</Filter>
     </None>
     <None Include="..\LICENSE.txt">
