@@ -8,6 +8,9 @@
 #include "target.h"
 #include "windowstool.h"
 
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
+
 
 ///
 class Target
@@ -78,12 +81,34 @@ class Target
 		POINT m_p;					///
 		HWND m_hwnd;				///
 		RECT m_rc;					///
+		DWORD m_processId;			/// owner of the toplevel window
 	};
 
+	/// a cloaked window is still visible to IsWindowVisible() but is not drawn
+	/// (suspended store apps, windows on another virtual desktop)
+	static bool isCloaked(HWND i_hwnd) {
+		DWORD cloaked = 0;
+		return SUCCEEDED(DwmGetWindowAttribute(i_hwnd, DWMWA_CLOAKED, &cloaked,
+											   sizeof(cloaked))) &&
+			   cloaked != 0;
+	}
+
 	///
+	static bool isOwnedBy(HWND i_hwnd, DWORD i_processId) {
+		DWORD processId = 0;
+		GetWindowThreadProcessId(i_hwnd, &processId);
+		return processId == i_processId;
+	}
+
+	/// Chromium based applications (Edge, VSCode, WebView2) parent an
+	/// "Intermediate D3D Window" owned by their sandboxed GPU process into the
+	/// application window, covering the whole client area.  The hook DLL cannot
+	/// be loaded into that process, so a target notification posted there is
+	/// never answered and the log stays silent.  Descend only into windows the
+	/// toplevel window's own process owns.
 	static BOOL CALLBACK childWindowFromPoint(HWND i_hwnd, LPARAM i_lParam) {
-		if (IsWindowVisible(i_hwnd)) {
-			PointWindow &pw = *(PointWindow *)i_lParam;
+		PointWindow &pw = *(PointWindow *)i_lParam;
+		if (IsWindowVisible(i_hwnd) && isOwnedBy(i_hwnd, pw.m_processId)) {
 			RECT rc;
 			CHECK_TRUE( GetWindowRect(i_hwnd, &rc) );
 			if (PtInRect(&rc, pw.m_p))
@@ -97,9 +122,14 @@ class Target
 
 	///
 	static BOOL CALLBACK windowFromPoint(HWND i_hwnd, LPARAM i_lParam) {
-		if (IsWindowVisible(i_hwnd)) {
+		if (IsWindowVisible(i_hwnd) && !isCloaked(i_hwnd)) {
 			PointWindow &pw = *(PointWindow *)i_lParam;
 			RECT rc;
+			// GetWindowRect() and GetCursorPos() are both virtualized for a
+			// DPI unaware process, so they agree at any scaling factor.  The
+			// DWM attributes report physical pixels and must not be mixed in
+			// here: DWMWA_EXTENDED_FRAME_BOUNDS would exclude the invisible
+			// resize border, but at 150% it would be off by half again.
 			CHECK_TRUE( GetWindowRect(i_hwnd, &rc) );
 			if (PtInRect(&rc, pw.m_p)) {
 				pw.m_hwnd = i_hwnd;
@@ -115,23 +145,34 @@ class Target
 		if (GetCapture() == m_hwnd) {
 			PointWindow pw;
 			CHECK_TRUE( GetCursorPos(&pw.m_p) );
-			pw.m_hwnd = 0;
+			pw.m_hwnd = NULL;
+			pw.m_processId = 0;
 			CHECK_TRUE( GetWindowRect(GetDesktopWindow(), &pw.m_rc) );
 			EnumWindows(windowFromPoint, (LPARAM)&pw);
-			while (1) {
-				HWND hwndParent = pw.m_hwnd;
-				if (!EnumChildWindows(pw.m_hwnd, childWindowFromPoint, (LPARAM)&pw))
-					break;
-				if (hwndParent == pw.m_hwnd)
-					break;
+			// without a toplevel window there is nothing to descend into.
+			// EnumChildWindows(NULL) would enumerate every toplevel window
+			// instead, which the rect test is not written for.
+			if (pw.m_hwnd) {
+				CHECK_TRUE( GetWindowThreadProcessId(pw.m_hwnd,
+													 &pw.m_processId) );
+				while (1) {
+					HWND hwndParent = pw.m_hwnd;
+					EnumChildWindows(pw.m_hwnd, childWindowFromPoint,
+									 (LPARAM)&pw);
+					if (hwndParent == pw.m_hwnd)
+						break;
+				}
 			}
 			if (pw.m_hwnd != m_preHwnd) {
 				if (m_preHwnd)
 					invertFrame(m_preHwnd);
 				m_preHwnd = pw.m_hwnd;
-				invertFrame(m_preHwnd);
-				SendMessage(GetParent(m_hwnd), WM_APP_targetNotify, 0,
-							(LPARAM)m_preHwnd);
+				// invertFrame(NULL) would draw on the screen DC
+				if (m_preHwnd) {
+					invertFrame(m_preHwnd);
+					SendMessage(GetParent(m_hwnd), WM_APP_targetNotify, 0,
+								(LPARAM)m_preHwnd);
+				}
 			}
 			SetCursor(m_hCursor);
 		}
