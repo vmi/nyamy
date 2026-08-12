@@ -64,7 +64,7 @@
     <None Include="..\nyamy-ja.ini" />
     <None Include="..\nyamy-en.ini" />
     <None Include="..\LICENSE.txt" />
-    <None Include="..\README.md" />
+    <None Include="..\s\README.md" />
     <None Include="..\doc\README-ja.html" />
     <None Include="..\doc\style.css" />
     <None Include="..\doc\syntax.txt" />

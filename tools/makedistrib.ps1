@@ -57,7 +57,9 @@ $payload = @(
     @{ Source = "nyamy-ja.ini";              Dest = "nyamy-ja.ini" }
     @{ Source = "nyamy-en.ini";              Dest = "nyamy-en.ini" }
     @{ Source = "LICENSE.txt";               Dest = "LICENSE.txt" }
-    @{ Source = "README.md";                 Dest = "README.md" }
+    # The distributed README is s\README.md (install/uninstall oriented), not
+    # the repo root README.md, which targets people building from source.
+    @{ Source = "s\README.md";               Dest = "README.md" }
     @{ Source = "scripter\nyamy_scripter.h"; Dest = "nyamy_scripter.h" }
     @{ Source = "doc\README-ja.html";        Dest = "doc\README-ja.html" }
     @{ Source = "doc\style.css";             Dest = "doc\style.css" }

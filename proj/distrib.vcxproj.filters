@@ -51,7 +51,7 @@
     <None Include="..\LICENSE.txt">
       <Filter>リソース ファイル</Filter>
     </None>
-    <None Include="..\README.md">
+    <None Include="..\s\README.md">
       <Filter>リソース ファイル</Filter>
     </None>
     <None Include="..\doc\README-ja.html">
