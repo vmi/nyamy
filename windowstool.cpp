@@ -163,12 +163,31 @@ void asyncMoveWindow(HWND i_hwnd, int i_x, int i_y)
 }
 
 
-// move window asynchronously
+/* move and resize window asynchronously
+
+   Asking for a position and a size in one request goes wrong when the
+   destination lies on a monitor of another DPI: the move makes Windows send
+   WM_DPICHANGED to the target, which rescales the window on top of the size
+   just asked for, so it arrives off by that factor (measured: 569x405 asked
+   for across a 125% -> 100% boundary, 455x324 delivered).  The position is
+   unaffected.
+
+   Splitting the request keeps the size out of the crossing.  Both parts are
+   posted to the thread owning the window and it runs them in order, so by the
+   time the size is applied the window already sits on the destination monitor
+   and its DPI change has been handled - there is no second boundary to cross.
+   Windows on the same DPI as now keep the single request; the split is visible
+   as an extra resize step and there is nothing to fix for them. */
 void asyncMoveWindow(HWND i_hwnd, int i_x, int i_y, int i_w, int i_h)
 {
+	RECT rcTarget = { i_x, i_y, i_x + i_w, i_y + i_h };
+	bool crossesDpi = dpiForRect(&rcTarget) != dpiForWindowMonitor(i_hwnd);
+
 	SetWindowPos(i_hwnd, NULL, i_x, i_y, i_w, i_h,
 				 SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_NOOWNERZORDER |
-				 SWP_NOZORDER);
+				 SWP_NOZORDER | (crossesDpi ? SWP_NOSIZE : 0));
+	if (crossesDpi)
+		asyncResize(i_hwnd, i_w, i_h);
 }
 
 
@@ -275,6 +294,13 @@ UINT dpiForPoint(POINT i_pt)
 UINT dpiForWindowMonitor(HWND i_hwnd)
 {
 	return effectiveDpi(monitorFromWindow(i_hwnd, MONITOR_DEFAULTTONEAREST));
+}
+
+
+// DPI of the monitor a rectangle falls on
+UINT dpiForRect(const RECT *i_rc)
+{
+	return effectiveDpi(MonitorFromRect(i_rc, MONITOR_DEFAULTTONEAREST));
 }
 
 

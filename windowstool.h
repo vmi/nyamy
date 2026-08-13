@@ -103,6 +103,13 @@ extern UINT dpiForPoint(POINT i_pt);
     desktop's own space, so it is the monitor that decides the scale. */
 extern UINT dpiForWindowMonitor(HWND i_hwnd);
 
+/** DPI of the monitor a rectangle falls on, or 96 if it cannot be determined.
+
+    Picks the monitor holding the largest part of the rectangle, the same rule
+    Windows uses to decide which monitor a window belongs to, so this answers
+    what DPI a window would be at once it has been put there. */
+extern UINT dpiForRect(const RECT *i_rc);
+
 /** Scale a length written for 96 dpi to what i_dpi calls for.
 
     Anything the code states as a pixel count - a caret width, a metric that
