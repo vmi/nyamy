@@ -1145,6 +1145,13 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			break;
 		}
 
+		// Nothing slow belongs here.  This runs in the low level mouse hook,
+		// which Windows skips for an event whose hook takes longer than
+		// LowLevelHooksTimeout - and a skipped button release leaves the
+		// engine believing the button is still down.  Taking the log lock here
+		// would do exactly that: the UI thread can be holding it, and it is
+		// busiest shortly after startup.
+
 		WaitForSingleObject(m_queueMutex, INFINITE);
 
 		if (kid.Flags & KEYBOARD_INPUT_DATA::BREAK) {

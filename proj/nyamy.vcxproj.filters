@@ -222,4 +222,9 @@
       <Filter>リソース ファイル</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="..\nyamy.manifest">
+      <Filter>リソース ファイル</Filter>
+    </Manifest>
+  </ItemGroup>
 </Project>

@@ -56,6 +56,8 @@ private:
 
 	using Items = std::list<Item>;		///
 
+
+
 protected:
 	HWND m_hwnd;					///
 
@@ -65,10 +67,38 @@ private:
 	SIZE m_smallestSize;				///
 	Restrict m_largestRestriction;		///
 	SIZE m_largestSize;				///
+	/// DPI the size limits were captured at
+	UINT m_dpi;
+	/** A DPI change is in flight.
+
+	    Windows resizes the window and rescales its controls before it delivers
+	    WM_DPICHANGED, and adjust() must not run on the WM_SIZE that raises: it
+	    would put every control back at the size and offset recorded for the
+	    old DPI, undoing the rescaling as fast as the dialog manager applies it.
+	    That is what made an earlier round look as though Per-Monitor v2 did not
+	    scale dialogs at all. */
+	bool m_isDpiChanging;
 
 public:
 	///
 	LayoutManager(HWND i_hwnd);
+	///
+	virtual ~LayoutManager();
+
+protected:
+	/** A DPI change is starting, and nothing has been rescaled yet.
+
+	    The one point at which a derived class can still read the dialog as the
+	    user last saw it.  By the time WM_DPICHANGED arrives the dialog manager
+	    has already resized the controls and rescaled their fonts, so anything
+	    that has to survive the change - a scroll position, say - has to be
+	    noted here rather than there. */
+	virtual void onDpiChangeBegin() {}
+
+	/// note the start of a DPI change exactly once, whichever message opens it
+	void beginDpiChange();
+
+public:
 
 	/** restrict the smallest size of the window to the current size of it or
 	    specified by i_size */
@@ -113,6 +143,19 @@ public:
 	/// WM_SIZE
 	virtual BOOL wmSize(DWORD /* i_fwSizeType */, short /* i_nWidth */,
 						short /* i_nHeight */);
+
+	/** WM_DPICHANGED: convert the layout baseline, then re-apply it.
+
+	    Per-Monitor v2 has already scaled the controls and their fonts by the
+	    time this arrives, so the fonts are left alone - scaling them here as
+	    well applied the factor twice and left the text visibly small after a
+	    round trip.  What the dialog manager cannot know is this class' baseline,
+	    and that has to be converted synchronously: reading the geometry back
+	    from a posted message instead looks equivalent, but the restore that
+	    runs during WM_INITDIALOG changes DPI and size in one step, and the
+	    adjust() at the end of it would then bake a layout computed from the old
+	    DPI into the baseline for good. */
+	virtual BOOL wmDpiChanged(UINT i_dpi, const RECT *i_suggested);
 
 	/// forward message
 	virtual BOOL defaultWMHandler(UINT i_message, WPARAM i_wParam,
