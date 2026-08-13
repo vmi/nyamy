@@ -419,11 +419,19 @@ private:
 		// MONITOR_DEFAULTTONULL: a placement saved on a monitor that is gone
 		// (or on a resolution that shrank) would put the dialog out of reach
 		//
-		// The key is not the one nyamy used before it became DPI aware.  Those
-		// values were written in the virtualized 96 dpi space and would place
-		// and size the dialog wrongly if read as the physical pixels they now
-		// are.
-		if (i_ini.read(L"logWindowPlacementPhysical", &wp) &&
+		// The key is not the one nyamy used before it became DPI aware, whose
+		// values were written in the virtualized 96 dpi space.  That one is
+		// still read as a fallback, once: the two spaces only differ for a
+		// window left on a monitor whose scaling is not the system's, and a
+		// rectangle that does come out wrong is pulled back into view by
+		// clampToWorkArea() below.  Carrying the position over the upgrade is
+		// worth that.  savePlacement() drops the old key, so the fallback
+		// stops applying as soon as the dialog has been closed once.
+		bool hasSaved = i_ini.read(L"logWindowPlacementPhysical", &wp);
+		if (!hasSaved)
+			hasSaved = i_ini.read(L"logWindowPlacement", &wp);
+
+		if (hasSaved &&
 				MonitorFromRect(&wp.rcNormalPosition, MONITOR_DEFAULTTONULL)) {
 			m_restoreMaximized = (wp.showCmd == SW_SHOWMAXIMIZED);
 			// the dialog is created hidden and stays that way until the user
@@ -535,7 +543,12 @@ private:
 		// state would restore to a window the user cannot see
 		wp.showCmd = (wp.showCmd == SW_SHOWMAXIMIZED) ? SW_SHOWMAXIMIZED
 					 : SW_SHOWNORMAL;
-		IniFile().write(L"logWindowPlacementPhysical", wp);
+		IniFile ini;
+		ini.write(L"logWindowPlacementPhysical", wp);
+		// The value just written supersedes the one the DPI unaware builds
+		// wrote, which restorePlacement() falls back to.  Drop it rather than
+		// leave a stale rectangle in the file for that fallback to find.
+		ini.remove(L"logWindowPlacement");
 	}
 };
 
