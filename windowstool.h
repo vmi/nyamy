@@ -75,6 +75,20 @@ extern bool setForegroundWindow(HWND i_hwnd);
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // DPI
+//
+// nyamy declares Per-Monitor v2 in its manifest, so USER32 reports physical
+// pixels rather than coordinates virtualized into a 96 dpi space.  See
+// doc/dpi-aware.md for what that changes and what it does not.
+
+/** Empty when the process runs at the per-monitor-v2 awareness the manifest
+    asks for, a warning to log otherwise.
+
+    The awareness is a property of the build and does not change while running,
+    so there is nothing to report in the normal case.  It can still be forced
+    down from outside - the compatibility tab of the executable, the
+    __COMPAT_LAYER variable, AppCompat registry entries - and a user does that
+    without knowing that coordinates are what breaks. */
+extern std::wstring warnUnexpectedDpiAwareness();
 
 /** DPI of the monitor a point falls on, or 96 if it cannot be determined.
 

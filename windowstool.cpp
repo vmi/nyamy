@@ -295,6 +295,59 @@ int scaleFromLogical(int i_px, UINT i_dpi)
 }
 
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// DPI diagnostics
+
+
+//
+std::wstring warnUnexpectedDpiAwareness()
+{
+	DPI_AWARENESS_CONTEXT context = GetThreadDpiAwarenessContext();
+
+	// v1 and v2 share one DPI_AWARENESS value, so GetAwarenessFromDpiAwareness-
+	// Context() cannot tell them apart and neither can shcore's
+	// GetProcessDpiAwareness().  Only a context comparison distinguishes the
+	// two, and the difference matters: v2 is what brings the automatic dialog
+	// and non-client scaling nyamy's dialogs are written against.
+	if (AreDpiAwarenessContextsEqual(context,
+									 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+		return std::wstring();
+
+	const wchar_t *name;
+	switch (GetAwarenessFromDpiAwarenessContext(context)) {
+	case DPI_AWARENESS_UNAWARE:
+		name = L"unaware";
+		break;
+	case DPI_AWARENESS_SYSTEM_AWARE:
+		name = L"system";
+		break;
+	case DPI_AWARENESS_PER_MONITOR_AWARE:
+		name = L"per-monitor";
+		break;
+	default:
+		name = L"invalid";
+		break;
+	}
+
+	// The log prefixes every line with hh:mm:ss.SSS|L|, so the continuation
+	// lines line up on their own.  Two spaces of indent under that prefix:
+	// starting right after the '|' reads as too tight.
+	wchar_t buf[512];
+	_snwprintf(buf, NUMBER_OF(buf),
+			   L"*** DPI awareness is \"%s\" ***\n"
+			   L"  Not the per-monitor-v2 the manifest asks for.\n"
+			   L"  Window positions and sizes may be off on monitors whose "
+			   L"scaling is not %u%%.\n"
+			   L"  Check the compatibility tab of the executable for a high "
+			   L"DPI scaling override.",
+			   name, MulDiv(GetDpiForSystem(), 100, USER_DEFAULT_SCREEN_DPI));
+	buf[NUMBER_OF(buf) - 1] = L'\0';
+	return std::wstring(buf);
+}
+
+
+
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // edit control

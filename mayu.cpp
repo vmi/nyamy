@@ -1318,6 +1318,13 @@ public:
 	/// message loop
 	WPARAM messageLoop() {
 		showBanner(false);
+		// Only here, not in showBanner(): that runs again whenever the log is
+		// cleared, and this says nothing new the second time.
+		if (std::wstring warning = warnUnexpectedDpiAwareness();
+				!warning.empty()) {
+			Acquire a(&m_log, LogLevel::Warn);
+			m_log << warning << std::endl;
+		}
 		load();
 
 		startNotifyReader();
