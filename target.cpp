@@ -126,20 +126,38 @@ class Target
 		return TRUE;
 	}
 
+	/** Bounds of the frame the user actually sees.
+
+	    GetWindowRect() includes the invisible resize border - 8px at the left,
+	    right and bottom of a standard frame - so two windows placed side by
+	    side overlap along that seam, and whichever is higher in the z order
+	    claims both.  The DWM reports the drawn frame instead.
+
+	    This is only usable because nyamy is DPI aware: the DWM attributes have
+	    always been in physical pixels, and USER32 now is too.  See
+	    doc/dpi-aware.md.  Falls back for windows the DWM has nothing to say
+	    about. */
+	static bool getVisibleWindowRect(HWND i_hwnd, RECT *o_rc) {
+		if (SUCCEEDED(DwmGetWindowAttribute(i_hwnd,
+											DWMWA_EXTENDED_FRAME_BOUNDS,
+											o_rc, sizeof(*o_rc))))
+			return true;
+		return !!GetWindowRect(i_hwnd, o_rc);
+	}
+
 	///
 	static BOOL CALLBACK windowFromPoint(HWND i_hwnd, LPARAM i_lParam) {
 		if (IsWindowVisible(i_hwnd) && !isCloaked(i_hwnd)) {
 			PointWindow &pw = *(PointWindow *)i_lParam;
-			RECT rc;
-			// GetWindowRect() and GetCursorPos() are both virtualized for a
-			// DPI unaware process, so they agree at any scaling factor.  The
-			// DWM attributes report physical pixels and must not be mixed in
-			// here: DWMWA_EXTENDED_FRAME_BOUNDS would exclude the invisible
-			// resize border, but at 150% it would be off by half again.
-			CHECK_TRUE( GetWindowRect(i_hwnd, &rc) );
-			if (PtInRect(&rc, pw.m_p)) {
+			RECT rcVisible;
+			CHECK_TRUE( getVisibleWindowRect(i_hwnd, &rcVisible) );
+			if (PtInRect(&rcVisible, pw.m_p)) {
 				pw.m_hwnd = i_hwnd;
-				pw.m_rc = rc;
+				// The descent below compares child windows against this with
+				// GetWindowRect(), so that is what it has to hold: a child
+				// filling the window would not be contained in the smaller
+				// visible frame, and the search would stop at the toplevel.
+				CHECK_TRUE( GetWindowRect(i_hwnd, &pw.m_rc) );
 				return FALSE;
 			}
 		}
