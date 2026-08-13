@@ -66,10 +66,16 @@ class Target
 		if (GetCapture() != m_hwnd) {
 			RECT rc;
 			CHECK_TRUE( GetClientRect(m_hwnd, &rc) );
+			// DrawIconEx rather than DrawIcon: the cursor resource is a fixed
+			// 32x32, and the control it is centred in grows with the DPI, so
+			// the icon has to be stretched to the size the DPI calls for
+			UINT dpi = GetDpiForWindow(m_hwnd);
+			int cx = GetSystemMetricsForDpi(SM_CXICON, dpi);
+			int cy = GetSystemMetricsForDpi(SM_CYICON, dpi);
 			CHECK_TRUE(
-				DrawIcon(hdc, (rcWidth(&rc) - GetSystemMetrics(SM_CXICON)) / 2,
-						 (rcHeight(&rc) - GetSystemMetrics(SM_CYICON)) / 2,
-						 m_hCursor) );
+				DrawIconEx(hdc, (rcWidth(&rc) - cx) / 2,
+						   (rcHeight(&rc) - cy) / 2,
+						   m_hCursor, cx, cy, 0, NULL, DI_NORMAL) );
 		}
 
 		EndPaint(m_hwnd, &ps);

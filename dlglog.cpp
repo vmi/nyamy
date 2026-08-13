@@ -18,7 +18,13 @@ class DlgLog : public LayoutManager
 {
 	HWND m_hwndEdit;				///
 	HWND m_hwndTaskTray;				/// tasktray window
-	LOGFONT m_lf;					///
+	/** Log font, with lfHeight held at 96 dpi.
+
+	    That is the form the ini stores, so a settings file written before
+	    nyamy became DPI aware still means what it says, and one font setting
+	    describes the same apparent size on every monitor.  It is scaled to the
+	    window's DPI only on the way into GDI; see makeFont(). */
+	LOGFONT m_lf;
 	HFONT m_hfontOriginal;			///
 	HFONT m_hfont;				///
 	womsgstream *m_log;				///
@@ -65,7 +71,7 @@ public:
 
 		// set font
 		ini.read(L"logFont", &m_lf, loadString(IDS_logFont));
-		m_hfont = CreateFontIndirect(&m_lf);
+		m_hfont = makeFont();
 		SetWindowFont(m_hwndEdit, m_hfont, false);
 
 		m_editStyle = static_cast<DWORD>(GetWindowLongPtr(m_hwndEdit, GWL_STYLE))
@@ -175,14 +181,23 @@ public:
 		}
 
 		case IDC_BUTTON_changeFont: {
+			// The dialog works in device pixels, so hand it a scaled copy and
+			// convert the answer back: m_lf stays the 96 dpi original.
+			UINT dpi = GetDpiForWindow(m_hwnd);
+			LOGFONT lf = m_lf;
+			lf.lfHeight = scaleFromLogical(m_lf.lfHeight, dpi);
+
 			CHOOSEFONT cf;
 			memset(&cf, 0, sizeof(cf));
 			cf.lStructSize = sizeof(cf);
 			cf.hwndOwner = m_hwnd;
-			cf.lpLogFont = &m_lf;
+			cf.lpLogFont = &lf;
 			cf.Flags = CF_INITTOLOGFONTSTRUCT | CF_SCREENFONTS;
 			if (ChooseFont(&cf)) {
-				HFONT hfontNew = CreateFontIndirect(&m_lf);
+				m_lf = lf;
+				m_lf.lfHeight = MulDiv(lf.lfHeight, USER_DEFAULT_SCREEN_DPI,
+									   static_cast<int>(dpi));
+				HFONT hfontNew = makeFont();
 				SetWindowFont(m_hwndEdit, hfontNew, true);
 				DeleteObject(m_hfont);
 				m_hfont = hfontNew;
@@ -214,6 +229,16 @@ public:
 	}
 
 private:
+	/** Build the log font for the DPI the dialog is on.
+
+	    m_lf.lfHeight is a 96 dpi length; GDI wants device pixels. */
+	HFONT makeFont() const {
+		LOGFONT lf = m_lf;
+		lf.lfHeight = scaleFromLogical(m_lf.lfHeight,
+									   GetDpiForWindow(m_hwnd));
+		return CreateFontIndirect(&lf);
+	}
+
 	/// apply the "detail" state, and let the tasktray window forward it
 	void applyThreshold(bool i_isDetail) {
 		LogLevel level = i_isDetail ? kLogLevelDetail : kLogLevelNormal;

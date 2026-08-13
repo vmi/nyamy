@@ -20,11 +20,13 @@ extern HINSTANCE g_hInst;
 /// load resource string
 extern std::wstring loadString(UINT i_id);
 
-/// load small icon resource (it must be deleted by DestroyIcon())
-extern HICON loadSmallIcon(UINT i_id);
+/** load small icon resource at the size i_dpi calls for (it must be deleted by
+    DestroyIcon()) */
+extern HICON loadSmallIcon(UINT i_id, UINT i_dpi);
 
-///load big icon resource (it must be deleted by DestroyIcon())
-extern HICON loadBigIcon(UINT i_id);
+/** load big icon resource at the size i_dpi calls for (it must be deleted by
+    DestroyIcon()) */
+extern HICON loadBigIcon(UINT i_id, UINT i_dpi);
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,6 +71,23 @@ extern DWORD getDllVersion(const wchar_t *i_dllname);
 
 // workaround of SetForegroundWindow
 extern bool setForegroundWindow(HWND i_hwnd);
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// DPI
+
+/** Scale a length written for 96 dpi to what i_dpi calls for.
+
+    Anything the code states as a pixel count - a caret width, a metric that
+    predates GetSystemMetricsForDpi, a size out of the ini or the config file -
+    is a 96 dpi length by convention and goes through here before it reaches
+    the screen.  At 96 dpi this is the identity, which is what keeps the
+    primary monitor a usable regression baseline.
+
+    A non-zero length never scales down to nothing: a 1 px nudge stays a nudge
+    rather than becoming a no-op. */
+extern int scaleFromLogical(int i_px, UINT i_dpi);
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // dialog

@@ -92,6 +92,15 @@ public:
 	///
 	void adjust() const;
 
+private:
+	/** Client rect of the size box, for the window's current DPI.
+
+	    Shared by the drawing and the hit test so the two cannot disagree:
+	    a grip drawn at one size and grabbed at another is invisible as a bug
+	    until someone tries to resize by a corner that no longer answers. */
+	RECT sizeGripRect() const;
+
+public:
 	/// draw size box
 	virtual BOOL wmPaint();
 

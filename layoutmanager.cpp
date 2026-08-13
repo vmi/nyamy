@@ -122,15 +122,24 @@ void LayoutManager::adjust() const
 }
 
 
+// client rect of the size box, for the window's current DPI
+RECT LayoutManager::sizeGripRect() const
+{
+	RECT rc;
+	GetClientRect(m_hwnd, &rc);
+	UINT dpi = GetDpiForWindow(m_hwnd);
+	rc.left = rc.right - GetSystemMetricsForDpi(SM_CXHTHUMB, dpi);
+	rc.top = rc.bottom - GetSystemMetricsForDpi(SM_CYVTHUMB, dpi);
+	return rc;
+}
+
+
 // draw size box
 BOOL LayoutManager::wmPaint()
 {
 	PAINTSTRUCT ps;
 	HDC hdc = BeginPaint(m_hwnd, &ps);
-	RECT rc;
-	GetClientRect(m_hwnd, &rc);
-	rc.left = rc.right - GetSystemMetrics(SM_CXHTHUMB);
-	rc.top = rc.bottom - GetSystemMetrics(SM_CYVTHUMB);
+	RECT rc = sizeGripRect();
 	DrawFrameControl(hdc, &rc, DFC_SCROLL, DFCS_SCROLLSIZEGRIP);
 	EndPaint(m_hwnd, &ps);
 	return TRUE;
@@ -197,10 +206,8 @@ BOOL LayoutManager::wmNcHitTest(int i_x, int i_y)
 {
 	POINT p = { i_x, i_y };
 	ScreenToClient(m_hwnd, &p);
-	RECT rc;
-	GetClientRect(m_hwnd, &rc);
-	if (rc.right - GetSystemMetrics(SM_CXHTHUMB) <= p.x &&
-			rc.bottom - GetSystemMetrics(SM_CYVTHUMB) <= p.y) {
+	RECT rc = sizeGripRect();
+	if (rc.left <= p.x && rc.top <= p.y) {
 		SetWindowLongPtr(m_hwnd, DWLP_MSGRESULT, HTBOTTOMRIGHT);
 		return TRUE;
 	}

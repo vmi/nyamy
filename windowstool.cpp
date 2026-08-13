@@ -36,18 +36,24 @@ std::wstring loadString(UINT i_id)
 
 
 // load small icon resource
-HICON loadSmallIcon(UINT i_id)
+HICON loadSmallIcon(UINT i_id, UINT i_dpi)
 {
+	// SM_CXSMICON is 16 at 96 dpi, which is what this used to hardcode
+	int cx = GetSystemMetricsForDpi(SM_CXSMICON, i_dpi);
+	int cy = GetSystemMetricsForDpi(SM_CYSMICON, i_dpi);
 	return reinterpret_cast<HICON>(
-			   LoadImage(g_hInst, MAKEINTRESOURCE(i_id), IMAGE_ICON, 16, 16, 0));
+			   LoadImage(g_hInst, MAKEINTRESOURCE(i_id), IMAGE_ICON, cx, cy, 0));
 }
 
 
 // load big icon resource
-HICON loadBigIcon(UINT i_id)
+HICON loadBigIcon(UINT i_id, UINT i_dpi)
 {
+	// SM_CXICON is 32 at 96 dpi, which is what this used to hardcode
+	int cx = GetSystemMetricsForDpi(SM_CXICON, i_dpi);
+	int cy = GetSystemMetricsForDpi(SM_CYICON, i_dpi);
 	return reinterpret_cast<HICON>(
-			   LoadImage(g_hInst, MAKEINTRESOURCE(i_id), IMAGE_ICON, 32, 32, 0));
+			   LoadImage(g_hInst, MAKEINTRESOURCE(i_id), IMAGE_ICON, cx, cy, 0));
 }
 
 
@@ -55,7 +61,8 @@ HICON loadBigIcon(UINT i_id)
 // @return handle of previous icon or NULL
 HICON setSmallIcon(HWND i_hwnd, UINT i_id)
 {
-	HICON hicon = (i_id == static_cast<UINT>(-1)) ? NULL : loadSmallIcon(i_id);
+	HICON hicon = (i_id == static_cast<UINT>(-1))
+				  ? NULL : loadSmallIcon(i_id, GetDpiForWindow(i_hwnd));
 	return reinterpret_cast<HICON>(
 			   SendMessage(i_hwnd, WM_SETICON, static_cast<WPARAM>(ICON_SMALL),
 						   reinterpret_cast<LPARAM>(hicon)));
@@ -66,7 +73,8 @@ HICON setSmallIcon(HWND i_hwnd, UINT i_id)
 // @return handle of previous icon or NULL
 HICON setBigIcon(HWND i_hwnd, UINT i_id)
 {
-	HICON hicon = (i_id == static_cast<UINT>(-1)) ? NULL : loadBigIcon(i_id);
+	HICON hicon = (i_id == static_cast<UINT>(-1))
+				  ? NULL : loadBigIcon(i_id, GetDpiForWindow(i_hwnd));
 	return reinterpret_cast<HICON>(
 			   SendMessage(i_hwnd, WM_SETICON, static_cast<WPARAM>(ICON_BIG),
 						   reinterpret_cast<LPARAM>(hicon)));
@@ -220,6 +228,27 @@ bool setForegroundWindow(HWND i_hwnd)
 
 	AttachThreadInput(nTargetID, nForegroundID, FALSE);
 	return true;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// DPI
+
+
+// scale a length written for 96 dpi to what i_dpi calls for
+int scaleFromLogical(int i_px, UINT i_dpi)
+{
+	if (i_px == 0 || i_dpi == USER_DEFAULT_SCREEN_DPI)
+		return i_px;
+
+	int scaled = MulDiv(i_px, static_cast<int>(i_dpi),
+						USER_DEFAULT_SCREEN_DPI);
+	// MulDiv rounds to nearest, so a 1 px value scaled by 1.25 lands back on 1
+	// - fine - but scaling down could take it to 0 and silently turn a nudge
+	// into a no-op.  Keep the sign and at least the smallest step.
+	if (scaled == 0)
+		return (i_px < 0) ? -1 : 1;
+	return scaled;
 }
 
 

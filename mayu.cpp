@@ -1162,9 +1162,12 @@ public:
 		m_engine.setAssociatedWndow(m_hwndTaskTray);
 		m_engine.start();
 
-		// show tasktray icon
-		m_tasktrayIcon[0] = loadSmallIcon(IDI_ICON_mayu_disabled);
-		m_tasktrayIcon[1] = loadSmallIcon(IDI_ICON_mayu);
+		// show tasktray icon.  Sized for the system DPI rather than for our own
+		// hidden window: the icon is drawn by the notification area, not by us,
+		// and the shell asks for a system-DPI sized one.
+		m_tasktrayIcon[0] = loadSmallIcon(IDI_ICON_mayu_disabled,
+										  GetDpiForSystem());
+		m_tasktrayIcon[1] = loadSmallIcon(IDI_ICON_mayu, GetDpiForSystem());
 		std::memset(&m_ni, 0, sizeof(m_ni));
 		m_ni.uID    = ID_TaskTrayIcon;
 		m_ni.hWnd   = m_hwndTaskTray;

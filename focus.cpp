@@ -27,7 +27,10 @@ static LRESULT CALLBACK WndProc(
 	case WM_SETFOCUS: {
 		RECT rc;
 		GetClientRect(i_hwnd, &rc);
-		CreateCaret(i_hwnd, reinterpret_cast<HBITMAP>(NULL), 2,
+		// the height follows the control, but the 2 px width is a literal and
+		// would stay hairline-thin as the DPI goes up
+		CreateCaret(i_hwnd, reinterpret_cast<HBITMAP>(NULL),
+					scaleFromLogical(2, GetDpiForWindow(i_hwnd)),
 					rcHeight(&rc) / 2);
 		ShowCaret(i_hwnd);
 		SetCaretPos(rcWidth(&rc) / 2, rcHeight(&rc) / 4);
