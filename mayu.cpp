@@ -223,21 +223,27 @@ private:
 
 			bool isMDI = true;
 			HWND hwnd = getToplevelWindow(n->getHwnd(), &isMDI);
-			RECT rc;
+			// zeroed because the queries below fail for a NULL window - a
+			// notification can carry one - and used to print whatever the
+			// stack happened to hold
+			RECT rc = {};
 			if (isMDI) {
-				getChildWindowRect(hwnd, &rc);
-				m_log << L"MDI Window Position/Size: ("
-				<< rc.left << L", " << rc.top << L") / ("
-				<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
-				<< std::endl;
+				if (getChildWindowRect(hwnd, &rc))
+					m_log << L"MDI Window Position/Size: ("
+					<< rc.left << L", " << rc.top << L") / ("
+					<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
+					<< std::endl;
 				hwnd = getToplevelWindow(n->getHwnd(), NULL);
 			}
 
-			GetWindowRect(hwnd, &rc);
-			m_log << L"Toplevel Window Position/Size: ("
-			<< rc.left << L", " << rc.top << L") / ("
-			<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
-			<< std::endl;
+			if (GetWindowRect(hwnd, &rc))
+				m_log << L"Toplevel Window Position/Size: ("
+				<< rc.left << L", " << rc.top << L") / ("
+				<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
+				<< std::endl;
+			else
+				m_log << L"Toplevel Window Position/Size: (unavailable)"
+				<< std::endl;
 
 			SystemParametersInfo(SPI_GETWORKAREA, 0, (void *)&rc, FALSE);
 			m_log << L"Desktop Window Position/Size: ("
