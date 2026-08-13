@@ -1083,8 +1083,8 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			LONG dr = 0;
 			dr += (i_mid->pt.x - m_msllHookCurrent.pt.x) * (i_mid->pt.x - m_msllHookCurrent.pt.x);
 			dr += (i_mid->pt.y - m_msllHookCurrent.pt.y) * (i_mid->pt.y - m_msllHookCurrent.pt.y);
-			if (m_buttonPressed && !m_dragging && s->m_dragThreshold &&
-				(s->m_dragThreshold * s->m_dragThreshold < dr)) {
+			if (m_buttonPressed && !m_dragging && m_dragThresholdPx &&
+				(m_dragThresholdPx * m_dragThresholdPx < dr)) {
 				kid.MakeCode = 0;
 				WaitForSingleObject(m_queueMutex, INFINITE);
 				m_dragging = true;
@@ -1163,6 +1163,11 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 		} else if (i_message != WM_MOUSEWHEEL && i_message != WM_MOUSEHWHEEL) {
 			m_buttonPressed = true;
 			m_msllHookCurrent = *i_mid;
+			// the config states the threshold in 96 dpi pixels, so that the
+			// same setting means the same apparent distance on every monitor
+			m_dragThresholdPx =
+				scaleFromLogical(static_cast<int>(s->m_dragThreshold),
+								 dpiForPoint(i_mid->pt));
 		}
 
 		m_inputQueue->push_back(kid);
@@ -1491,6 +1496,7 @@ Engine::Engine(womsgstream &i_log)
 	m_msllHookCurrent.flags = 0;
 	m_msllHookCurrent.time = 0;
 	m_msllHookCurrent.dwExtraInfo = 0;
+	m_dragThresholdPx = 0;
 }
 
 

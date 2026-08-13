@@ -260,6 +260,12 @@ private:
 	MSLLHOOKSTRUCT m_msllHookCurrent;
 	bool m_buttonPressed;
 	bool m_dragging;
+	/** Setting::m_dragThreshold scaled to the monitor the drag started on.
+
+	    Resolved when the button goes down rather than per mouse move: the
+	    comparison lives in a low level hook, which Windows unhooks if it dawdles,
+	    and the monitor cannot change while the button is held anyway. */
+	LONG m_dragThresholdPx;
 	InputHandler m_keyboardHandler;
 	InputHandler m_mouseHandler;
 	HANDLE m_readEvent;				/** reading from mayu device

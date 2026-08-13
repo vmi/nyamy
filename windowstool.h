@@ -76,6 +76,19 @@ extern bool setForegroundWindow(HWND i_hwnd);
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // DPI
 
+/** DPI of the monitor a point falls on, or 96 if it cannot be determined.
+
+    A failure therefore scales nothing rather than guessing. */
+extern UINT dpiForPoint(POINT i_pt);
+
+/** DPI of the monitor a window sits on, or 96 if it cannot be determined.
+
+    Not the same as GetDpiForWindow(): that answers what DPI the window is
+    being rendered at, which for a DPI unaware target process is 96 whatever
+    monitor it is on.  Coordinates nyamy hands to SetWindowPos are in the
+    desktop's own space, so it is the monitor that decides the scale. */
+extern UINT dpiForWindowMonitor(HWND i_hwnd);
+
 /** Scale a length written for 96 dpi to what i_dpi calls for.
 
     Anything the code states as a pixel count - a caret width, a metric that
@@ -87,6 +100,7 @@ extern bool setForegroundWindow(HWND i_hwnd);
     A non-zero length never scales down to nothing: a 1 px nudge stays a nudge
     rather than becoming a no-op. */
 extern int scaleFromLogical(int i_px, UINT i_dpi);
+
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

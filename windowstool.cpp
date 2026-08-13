@@ -10,6 +10,8 @@
 #include <windowsx.h>
 #include <malloc.h>
 #include <shlwapi.h>
+#include <shellscalingapi.h>
+#pragma comment(lib, "shcore.lib")
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -233,6 +235,47 @@ bool setForegroundWindow(HWND i_hwnd)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // DPI
+
+
+// query one DPI flavour of a monitor; 0 when it cannot be obtained
+//
+// GetDpiForMonitor lives in shcore.dll, which is linked statically.  Resolving
+// it at run time would protect nothing: this binary already imports
+// GetDpiForWindow and GetSystemMetricsForDpi from USER32, and the manifest asks
+// for Per-Monitor v2, so the process cannot load below Windows 10 1703 anyway.
+static UINT monitorDpi(HMONITOR i_hmonitor, MONITOR_DPI_TYPE i_type)
+{
+	if (!i_hmonitor)
+		return 0;
+	UINT dpiX = 0, dpiY = 0;
+	if (FAILED(GetDpiForMonitor(i_hmonitor, i_type, &dpiX, &dpiY)))
+		return 0;
+	// only the x axis is reported: Windows has never shipped a monitor whose
+	// two axes differ, and a single number keeps the callers readable
+	return dpiX;
+}
+
+
+// DPI of a monitor, falling back to 96 so that a failure scales nothing
+static UINT effectiveDpi(HMONITOR i_hmonitor)
+{
+	UINT dpi = monitorDpi(i_hmonitor, MDT_EFFECTIVE_DPI);
+	return dpi ? dpi : USER_DEFAULT_SCREEN_DPI;
+}
+
+
+// DPI of the monitor a point falls on
+UINT dpiForPoint(POINT i_pt)
+{
+	return effectiveDpi(MonitorFromPoint(i_pt, MONITOR_DEFAULTTONEAREST));
+}
+
+
+// DPI of the monitor a window sits on
+UINT dpiForWindowMonitor(HWND i_hwnd)
+{
+	return effectiveDpi(monitorFromWindow(i_hwnd, MONITOR_DEFAULTTONEAREST));
+}
 
 
 // scale a length written for 96 dpi to what i_dpi calls for
