@@ -81,7 +81,12 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	// be relative; it is resolved against the config search path, never the
 	// current directory.
 	const char *argv[2] = { "nyamy-scripter-tests", i_scriptPathUtf8.c_str() };
-	MRubyContext ctx = { 2, argv, nullptr };
+	MRubyContext ctx = {};
+	ctx.argc           = 2;
+	ctx.argv           = argv;
+	ctx.mrb            = nullptr;
+	ctx.scriptArgIndex = 1;
+	ctx.includeDirs    = nullptr;
 	NYsCallbacks cb = {};
 	cb.on_load_setting = mruby_on_load_setting;
 	cb.on_quit         = mruby_on_quit;

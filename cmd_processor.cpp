@@ -115,6 +115,7 @@ void CmdProcessor::beginSetting()
 {
 	m_pendingKeySeqs.clear();
 	m_pendingSubsts.clear();
+	m_keymapStack.clear();
 	m_setting = std::make_shared<Setting>();
 	m_builder = std::make_unique<SettingBuilder>(*m_setting);
 
@@ -343,6 +344,29 @@ void CmdProcessor::operator()(CmdArgsBeginKeymap &data)
 		keySeq = m_builder->addKeySeq(KeySeq(data.name).add(ActionFunction(fd)));
 	}
 	m_builder->currentKeymap()->setIfNotYet(keySeq, parent);
+}
+
+
+// Save the keymap a `keymap`/`window` block was entered from.  The BeginKeymap
+// that follows overwrites the current keymap; the matching PopKeymap puts this
+// one back, so definitions written after the block land where the author wrote
+// them rather than in the block's keymap.
+void CmdProcessor::operator()(CmdArgsPushKeymap)
+{
+	m_keymapStack.push_back(m_builder->currentKeymap());
+}
+
+
+void CmdProcessor::operator()(CmdArgsPopKeymap)
+{
+	// An unmatched Pop means the producer is broken.  Say so and carry on with
+	// the current keymap: the rest of the setting is still worth having.
+	if (m_keymapStack.empty()) {
+		error(L"PopKeymap without a matching PushKeymap");
+		return;
+	}
+	m_builder->setCurrentKeymap(m_keymapStack.back());
+	m_keymapStack.pop_back();
 }
 
 

@@ -114,6 +114,7 @@
   <ItemGroup>
     <ClCompile Include="..\scripter\mruby_main.cpp" />
     <ClCompile Include="..\scripter\mruby_binding.cpp" />
+    <ClCompile Include="..\scripter\cli_options.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="nyamy-scripter-dll.vcxproj">
@@ -122,6 +123,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\scripter\mruby_binding.h" />
+    <ClInclude Include="..\scripter\cli_options.h" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="..\scripter\mruby_main.manifest" />

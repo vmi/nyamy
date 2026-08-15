@@ -37,6 +37,9 @@ enum class CmdId : uint8_t {
 	AssignKey      = 0x21,
 	AssignEvent    = 0x23,
 	AssignMod      = 0x24,
+	// 0x22 is deliberately left free for a future Assign* command.
+	PushKeymap     = 0x25,
+	PopKeymap      = 0x26,
 	Reset          = 0xFE,
 	Commit         = 0xFF,
 };
@@ -179,6 +182,14 @@ struct CmdArgsAssignMod {
 /// Tag-only struct for the payload-free Commit command
 struct CmdArgsCommit {};
 
+/// Tag-only structs for the payload-free keymap scope commands.
+/// A `keymap`/`window` written with a block is bracketed by these, so that the
+/// keymap in effect before the block is restored on the way out.  The blockless
+/// form emits neither and stays in effect until the next BeginKeymap, which is
+/// what .mayu has always done - the .mayu compiler never emits these.
+struct CmdArgsPushKeymap {};
+struct CmdArgsPopKeymap {};
+
 /// Tag-only struct for the payload-free Reset command.
 /// Marks the start of a setting definition block: the consumer discards any
 /// partially built setting and starts a fresh one.
@@ -205,6 +216,8 @@ using CmdArgs = std::variant<
 	CmdArgsAssignKey,
 	CmdArgsAssignEvent,
 	CmdArgsAssignMod,
+	CmdArgsPushKeymap,
+	CmdArgsPopKeymap,
 	CmdArgsReset,
 	CmdArgsCommit
 >;

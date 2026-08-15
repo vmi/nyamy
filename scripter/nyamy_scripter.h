@@ -131,6 +131,14 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx);
 /// Call before nys_start().
 NYS_API void nys_set_quit_timeout(uint32_t millisec);
 
+/// Define a symbol for every setting load, on top of whatever the Start command
+/// carries.  This is what the -D option is made of, so a symbol given on the
+/// command line means the same thing as one given by nyamy.
+/// Call before nys_start(): the symbols are re-applied at each Start, so they
+/// survive a reload, and the set is settled before on_load_setting runs.
+/// Idempotent.
+NYS_API bool nys_add_default_symbol(const char* name);
+
 /// Version check for FFI compatibility: major(16) | minor(8) | patch(8)
 NYS_API uint32_t nys_version(void);
 
@@ -191,6 +199,14 @@ NYS_API bool nys_begin_keymap(const char* keyword, const char* name,
 	const char* window_class, const char* window_title,
 	const char* op, const char* parent_name,
 	int default_keyseq_idx);
+
+/// Bracket a scoped keymap: nys_push_keymap() saves the keymap currently in
+/// effect and nys_pop_keymap() restores it.  A `keymap`/`window` written with a
+/// block calls push before nys_begin_keymap() and pop after the block, so that
+/// what follows the block is not silently swallowed by it.  The blockless form
+/// calls neither and stays in effect, which is what .mayu has always done.
+NYS_API bool nys_push_keymap(void);
+NYS_API bool nys_pop_keymap(void);
 
 /// Equivalent to: key <lhs_mod_keys...> = <keyseq>  (inside a keymap block)
 NYS_API bool nys_assign_key(const NYsStrs* lhs_mod_keys, int rhs_keyseq_idx);

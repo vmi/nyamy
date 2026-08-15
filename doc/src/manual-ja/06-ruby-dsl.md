@@ -33,11 +33,15 @@ require "mylib"        # load と同様だが、同じファイルは一度し�
 `.rb` の相対パスは `$LOAD_PATH` の順、すなわち
 
 1. 実行中のスクリプトのあるフォルダ
-2. `NYAMY_CONFIG` (`%LOCALAPPDATA%\NYamy\Config`)
-3. `NYAMY_HOME\Lib` (`%LOCALAPPDATA%\NYamy\Lib`)
-4. `NYAMY_ROOT` (`nyamy.exe` のあるフォルダ)
+2. [`-I` オプション](#cmdline)で追加したフォルダ (指定順)
+3. [`NYAMY_LOAD_PATH`](#cmdline) で追加したフォルダ (指定順)
+4. `NYAMY_CONFIG` (`%LOCALAPPDATA%\NYamy\Config`)
+5. `NYAMY_HOME\Lib` (`%LOCALAPPDATA%\NYamy\Lib`)
+6. `NYAMY_ROOT` (`nyamy.exe` のあるフォルダ)
 
-で検索されます ([設定フォルダ](#HOME))。カレントディレクトリは検索されません。`$LOAD_PATH` はスクリプトから追加・変更できます。
+で検索されます ([設定フォルダ](#HOME))。カレントディレクトリは検索されません。重複するフォルダは取り除かれます。`$LOAD_PATH` はスクリプトから追加・変更できます。
+
+実際に使われた `$LOAD_PATH` は、設定を読み込むたびにログに出力されます (「[ログ(<u>L</u>)...](#menu-l)」で確認できます)。
 
 `.mayu` の読み込み (`load "some.mayu"` や `.mayu` 内の `include`) は `$LOAD_PATH` ではなく設定ファイルの検索順 (`NYAMY_CONFIG`、`NYAMY_ROOT`) に従います。`NYAMY_HOME\Lib` は `.rb` ライブラリ専用です。
 
@@ -126,6 +130,36 @@ window "Some", class: /class/, title: /title/, op: "||", parent: "Global"
 
 正規表現リテラルを渡した場合、キーマップに登録されるのはパターン文字列だけです。ウィンドウの照合は常に大文字小文字を区別しない ECMAScript 方言で行われるため、`i` / `m` を付けても効果がなく、指定するとログに警告が出ます (`x` は例外で、後述のとおりパターン自体を書き換えるので有効です)。詳しくは[正規表現の制限](#dsl_regexp)を参照してください。
 
+#### ブロックの有無と適用範囲 {#dsl_keymap_scope}
+
+ブロック (`do ... end`) を**付けた**場合、そのキーマップはブロックの中だけに適用されます。ブロックを抜けると、直前のキーマップに戻ります。入れ子にもできます。
+
+```mayu
+keymap "Global" do
+  key["C-A"] = "Home"          # Global
+end
+
+window "Opera", class: 'Opera\.exe:' do
+  key["C-B"] = "End"           # Opera
+end
+
+key["C-C"] = "Delete"          # Global に戻っている
+```
+
+ブロックを**付けなかった**場合は `.mayu` と同じ扱いで、次のキーマップ定義が現れるまで適用され続けます。
+
+```mayu
+window "Opera", class: 'Opera\.exe:', parent: "EmacsEdit"
+
+key["C-B"] = "End"             # Opera (ブロックが無いので継続している)
+
+keymap "Global"                # ここで Global に戻す
+
+key["C-C"] = "Delete"          # Global
+```
+
+`load` したファイルの中も同じです。ブロック付きで書かれていれば呼び出し元に影響しませんが、ブロック無しで終わっていると、`load` から戻ったあとの割り当てもそのキーマップに入ります。`load` の直後に `keymap "Global"` と書けば確実に戻せます。
+
 ### キー割り当て (`key`) {#dsl_key}
 
 **`.mayu` 相当:** `key C-A = Home` ([キー割り当ての変更](#key))
@@ -199,7 +233,18 @@ end
 load "default.mayu.rb" if symbol_defined?("USEdefault")
 ```
 
-シンボルは「[設定(<u>S</u>)...](#menu-s)」の `-Dシンボル名` で定義されたものと、設定ファイル内で `define` したものの集合です。これに加えて、NYamy が設定の読み込み開始時に自動で定義するシンボルがあります ([Scancode Map の照会](#dsl_scancodemap) を参照)。`SCM-` で始まる名前は NYamy の予約接頭辞なので、`define` で使わないでください。
+シンボルは「[設定(<u>S</u>)...](#menu-s)」の `-Dシンボル名` で定義されたものと、[`nyamy-scripter` の `-D` オプション](#cmdline)で定義されたものと、設定ファイル内で `define` したものの集合です。これに加えて、NYamy が設定の読み込み開始時に自動で定義するシンボルがあります ([Scancode Map の照会](#dsl_scancodemap) を参照)。`SCM-` で始まる名前は NYamy の予約接頭辞なので、`define` で使わないでください。
+
+定義されたシンボルは `symbol: 名前` の形で 1 個につき 1 行ログに出力されます (「[ログ(<u>L</u>)...](#menu-l)」で確認できます)。出力されるのは最初に定義されたときだけで、同じシンボルを二度 `define` してもエラーにはならず、二度目以降は何も起きません。
+
+なお、`load "some.mayu"` で読み込んだ `.mayu` の中の `define` は、`symbol_defined?` からは**見えません**。`.mayu` の読み込みは Ruby スクリプトを実行し終えたあとにまとめて行われるためです。逆向き (Ruby の `define` を `.mayu` の `if` から参照する) は問題なく動きます。`.mayu` 側で条件分岐したいシンボルは、Ruby 側で `define` してください。
+
+```mayu
+define "USEdefault"        # .mayu の if ( USEdefault ) から参照できる
+load "some.mayu"           # この中の define は symbol_defined? から見えない
+```
+
+`.mayu` どうしであれば、先に読み込んだファイルの `define` は後のファイルの `if` から参照できます。
 
 ### Scancode Map の照会 (`sc` / `ScancodeMap`) {#dsl_scancodemap}
 
@@ -241,6 +286,33 @@ end
 ```
 
 `.mayu` からは `if ( ! SCM-REMAP-ESC )` と書きます。
+
+### 環境変数の参照 (`ENV`) {#dsl_env}
+
+環境変数を `ENV` で読むことができます。マシンごとに違うフォルダを設定に埋め込みたいときなどに使います。
+
+```mayu
+ENV["HOME"]                          # 未定義なら nil
+ENV.fetch("EDITOR", "notepad.exe")   # 既定値つき。既定値を省くと KeyError
+ENV.key?("NYAMY_DEBUG")              # 定義されているか
+ENV.keys                             # 名前の配列
+ENV.to_h                             # 名前 → 値のハッシュ
+ENV.each { |name, value| ... }
+```
+
+使用例:
+
+```mayu
+$LOAD_PATH.push "#{ENV['HOME']}\\nyamy-lib" if ENV.key?("HOME")
+
+if ENV["COMPUTERNAME"] == "WORK-PC"
+  load "work.mayu.rb"
+end
+```
+
+**読み取り専用**です。`ENV[...] = ...` による書き込みはできません。設定を読み込むのは `nyamy-scripter` プロセスで、そこから他のプロセスを起動することはないため、書き込めても影響する先がないからです。`nyamy.ini` の [`cmdLine`](#cmdline) の展開は NYamy 本体側で行われるので、こちらにも影響しません。
+
+`HOME` は Windows が定義していない場合でも、NYamy が `%USERPROFILE%` と同じ値を補って `nyamy-scripter` に渡します ([scripter の起動](#cmdline))。
 
 ### ユーザー定義関数 (`deffunc`) {#dsl_deffunc}
 

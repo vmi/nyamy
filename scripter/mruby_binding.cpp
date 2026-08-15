@@ -10,6 +10,7 @@
 
 #include "mruby_binding.h"
 #include "nyamy_scripter.h"
+#include "cli_options.h"		// normalizeDirectory / splitDirectoryList
 #include "../stringtool.h"		// wregex_stored
 
 #include <mruby.h>
@@ -26,6 +27,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -1587,6 +1589,14 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 	if (!mrb_nil_p(default_v))
 		default_idx = resolveRhs(mrb, default_v);
 
+	// With a block, the keymap is a scope: the keymap in effect on the way in
+	// is restored on the way out, so a `key` written after the block goes where
+	// it looks like it goes.  Without one, the keymap stays in effect until the
+	// next one - the .mayu behaviour, which existing configurations rely on.
+	bool scoped = !mrb_nil_p(blk) && mrb_proc_p(blk);
+	if (scoped && !nys_push_keymap())
+		raiseApiError(mrb, "nys_push_keymap failed");
+
 	if (!nys_begin_keymap(
 			keyword,
 			name.c_str(),
@@ -1597,9 +1607,15 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 			default_idx))
 		raiseApiError(mrb, "nys_begin_keymap failed");
 
-	if (!mrb_nil_p(blk) && mrb_proc_p(blk))
+	if (scoped) {
 		mrb_funcall_with_block(mrb, self,
 			mrb_intern_lit(mrb, "instance_eval"), 0, nullptr, blk);
+		// An exception in the block unwinds past this, leaving the Push
+		// unmatched.  That is harmless: the setting is discarded wholesale when
+		// on_load_setting reports failure, so no half-scoped stream is applied.
+		if (!nys_pop_keymap())
+			raiseApiError(mrb, "nys_pop_keymap failed");
+	}
 
 	return mrb_true_value();
 }
@@ -1755,6 +1771,146 @@ static mrb_value dsl_log(mrb_state *mrb, mrb_value self)
 	}
 	return lg;
 }
+
+//=============================================================================
+// ENV
+//=============================================================================
+
+// A read-only view of the process environment, enough of ENV to branch a
+// configuration on a machine-specific variable and to build a path from one.
+//
+// Read-only on purpose: the scripter loads the configuration and launches
+// nothing, so a write would reach nobody.  In particular it would not reach the
+// ini "cmdLine", which nyamy expands in its own process before this one starts.
+//
+// Not the mruby-env gem: pulling in a gem changes how mruby is built, and this
+// is a hundred lines.
+
+// Name of the variable being asked about.  Symbols are accepted so that
+// ENV[:HOME] reads naturally, though ENV["HOME"] is the Ruby spelling.
+static std::wstring envNameArg(mrb_state *mrb, mrb_value v)
+{
+	if (mrb_symbol_p(v)) {
+		mrb_int len = 0;
+		const char *p = mrb_sym_name_len(mrb, mrb_symbol(v), &len);
+		return utf8ToWide(std::string(p, (size_t)len));
+	}
+	return utf8ToWide(toStdStr(mrb, v));
+}
+
+// GetEnvironmentVariableW into a std::wstring.  Returns false when unset, which
+// is not the same as set-but-empty: the length is 0 for both, so the error code
+// has to settle it.
+static bool envLookup(const std::wstring &name, std::wstring *o_value)
+{
+	SetLastError(ERROR_SUCCESS);
+	DWORD need = GetEnvironmentVariableW(name.c_str(), nullptr, 0);
+	if (need == 0) {
+		if (GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+			return false;
+		o_value->clear();
+		return true;
+	}
+	std::wstring buf(need, L'\0');
+	DWORD got = GetEnvironmentVariableW(name.c_str(), &buf[0], need);
+	if (got == 0 || need <= got)
+		return false;
+	buf.resize(got);
+	*o_value = std::move(buf);
+	return true;
+}
+
+static mrb_value envToMrb(mrb_state *mrb, const std::wstring &value)
+{
+	std::string utf8 = wideToUtf8(value);
+	return mrb_str_new(mrb, utf8.c_str(), utf8.size());
+}
+
+static mrb_value env_aref(mrb_state *mrb, mrb_value)
+{
+	mrb_value name_v;
+	mrb_get_args(mrb, "o", &name_v);
+	std::wstring value;
+	if (!envLookup(envNameArg(mrb, name_v), &value))
+		return mrb_nil_value();
+	return envToMrb(mrb, value);
+}
+
+static mrb_value env_fetch(mrb_state *mrb, mrb_value)
+{
+	mrb_value name_v, default_v = mrb_undef_value();
+	mrb_get_args(mrb, "o|o", &name_v, &default_v);
+	std::wstring value;
+	if (envLookup(envNameArg(mrb, name_v), &value))
+		return envToMrb(mrb, value);
+	if (!mrb_undef_p(default_v))
+		return default_v;
+	mrb_raisef(mrb, E_KEY_ERROR, "key not found: %v", name_v);
+	return mrb_nil_value();	// not reached
+}
+
+static mrb_value env_key_p(mrb_state *mrb, mrb_value)
+{
+	mrb_value name_v;
+	mrb_get_args(mrb, "o", &name_v);
+	std::wstring value;
+	return mrb_bool_value(envLookup(envNameArg(mrb, name_v), &value));
+}
+
+// Walk the whole block once, handing each "NAME=VALUE" to visit().  An entry
+// whose name is empty is skipped: those are the "=C:=C:\..." per-drive current
+// directories Windows keeps in the block, which are not environment variables
+// in any sense a script cares about.
+static void envForEach(const std::function<void(const std::wstring &,
+                                                const std::wstring &)> &visit)
+{
+	wchar_t *block = GetEnvironmentStringsW();
+	if (!block)
+		return;
+	for (const wchar_t *p = block; *p; ) {
+		std::wstring entry(p);
+		p += entry.size() + 1;
+		size_t eq = entry.find(L'=');
+		if (eq == std::wstring::npos || eq == 0)
+			continue;
+		visit(entry.substr(0, eq), entry.substr(eq + 1));
+	}
+	FreeEnvironmentStringsW(block);
+}
+
+static mrb_value env_keys(mrb_state *mrb, mrb_value)
+{
+	mrb_value ary = mrb_ary_new(mrb);
+	envForEach([&](const std::wstring &name, const std::wstring &) {
+		mrb_ary_push(mrb, ary, envToMrb(mrb, name));
+	});
+	return ary;
+}
+
+static mrb_value env_to_h(mrb_state *mrb, mrb_value)
+{
+	mrb_value hash = mrb_hash_new(mrb);
+	envForEach([&](const std::wstring &name, const std::wstring &value) {
+		mrb_hash_set(mrb, hash, envToMrb(mrb, name), envToMrb(mrb, value));
+	});
+	return hash;
+}
+
+// each yields [name, value] pairs, so Enumerable-style use reads the same as
+// it would over a Hash.
+static mrb_value env_each(mrb_state *mrb, mrb_value self)
+{
+	mrb_value blk = mrb_nil_value();
+	mrb_get_args(mrb, "&", &blk);
+	if (mrb_nil_p(blk))
+		return mrb_funcall(mrb, self, "to_h", 0);
+	envForEach([&](const std::wstring &name, const std::wstring &value) {
+		mrb_value args[2] = { envToMrb(mrb, name), envToMrb(mrb, value) };
+		mrb_yield_argv(mrb, blk, 2, args);
+	});
+	return self;
+}
+
 
 // deffunc(name) { |trigger, *args| ... }
 static mrb_value dsl_deffunc(mrb_state *mrb, mrb_value self)
@@ -2054,6 +2210,23 @@ static void nyamy_mruby_init_internal(mrb_state *mrb)
 	mrb_define_method(mrb, log_cls, "level",  log_level_get, MRB_ARGS_NONE());
 	mrb_define_method(mrb, log_cls, "level=", log_level_set, MRB_ARGS_REQ(1));
 
+	// ENV: read-only view of the process environment, as a top-level constant
+	// so that scripts spell it the way Ruby does.
+	{
+		struct RClass *env_cls = mrb_define_class_under(mrb, nyamy, "Env",
+			mrb->object_class);
+		mrb_define_method(mrb, env_cls, "[]",       env_aref,  MRB_ARGS_REQ(1));
+		mrb_define_method(mrb, env_cls, "fetch",    env_fetch, MRB_ARGS_ARG(1, 1));
+		mrb_define_method(mrb, env_cls, "key?",     env_key_p, MRB_ARGS_REQ(1));
+		mrb_define_method(mrb, env_cls, "include?", env_key_p, MRB_ARGS_REQ(1));
+		mrb_define_method(mrb, env_cls, "has_key?", env_key_p, MRB_ARGS_REQ(1));
+		mrb_define_method(mrb, env_cls, "keys",     env_keys,  MRB_ARGS_NONE());
+		mrb_define_method(mrb, env_cls, "to_h",     env_to_h,  MRB_ARGS_NONE());
+		mrb_define_method(mrb, env_cls, "each",     env_each,  MRB_ARGS_BLOCK());
+		mrb_define_const(mrb, mrb->object_class, "ENV",
+			mrb_obj_new(mrb, env_cls, 0, nullptr));
+	}
+
 	// ScancodeMap: read-only view of the registry Scancode Map (top-level module).
 	// Forward lookup is ScancodeMap[x]; reverse lookup goes through the nested
 	// ScancodeMap::To module so that it reads as ScancodeMap.to[x].
@@ -2077,22 +2250,23 @@ bool mruby_on_load_setting(void* exeCtx)
 {
 	MRubyContext *ctx = static_cast<MRubyContext *>(exeCtx);
 
-	// 1. Resolve the script to an absolute path.  A relative argv[1] is
+	// 1. Resolve the script to an absolute path.  A relative script argument is
 	//    searched in the config search path (NYAMY_CONFIG, then NYAMY_ROOT);
 	//    the current directory is never consulted, so where nyamy happened to
 	//    be started from cannot decide which configuration is loaded.
-	//    main() rejects a missing argv[1] before nys_start, so reaching this
+	//    main() rejects a missing script before nys_start, so reaching this
 	//    without one is an internal error.
-	if (ctx->argc < 2) {
+	int scriptIdx = ctx->scriptArgIndex;
+	if (scriptIdx <= 0 || ctx->argc <= scriptIdx) {
 		nysLogUtf8(LogLevel::Error,
 				   "no script path was passed to on_load_setting");
 		return false;
 	}
 
 	const char *found = nullptr;
-	if (!nys_resolve_config_path(ctx->argv[1], &found) || !found) {
+	if (!nys_resolve_config_path(ctx->argv[scriptIdx], &found) || !found) {
 		nysLogUtf8(LogLevel::Error,
-				   (std::string("script not found: ") + ctx->argv[1] +
+				   (std::string("script not found: ") + ctx->argv[scriptIdx] +
 					" (searched: " + nys_paths_config() + ";" +
 					nys_paths_root() + ")").c_str());
 		return false;
@@ -2116,10 +2290,15 @@ bool mruby_on_load_setting(void* exeCtx)
 	ctx->mrb = mrb;
 	nyamy_mruby_init_internal(mrb);
 
-	// 3. Set $LOAD_PATH to the script's own directory, the config directory,
-	//    the user library directory and the installation, and $LOADED_FEATURES
-	//    to an empty array.  DSL#load and DSL#require search $LOAD_PATH when
-	//    given a relative .rb path.
+	// 3. Set $LOAD_PATH to the script's own directory, the -I and
+	//    NYAMY_LOAD_PATH directories, the config directory, the user library
+	//    directory and the installation, and $LOADED_FEATURES to an empty
+	//    array.  DSL#load and DSL#require search $LOAD_PATH when given a
+	//    relative .rb path.
+	//
+	//    The script's own directory stays first so that a file sitting next to
+	//    the configuration still wins; the added directories go straight after
+	//    it, ahead of the standard three.
 	{
 		mrb_value load_path = mrb_ary_new(mrb);
 		auto pushUnique = [&](const std::string &dir) {
@@ -2134,10 +2313,52 @@ bool mruby_on_load_setting(void* exeCtx)
 			mrb_ary_push(mrb, load_path,
 				mrb_str_new(mrb, dir.c_str(), dir.size()));
 		};
+		// A directory that does not exist is worth a word but not a refusal:
+		// it may be created later, and refusing would cost the whole setting.
+		auto pushDirectory = [&](const std::string &dir, const char *origin) {
+			std::string norm = normalizeDirectory(dir);
+			DWORD attr = GetFileAttributesW(utf8ToWide(norm).c_str());
+			if (attr == INVALID_FILE_ATTRIBUTES ||
+			    !(attr & FILE_ATTRIBUTE_DIRECTORY))
+				nysLogUtf8(LogLevel::Warn,
+						   (std::string(origin) + ": not a directory: " +
+							norm).c_str());
+			pushUnique(norm);
+		};
 
 		size_t sep = script.find_last_of("\\/");
 		if (sep != std::string::npos && sep > 0)
 			pushUnique(script.substr(0, sep));
+
+		if (ctx->includeDirs)
+			for (const char *const *p = ctx->includeDirs; *p; ++p)
+				pushDirectory(*p, "-I");
+
+		// NYAMY_LOAD_PATH comes after -I: the command line is the more
+		// specific statement of the two.  A relative element is dropped with a
+		// warning rather than taken as a usage error - an environment variable
+		// left over from somewhere else should not stop nyamy from starting.
+		{
+			std::wstring wenv;
+			DWORD need = GetEnvironmentVariableW(L"NYAMY_LOAD_PATH", nullptr, 0);
+			if (need > 0) {
+				wenv.resize(need);
+				DWORD got = GetEnvironmentVariableW(L"NYAMY_LOAD_PATH",
+													&wenv[0], need);
+				wenv.resize(got);
+			}
+			for (const auto &dir : splitDirectoryList(wideToUtf8(wenv))) {
+				std::string norm = normalizeDirectory(dir);
+				if (!isAbsoluteDirectory(norm)) {
+					nysLogUtf8(LogLevel::Warn,
+							   ("NYAMY_LOAD_PATH: ignoring relative path: " +
+								dir).c_str());
+					continue;
+				}
+				pushDirectory(norm, "NYAMY_LOAD_PATH");
+			}
+		}
+
 		pushUnique(nys_paths_config());
 		pushUnique(std::string(nys_paths_home()) + "\\Lib");
 		pushUnique(nys_paths_root());
@@ -2145,6 +2366,18 @@ bool mruby_on_load_setting(void* exeCtx)
 		mrb_gv_set(mrb, mrb_intern_cstr(mrb, "$LOAD_PATH"), load_path);
 		mrb_gv_set(mrb, mrb_intern_cstr(mrb, "$LOADED_FEATURES"),
 			mrb_ary_new(mrb));
+
+		// One line per entry: these are full paths, and a single ";"-joined
+		// line is too wide to read in the log dialog.  The index keeps each
+		// line meaningful on its own once the log is interleaved with others.
+		nysLogUtf8(LogLevel::Info, ("script: " + script).c_str());
+		mrb_int n = RARRAY_LEN(load_path);
+		for (mrb_int i = 0; i < n; ++i) {
+			mrb_value e = mrb_ary_ref(mrb, load_path, i);
+			std::string line = "  $LOAD_PATH[" + std::to_string((int)i) + "]: " +
+				std::string(RSTRING_PTR(e), RSTRING_LEN(e));
+			nysLogUtf8(LogLevel::Info, line.c_str());
+		}
 	}
 
 	// 4. Set $0 to the script path.
@@ -2154,7 +2387,7 @@ bool mruby_on_load_setting(void* exeCtx)
 	// 5. Set ARGV constant from arguments after the script name.
 	{
 		mrb_value argv_val = mrb_ary_new(mrb);
-		for (int i = 2; i < ctx->argc; ++i)
+		for (int i = scriptIdx + 1; i < ctx->argc; ++i)
 			mrb_ary_push(mrb, argv_val, mrb_str_new_cstr(mrb, ctx->argv[i]));
 		mrb_define_global_const(mrb, "ARGV", argv_val);
 	}

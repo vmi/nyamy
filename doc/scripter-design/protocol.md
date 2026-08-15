@@ -219,10 +219,17 @@ enum class CmdId : uint8_t {
     AssignKey   = 0x21,
     AssignEvent = 0x23,
     AssignMod   = 0x24,
+    // 0x22 は将来の Assign* 用に空けてある
+    PushKeymap  = 0x25,
+    PopKeymap   = 0x26,
     Reset       = 0xFE,
     Commit      = 0xFF,
 };
 ```
+
+`PushKeymap` / `PopKeymap` はペイロードを持たず、キーマップのスコープを囲む。`PushKeymap` は現在のキーマップを退避し、`PopKeymap` はそれを戻す。消費側はスタックで保持し、`Reset` でクリアする。対応しない `PopKeymap` はエラーログのみで無視する。
+
+ブロック付きの `keymap` / `window` (Ruby DSL) だけがこの 2 つを送出する。ブロック無しの形式と `.mayu` コンパイラは送出せず、従来どおり次の `BeginKeymap` まで有効なままになる。この 2 つを一切送らない実装も従来どおり動作する。
 
 ---
 

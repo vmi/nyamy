@@ -230,9 +230,33 @@ void ScripterManager::setLogLevel(LogLevel logLevel)
 }
 
 
+// The value HOME gets when the environment does not already have one.
+// USERPROFILE rather than HOMEDRIVE+HOMEPATH: on a domain-joined machine those
+// two can point at a network home, which is unreachable while offline - a poor
+// thing to hang a configuration search path on.  An existing HOME is left
+// alone; whoever set it meant it.
+//
+// Deliberately not published to this process' environment: everything nyamy
+// launches (a &ShellExecute target, say) would inherit it.  It is handed to the
+// scripter only - through its environment block, and through ${HOME} in the ini
+// "cmdLine", which is why both go through here.
+static std::wstring homeDirectory()
+{
+	wchar_t buf[GANA_MAX_PATH];
+	DWORD len = GetEnvironmentVariableW(L"HOME", buf, NUMBER_OF(buf));
+	if (0 < len && len < NUMBER_OF(buf))
+		return std::wstring(buf, len);
+	len = GetEnvironmentVariableW(L"USERPROFILE", buf, NUMBER_OF(buf));
+	if (0 < len && len < NUMBER_OF(buf))
+		return std::wstring(buf, len);
+	return std::wstring();
+}
+
+
 // Expand ${VAR} placeholders in s from the environment.
 // NYAMY_ROOT / NYAMY_HOME / NYAMY_CONFIG need no special case: NYamyPaths has
-// published them to this process' environment already.
+// published them to this process' environment already.  HOME does: it is not in
+// the environment, so it is answered from homeDirectory() instead.
 // Unknown vars are left as-is and appended to *unknownVars if provided.
 // After each expansion, if the result ends with '\' and the next input char is also '\',
 // one backslash is consumed to prevent double separators.
@@ -249,8 +273,13 @@ static std::wstring expandVars(const std::wstring &s,
 			{
 				wchar_t buf[2048];
 				DWORD len = GetEnvironmentVariableW(name.c_str(), buf, 2048);
+				std::wstring home;
+				if (len == 0 && name == L"HOME")
+					home = homeDirectory();
 				if (len > 0 && len < 2048) {
 					result.append(buf, len);
+				} else if (!home.empty()) {
+					result.append(home);
 				} else {
 					result += s.substr(i, end - i + 1);
 					if (unknownVars) unknownVars->push_back(name);
@@ -439,6 +468,12 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 		};
 		addVar(L"NYS_CTRL", ctrlVal);
 		addVar(L"NYS_CMD",  cmdVal);
+		// The scripter (and a script reading ENV["HOME"]) gets a HOME even when
+		// Windows did not provide one.  Only the scripter does: see
+		// homeDirectory().
+		std::wstring home = homeDirectory();
+		if (!home.empty())
+			addVar(L"HOME", home.c_str());
 
 		// append current process environment
 		wchar_t *cur = GetEnvironmentStringsW();
@@ -447,11 +482,17 @@ bool ScripterManager::launchScripter(const wstringi &configName,
 				const wchar_t *entry = p;
 				while (*p) ++p;
 				++p;  // skip NUL
-				// skip any existing NYS_CTRL/NYS_CMD entries
+				// Skip the entries just written, so each name appears once.
+				// The length is in characters, not bytes: wcsncmp counts
+				// wchar_t, and a count past the pattern's NUL makes every
+				// comparison fail, which would let the old value through.
 				wchar_t nysCtrlEq[] = L"NYS_CTRL=";
 				wchar_t nysCmdEq[] = L"NYS_CMD=";
-				bool skip = (wcsncmp(entry, nysCtrlEq, sizeof(nysCtrlEq) - 1) == 0 ||
-				             wcsncmp(entry, nysCmdEq, sizeof(nysCmdEq) - 1) == 0);
+				wchar_t homeEq[] = L"HOME=";
+				bool skip = (wcsncmp(entry, nysCtrlEq, NUMBER_OF(nysCtrlEq) - 1) == 0 ||
+				             wcsncmp(entry, nysCmdEq, NUMBER_OF(nysCmdEq) - 1) == 0 ||
+				             (!home.empty() &&
+				              wcsncmp(entry, homeEq, NUMBER_OF(homeEq) - 1) == 0));
 				if (!skip) {
 					for (const wchar_t *q = entry; q < p; ++q) envBlock.push_back(*q);
 				}

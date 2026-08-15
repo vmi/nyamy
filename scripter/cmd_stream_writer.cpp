@@ -264,6 +264,18 @@ void CmdStreamWriter::writeAssignMod(const CmdArgsAssignMod &data)
 
 
 
+void CmdStreamWriter::writePushKeymap()
+{
+	writeU8(static_cast<uint8_t>(CmdId::PushKeymap));
+}
+
+
+void CmdStreamWriter::writePopKeymap()
+{
+	writeU8(static_cast<uint8_t>(CmdId::PopKeymap));
+}
+
+
 void CmdStreamWriter::writeReset()
 {
 	writeU8(static_cast<uint8_t>(CmdId::Reset));

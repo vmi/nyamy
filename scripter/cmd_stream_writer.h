@@ -28,6 +28,8 @@ public:
 	void writeAssignKey(const CmdArgsAssignKey &data);
 	void writeAssignEvent(const CmdArgsAssignEvent &data);
 	void writeAssignMod(const CmdArgsAssignMod &data);
+	void writePushKeymap();
+	void writePopKeymap();
 	void writeReset();
 	void writeCommit();
 	// The following can be executed only after running writeCommit.

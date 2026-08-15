@@ -19,6 +19,7 @@
 #include "keyboard.h"
 #include "symbols.h"
 #include "nyamy_scripter.h"   // parseScancodeMapBlob (exported test helper)
+#include "cli_options.h"
 
 #include <windows.h>
 #include <io.h>
@@ -180,9 +181,9 @@ int main()
 	std::string wkMayuPath  = exeDirU8 + "\\__wk_via_mayu__.rb";
 
 	// Generate the loader scripts.  workaround.* is not included from dot.*,
-	// so chain it behind the dot configuration.  The .mayu reference uses a
-	// wrapper .mayu (single compile) because `define`d symbols do not
-	// propagate between two separate `load "*.mayu"` calls.
+	// so chain it behind the dot configuration.  The .mayu reference goes
+	// through a wrapper .mayu, which is the spelling the .rb side mirrors:
+	// one `load` of a file that includes both.
 	writeUtf8File(exeDir + L"\\__via_mayu__.rb", L"load \"dot.mayu\"\n");
 	writeUtf8File(exeDir + L"\\__wk_all__.mayu",
 	              L"include \"dot.mayu\"\ninclude \"workaround.mayu\"\n");
@@ -1264,7 +1265,255 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 16;
+	// A `keymap`/`window` written with a block is a scope: what follows the
+	// block belongs to the keymap that was in effect before it, not to the
+	// block's.  Written without a block it stays in effect, which is what
+	// .mayu does and what existing configurations are written against.
+	{
+		printf("[%d] keymap block scope ... ", idx + 17);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__scope__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"keymap \"Global\" do\n"
+			L"  key[\"C-A\"] = \"Home\"\n"
+			L"end\n"
+			L"window \"W1\", class: 'w1', parent: \"Global\" do\n"
+			L"  key[\"C-B\"] = \"End\"\n"
+			L"end\n"
+			L"key[\"C-C\"] = \"Delete\"\n"
+			L"keymap \"K2\", parent: \"Global\" do\n"
+			L"  window \"W2\", class: 'w2', parent: \"Global\" do\n"
+			L"    key[\"C-D\"] = \"Left\"\n"
+			L"  end\n"
+			L"  key[\"C-E\"] = \"Right\"\n"
+			L"end\n"
+			L"key[\"C-F\"] = \"Up\"\n"
+			L"window \"W3\", class: 'w3', parent: \"Global\"\n"
+			L"key[\"C-G\"] = \"Down\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__scope__.rb", syms);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		// Whether the keymap itself carries the assignment, without looking at
+		// its parents: that is exactly the question the scope answers.
+		auto assigned = [&](const wchar_t *keymapName, const wchar_t *keyName) {
+			if (!s) return false;
+			const Keymap *km = findKeymap(*s, keymapName);
+			if (!km) return false;
+			Keyboard &kb = const_cast<Keyboard &>(s->m_keyboard);
+			Key *key = kb.searchKey(wstringi(keyName));
+			if (!key) return false;
+			Held held;
+			held.ctrl = true;
+			return km->searchAssignment(physicalKey(key, true, held)) != nullptr;
+		};
+
+		check(s != nullptr, "script loaded");
+		check(assigned(L"Global", L"A"), "C-A lands in Global");
+		check(assigned(L"W1", L"B"),     "C-B lands in the window block");
+		check(assigned(L"Global", L"C"), "C-C after the block returns to Global");
+		check(!assigned(L"W1", L"C"),    "C-C does not leak into the window");
+		check(assigned(L"W2", L"D"),     "C-D lands in the inner block");
+		check(assigned(L"K2", L"E"),     "C-E returns to the enclosing block");
+		check(!assigned(L"W2", L"E"),    "C-E does not leak out of the inner block");
+		check(assigned(L"Global", L"F"), "C-F returns to Global from a nested block");
+		check(assigned(L"W3", L"G"),     "blockless window stays in effect");
+		check(!assigned(L"Global", L"G"), "blockless window is not scoped");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// `define' in one included .mayu is visible to the `if' of the next one.
+	// Each include is compiled on its own, so the symbols have to be carried
+	// across; nesting an include has always worked, and these have to match.
+	{
+		printf("[%d] symbols across sibling includes ... ", idx + 18);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__sib_a__.mayu", L"define SIB-A\n");
+		writeUtf8File(exeDir + L"\\__sib_b__.mayu",
+			L"if ( SIB-A )\n"
+			L"  define SIB-B-SAW-A\n"
+			L"endif\n");
+		writeUtf8File(exeDir + L"\\__sib_main__.rb",
+			L"load \"__sib_a__.mayu\"\n"
+			L"load \"__sib_b__.mayu\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__sib_main__.rb", syms);
+
+		bool saw = s && s->m_symbols.count(wstringi(L"SIB-B-SAW-A")) > 0;
+		if (saw) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (%s)\n",
+			       s ? "the second include did not see the first define"
+			         : "load failed");
+			++failures;
+		}
+	}
+
+	// ENV: a read-only view of the process environment.
+	{
+		printf("[%d] ENV ... ", idx + 19);
+		fflush(stdout);
+
+		SetEnvironmentVariableW(L"NYAMY_TEST_ENV", L"hello");
+		SetEnvironmentVariableW(L"NYAMY_TEST_ENV_MISSING", nullptr);
+
+		writeUtf8File(exeDir + L"\\__env__.rb",
+			L"raise \"[] failed\" unless ENV[\"NYAMY_TEST_ENV\"] == \"hello\"\n"
+			L"raise \"[] on unset\" unless ENV[\"NYAMY_TEST_ENV_MISSING\"].nil?\n"
+			L"raise \"symbol key\" unless ENV[:NYAMY_TEST_ENV] == \"hello\"\n"
+			L"raise \"key? true\"  unless ENV.key?(\"NYAMY_TEST_ENV\")\n"
+			L"raise \"key? false\" if ENV.key?(\"NYAMY_TEST_ENV_MISSING\")\n"
+			L"raise \"fetch\" unless ENV.fetch(\"NYAMY_TEST_ENV\") == \"hello\"\n"
+			L"raise \"fetch default\" unless\n"
+			L"  ENV.fetch(\"NYAMY_TEST_ENV_MISSING\", \"d\") == \"d\"\n"
+			L"raised = false\n"
+			L"begin\n"
+			L"  ENV.fetch(\"NYAMY_TEST_ENV_MISSING\")\n"
+			L"rescue KeyError\n"
+			L"  raised = true\n"
+			L"end\n"
+			L"raise \"fetch should raise KeyError\" unless raised\n"
+			L"raise \"keys\" unless ENV.keys.include?(\"NYAMY_TEST_ENV\")\n"
+			L"raise \"to_h\" unless ENV.to_h[\"NYAMY_TEST_ENV\"] == \"hello\"\n"
+			L"n = 0\n"
+			L"ENV.each { |k, v| n += 1 if k == \"NYAMY_TEST_ENV\" && v == \"hello\" }\n"
+			L"raise \"each\" unless n == 1\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__env__.rb", syms);
+
+		SetEnvironmentVariableW(L"NYAMY_TEST_ENV", nullptr);
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (script raised or no commit)\n");
+			++failures;
+		}
+	}
+
+	// NYAMY_LOAD_PATH adds to $LOAD_PATH.  A relative element is dropped with a
+	// warning instead of failing the load: a stray environment variable should
+	// not be able to stop nyamy from starting.
+	{
+		printf("[%d] NYAMY_LOAD_PATH ... ", idx + 20);
+		fflush(stdout);
+
+		std::wstring lpDir = exeDir + L"\\__nlp__";
+		CreateDirectoryW(lpDir.c_str(), nullptr);
+		writeUtf8File(lpDir + L"\\__nlp_lib__.rb", L"$nlp_loaded = true\n");
+		writeUtf8File(exeDir + L"\\__nlp_main__.rb",
+			L"load \"__nlp_lib__.rb\"\n"
+			L"raise \"NYAMY_LOAD_PATH entry not searched\" unless $nlp_loaded\n");
+
+		SetEnvironmentVariableW(L"NYAMY_LOAD_PATH",
+		                        (L"relative\\path;" + lpDir).c_str());
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__nlp_main__.rb", syms);
+
+		SetEnvironmentVariableW(L"NYAMY_LOAD_PATH", nullptr);
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (script raised or no commit)\n");
+			++failures;
+		}
+	}
+
+	// The command line parser, which main() is the only production caller of.
+	{
+		printf("[%d] command line options ... ", idx + 21);
+		fflush(stdout);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+
+		{
+			const char *argv[] = { "nyamy-scripter", "-I", "C:\\a;D:/b\\",
+			                       "-DSYM1", "-D", "SYM2", "--",
+			                       "-script.rb", "arg1" };
+			CliOptions o;
+			std::string err;
+			bool ok = parseCliOptions((int)(sizeof(argv) / sizeof(argv[0])),
+			                          argv, &o, &err);
+			check(ok, "full command line parses");
+			check(o.includeDirs.size() == 2, "two -I directories");
+			check(o.includeDirs.size() == 2 && o.includeDirs[0] == "C:\\a" &&
+			      o.includeDirs[1] == "D:\\b",
+			      "-I is split on ';', slashes and trailing separator normalized");
+			check(o.symbols.size() == 2 && o.symbols[0] == "SYM1" &&
+			      o.symbols[1] == "SYM2", "-D glued and separated both work");
+			check(o.scriptArgIndex == 7, "-- makes the next argument the script");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "script.rb" };
+			CliOptions o;
+			std::string err;
+			check(parseCliOptions(2, argv, &o, &err) && o.scriptArgIndex == 1,
+			      "a bare script is the script");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "--help" };
+			CliOptions o;
+			std::string err;
+			check(parseCliOptions(2, argv, &o, &err) && o.showHelp &&
+			      o.scriptArgIndex == 0, "--help needs no script");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "-I", "lib", "s.rb" };
+			CliOptions o;
+			std::string err;
+			check(!parseCliOptions(4, argv, &o, &err), "relative -I is rejected");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "-I", "\\lib", "s.rb" };
+			CliOptions o;
+			std::string err;
+			check(!parseCliOptions(4, argv, &o, &err),
+			      "drive-relative -I is rejected");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "-D" };
+			CliOptions o;
+			std::string err;
+			check(!parseCliOptions(2, argv, &o, &err), "-D without a value fails");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "-Z", "s.rb" };
+			CliOptions o;
+			std::string err;
+			check(!parseCliOptions(3, argv, &o, &err), "an unknown option fails");
+		}
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 21;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

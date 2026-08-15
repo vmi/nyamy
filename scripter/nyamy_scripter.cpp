@@ -135,6 +135,16 @@ static void logLine(const std::wstring& msg)
 }
 
 
+// Report a symbol the moment it first enters the set, wherever it came from.
+// At info rather than debug: which symbols are defined decides which half of
+// every `if` in the configuration runs, and the automatic SCM-REMAP-* ones in
+// particular are the answer to "why is this one key not remapped".
+static void logSymbolDefined(const wstringi& symbol)
+{
+	logLine(LogLevel::Info, L"symbol: " + std::wstring(symbol));
+}
+
+
 // Split on newlines so that every physical line carries its own tag; an mruby
 // backtrace arrives as a single multi-line string.
 NYS_API void nysLogUtf8(LogLevel level, const char* msg)
@@ -234,6 +244,11 @@ static std::ostream*    g_dataStream = nullptr;
 static Symbols   g_symbols;
 static wstringi  g_configName;
 static wstringi  g_configPath;
+
+// Symbols added by nys_add_default_symbol (the -D option), applied on top of
+// every Start.  Start replaces g_symbols wholesale, so these have to be kept
+// apart and re-inserted rather than merged once.
+static Symbols   g_defaultSymbols;
 
 // User-function registry: funcName -> handler
 static std::unordered_map<std::string, nys_on_exec_user_func> g_userFuncs;
@@ -531,6 +546,8 @@ static bool flushQueue()
 				[](const CmdArgsAssignKey& a) { g_dataWriter->writeAssignKey(a); },
 				[](const CmdArgsAssignEvent& a){ g_dataWriter->writeAssignEvent(a); },
 				[](const CmdArgsAssignMod& a) { g_dataWriter->writeAssignMod(a); },
+				[](const CmdArgsPushKeymap&)  { g_dataWriter->writePushKeymap(); },
+				[](const CmdArgsPopKeymap&)   { g_dataWriter->writePopKeymap(); },
 			}, entry.cmd);
 		} else {
 			// Include: parse + compile with the current keyseq count.
@@ -550,6 +567,13 @@ static bool flushQueue()
 					return false;
 				}
 				nextKeySeqIdx = compiler.nextKeySeqIdx();
+				// Carry `define` across to the next included file.  Each
+				// include gets a compiler of its own, so without this a symbol
+				// defined in one is invisible to the `if` of the next, while
+				// the same define nested one level deeper is not.
+				for (const auto& sym : compiler.symbols())
+					if (g_symbols.insert(sym).second)
+						logSymbolDefined(sym);
 			}
 		}
 	}
@@ -804,6 +828,11 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 			g_configName = std::move(job.start.configName);
 			g_configPath = std::move(job.start.configPath);
 			g_symbols    = std::move(job.start.symbols);
+			// -D symbols, which Start does not know about, mean the same as
+			// the ones it carries.  Re-applied here because Start replaces the
+			// whole set, so a reload would otherwise drop them.
+			for (const auto& sym : g_defaultSymbols)
+				g_symbols.insert(sym);
 			// The threshold rides along with Start because the log dialog
 			// restores its "detail" state from the ini, so detail can already
 			// be on before the scripter has written its first line.
@@ -814,6 +843,12 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 			// reads the symbol set in flushQueue, so they have to be settled
 			// before on_load_setting runs.  resetQueue dropped the cached map,
 			// so this re-reads the registry for the new setting.
+			//
+			// Log the starting set before that, so the order read from the log
+			// is "what we were given, then what we worked out, then what the
+			// configuration defined".
+			for (const auto& sym : g_symbols)
+				logSymbolDefined(sym);
 			defineScancodeMapSymbols();
 			g_callbackState = CallbackState::LoadSetting;
 			g_lastError.clear();
@@ -869,6 +904,14 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 NYS_API void nys_set_quit_timeout(uint32_t millisec)
 {
 	g_quitTimeoutMillisec.store(millisec);
+}
+
+
+NYS_API bool nys_add_default_symbol(const char* name)
+{
+	if (!name || !*name) return setError("nys_add_default_symbol: name is empty");
+	g_defaultSymbols.insert(wstringi(from_UTF8(name)));
+	return true;
 }
 
 // FFI compatibility version.  While NYamy is 0.9.x this tracks NYamy's own
@@ -1163,6 +1206,20 @@ NYS_API bool nys_begin_keymap(const char* keyword, const char* name,
 	return true;
 }
 
+NYS_API bool nys_push_keymap(void)
+{
+	if (!checkInLoadSetting("nys_push_keymap")) return false;
+	g_cmdQueue.push_back(QueueEntry::makeDirect(CmdArgsPushKeymap{}));
+	return true;
+}
+
+NYS_API bool nys_pop_keymap(void)
+{
+	if (!checkInLoadSetting("nys_pop_keymap")) return false;
+	g_cmdQueue.push_back(QueueEntry::makeDirect(CmdArgsPopKeymap{}));
+	return true;
+}
+
 NYS_API bool nys_assign_key(const NYsStrs* lhs_mod_keys, int rhs_keyseq_idx)
 {
 	if (!checkInLoadSetting("nys_assign_key")) return false;
@@ -1248,7 +1305,9 @@ NYS_API bool nys_define_symbol(const char* name)
 	if (!name || !*name) return setError("nys_define_symbol: name is empty");
 	// Mirror the .mayu compiler's `define`: insert into the symbol set so that
 	// later nys_has_symbol() sees it and flushQueue() emits a DefSymbol for it.
-	g_symbols.insert(wstringi(from_UTF8(name)));
+	// Only the first definition is reported; redefining is legal and silent.
+	if (g_symbols.insert(wstringi(from_UTF8(name))).second)
+		logSymbolDefined(wstringi(from_UTF8(name)));
 	return true;
 }
 
@@ -1429,7 +1488,8 @@ static void defineScancodeMapSymbols()
 	for (const auto& e : kScancodeMapSymbols) {
 		for (const auto& m : g_scancodeMap) {
 			if (m.first == e.scan || m.second == e.scan) {
-				g_symbols.insert(wstringi(e.symbol));
+				if (g_symbols.insert(wstringi(e.symbol)).second)
+					logSymbolDefined(wstringi(e.symbol));
 				break;
 			}
 		}

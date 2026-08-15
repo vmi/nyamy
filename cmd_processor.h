@@ -46,6 +46,8 @@ public:
 	void operator()(CmdArgsAssignKey &);
 	void operator()(CmdArgsAssignEvent &);
 	void operator()(CmdArgsAssignMod &);
+	void operator()(CmdArgsPushKeymap);
+	void operator()(CmdArgsPopKeymap);
 	void operator()(CmdArgsCommit);
 
 private:
@@ -66,6 +68,11 @@ private:
 	// substitutes read the contents of a materialized keyseq.
 	std::vector<std::pair<KeySeq *, CmdArgsRegKeySeq>> m_pendingKeySeqs;
 	std::vector<CmdArgsDefSubst>                       m_pendingSubsts;
+
+	/// Keymaps saved by PushKeymap, innermost last.  Only the block form of
+	/// `keymap`/`window` brackets itself with Push/Pop, so this is empty
+	/// whenever the stream uses the blockless (.mayu) form only.
+	std::vector<Keymap *>                              m_keymapStack;
 
 	std::shared_ptr<Setting>        m_setting;   ///< Setting being built (Reset .. Commit)
 	std::shared_ptr<Setting>        m_committed; ///< last committed Setting (used by ExecKeySeq)
