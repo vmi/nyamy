@@ -1656,6 +1656,19 @@ void Engine::funcWindowIdentify(FunctionParam *i_param)
 	if (!i_param->m_isPressed)
 		return;
 
+	// No focus window is known for the foreground thread, so there is nothing
+	// to ask about.  Said out loud because PostMessage() below would otherwise
+	// hide it: a NULL window makes it post a thread message to this thread,
+	// which retrieves none, so the request succeeds and vanishes.  This
+	// function exists to tell the user what a window is; failing at it in
+	// silence is the worst thing it can do.
+	if (!i_param->m_hwnd) {
+		Acquire a(&m_log, LogLevel::Error);
+		m_log << L"error: &WindowIdentify: no window has the focus as far as "
+		L"nyamy knows, so there is nothing to identify." << std::endl;
+		return;
+	}
+
 	wchar_t className[GANA_MAX_ATOM_LENGTH];
 	bool ok = false;
 	if (GetClassName(i_param->m_hwnd, className, NUMBER_OF(className))) {
