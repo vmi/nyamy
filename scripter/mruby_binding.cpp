@@ -10,6 +10,7 @@
 
 #include "mruby_binding.h"
 #include "nyamy_scripter.h"
+#include "../stringtool.h"		// wregex_stored
 
 #include <mruby.h>
 #include <mruby/array.h>
@@ -22,10 +23,12 @@
 #include <mruby/compile.h>
 
 #include <cctype>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <windows.h>
 
@@ -320,6 +323,674 @@ static NYsStrs *buildLhsStrs(mrb_state *mrb, mrb_value lhs)
 	return buildYsStrs(mrb, lhs);
 }
 
+//=============================================================================
+// Regexp / MatchData
+//
+// mruby has no Regexp class, but its parser does understand /.../ literals:
+// the code generator emits ::Regexp.compile(source, flags, encoding) for one.
+// The real classes live under NYamy like every other binding class, and the
+// top-level constants are aliases (see nyamy_mruby_init_internal).
+//
+// Matching is std::wregex, the same engine and character type nyamy itself
+// uses for window class / title patterns, so a pattern that compiles here
+// behaves the same way there.
+//=============================================================================
+
+// Option bits.  These are the values CRuby's Regexp constants use, which are
+// also the ones mruby's lexer builds internally before flattening them into
+// the flag string handed to Regexp.compile.
+enum {
+	RE_IGNORECASE		= 1,
+	RE_EXTENDED			= 2,
+	RE_MULTILINE		= 4,
+	RE_FIXEDENCODING	= 16,
+	RE_NOENCODING		= 32,
+};
+
+// Options that cannot survive the trip to the engine: the wire format carries
+// the pattern string alone, and window matching is always case-insensitive.
+// EXTENDED is absent on purpose - it is folded into the pattern itself.
+static const uint32_t RE_NOT_ON_WIRE =
+	RE_IGNORECASE | RE_MULTILINE | RE_FIXEDENCODING | RE_NOENCODING;
+
+struct RegexpData {
+	wregex_stored	re;			///< compiled, plus the pattern it came from
+	std::wstring	source;		///< as written in the literal
+	uint32_t		options;	///< RE_* bits
+};
+
+struct MatchDataData {
+	struct Group {
+		bool	matched;
+		size_t	begin;			///< offset into subject, in wchar_t units
+		size_t	end;
+	};
+	std::wstring		subject;
+	std::vector<Group>	groups;
+};
+
+static void regexpDataFree(mrb_state *, void *p)
+{
+	delete static_cast<RegexpData *>(p);
+}
+
+static void matchDataFree(mrb_state *, void *p)
+{
+	delete static_cast<MatchDataData *>(p);
+}
+
+static const mrb_data_type g_regexpDataType = { "NYamy::Regexp", regexpDataFree };
+static const mrb_data_type g_matchDataType  = { "NYamy::MatchData", matchDataFree };
+
+// Sources already reported by noticeMultiline(), so that a literal inside a
+// loop does not repeat its notice.  Cleared at the start of every load.
+static std::unordered_set<std::wstring> g_multilineNoticed;
+
+static struct RClass *regexpClass(mrb_state *mrb)
+{
+	return mrb_class_get_under(mrb, mrb_module_get(mrb, "NYamy"), "Regexp");
+}
+
+// Null unless the value is one of ours; never raises.
+static RegexpData *regexpPtr(mrb_state *mrb, mrb_value v)
+{
+	return static_cast<RegexpData *>(
+		mrb_data_check_get_ptr(mrb, v, &g_regexpDataType));
+}
+
+static RegexpData *regexpPtrOrRaise(mrb_state *mrb, mrb_value v)
+{
+	return static_cast<RegexpData *>(
+		mrb_data_get_ptr(mrb, v, &g_regexpDataType));
+}
+
+static MatchDataData *matchPtrOrRaise(mrb_state *mrb, mrb_value v)
+{
+	return static_cast<MatchDataData *>(
+		mrb_data_get_ptr(mrb, v, &g_matchDataType));
+}
+
+static mrb_value wideToStr(mrb_state *mrb, const std::wstring &w)
+{
+	std::string s = wideToUtf8(w);
+	return mrb_str_new(mrb, s.c_str(), (mrb_int)s.size());
+}
+
+/** Apply the /x (extended) transformation to a pattern.
+
+    Unescaped whitespace and unescaped '#'-to-end-of-line comments are dropped.
+    An escaped character is copied through as a pair, and the contents of a
+    [...] character class are left completely alone: whitespace and '#' keep
+    their meaning in there.  ECMAScript requires ']' inside a class to be
+    escaped, so the Ruby "[]]" special case cannot arise.
+*/
+static std::wstring applyExtended(const std::wstring &i_src)
+{
+	std::wstring out;
+	out.reserve(i_src.size());
+	bool inClass = false;
+
+	for (size_t i = 0; i < i_src.size(); ++i) {
+		wchar_t c = i_src[i];
+
+		if (c == L'\\') {
+			out += c;
+			if (i + 1 < i_src.size())
+				out += i_src[++i];
+			continue;
+		}
+		if (inClass) {
+			out += c;
+			if (c == L']')
+				inClass = false;
+			continue;
+		}
+		if (c == L'[') {
+			inClass = true;
+			out += c;
+			continue;
+		}
+		if (c == L' ' || c == L'\t' || c == L'\n' || c == L'\r' ||
+			c == L'\f' || c == L'\v')
+			continue;
+		if (c == L'#') {
+			while (i + 1 < i_src.size() && i_src[i + 1] != L'\n')
+				++i;
+			continue;
+		}
+		out += c;
+	}
+	return out;
+}
+
+// Decode the flag string ("ixm", as mruby's code generator spells it) and the
+// separate encoding argument ("u" / "n") into RE_* bits.  This is the only
+// place flag letters are interpreted, so it is also where a bad one is caught.
+static uint32_t regexpOptionsFromChars(mrb_state *mrb, const char *s, size_t len)
+{
+	uint32_t o = 0;
+	for (size_t i = 0; i < len; ++i) {
+		switch (s[i]) {
+		case 'i': o |= RE_IGNORECASE;    break;
+		case 'x': o |= RE_EXTENDED;      break;
+		case 'm': o |= RE_MULTILINE;     break;
+		case 'u': o |= RE_FIXEDENCODING; break;
+		case 'n': o |= RE_NOENCODING;    break;
+		case 'o': break;	// "compile once" has no meaning here
+		default:
+			mrb_raisef(mrb, E_ARGUMENT_ERROR,
+				"unknown regexp option: %c", s[i]);
+		}
+	}
+	return o;
+}
+
+// Ruby accepts nil / false / true / Integer / String where options go.
+static uint32_t regexpOptionsFromValue(mrb_state *mrb, mrb_value v)
+{
+	if (mrb_nil_p(v) || mrb_false_p(v))
+		return 0;
+	if (mrb_integer_p(v))
+		return (uint32_t)mrb_integer(v);
+	if (mrb_string_p(v))
+		return regexpOptionsFromChars(mrb, RSTRING_PTR(v),
+			(size_t)RSTRING_LEN(v));
+	return RE_IGNORECASE;	// any other truthy value, as in Ruby
+}
+
+static std::regex::flag_type regexpSyntaxFlags(uint32_t i_options)
+{
+	std::regex::flag_type f = std::regex::ECMAScript;
+	if (i_options & RE_IGNORECASE)
+		f |= std::regex::icase;
+	// Ruby's /m means "dot matches newline", which ECMAScript cannot express;
+	// it is mapped to multiline instead (see the notice in noticeMultiline).
+	if (i_options & RE_MULTILINE)
+		f |= std::regex::multiline;
+	return f;
+}
+
+// Flag letters in Ruby's canonical inspect order.  Encoding bits are not
+// shown, matching Ruby.
+static std::string regexpFlagString(uint32_t i_options)
+{
+	std::string s;
+	if (i_options & RE_MULTILINE)  s += 'm';
+	if (i_options & RE_IGNORECASE) s += 'i';
+	if (i_options & RE_EXTENDED)   s += 'x';
+	return s;
+}
+
+// The literal as written, shortened so that the notice stays on one line.
+static std::string regexpLiteralForLog(const RegexpData *i_d)
+{
+	std::wstring src = i_d->source;
+	if (src.size() > 40) {
+		src.resize(40);
+		if (!src.empty() && (src.back() & 0xFC00) == 0xD800)
+			src.pop_back();		// never cut a surrogate pair in half
+		src += L"...";
+	}
+	return "/" + wideToUtf8(src) + "/" + regexpFlagString(i_d->options);
+}
+
+// Tell the user once that /m is not what Ruby's /m is.
+static void noticeMultiline(const RegexpData *i_d)
+{
+	if (!(i_d->options & RE_MULTILINE) || !nysWouldLog(LogLevel::Info))
+		return;
+	if (!g_multilineNoticed.insert(i_d->source).second)
+		return;
+	nysLogUtf8(LogLevel::Info,
+		("[mruby] " + regexpLiteralForLog(i_d) +
+		 ": 'm' = ECMAScript multiline (^ $ at line breaks), not dotall").c_str());
+}
+
+// Build a Regexp of the given class.  Raises RegexpError if it does not
+// compile, with the message std::regex produced.
+static mrb_value regexpNew(mrb_state *mrb, struct RClass *i_cls,
+	const std::wstring &i_source, uint32_t i_options)
+{
+	RegexpData *d = new RegexpData();
+	d->source  = i_source;
+	d->options = i_options;
+
+	std::wstring pattern = (i_options & RE_EXTENDED)
+		? applyExtended(i_source) : i_source;
+
+	// The pattern is kept by the regex itself, so the compiled object and the
+	// string it was compiled from can never drift apart.
+	try {
+		d->re.assign(pattern, regexpSyntaxFlags(i_options));
+	} catch (const std::regex_error &e) {
+		std::string what = e.what();
+		delete d;
+		mrb_raise(mrb, mrb_class_get(mrb, "RegexpError"), what.c_str());
+	}
+
+	noticeMultiline(d);
+	return mrb_obj_value(
+		mrb_data_object_alloc(mrb, i_cls, d, &g_regexpDataType));
+}
+
+// Regexp.compile(source, options = nil, encoding = nil)
+// This is the entry point mruby's code generator calls for a /.../ literal.
+static mrb_value regexp_s_compile(mrb_state *mrb, mrb_value self)
+{
+	mrb_value src_v = mrb_nil_value();
+	mrb_value opt_v = mrb_nil_value();
+	mrb_value enc_v = mrb_nil_value();
+	mrb_get_args(mrb, "o|oo", &src_v, &opt_v, &enc_v);
+
+	struct RClass *cls = mrb_class_ptr(self);
+
+	// Regexp.new(other_regexp) copies it, as in Ruby.
+	if (RegexpData *other = regexpPtr(mrb, src_v)) {
+		uint32_t options = mrb_nil_p(opt_v)
+			? other->options : regexpOptionsFromValue(mrb, opt_v);
+		return regexpNew(mrb, cls, other->source, options);
+	}
+
+	if (!mrb_string_p(src_v))
+		mrb_raise(mrb, E_TYPE_ERROR,
+			"regexp source must be a String or Regexp");
+
+	uint32_t options = regexpOptionsFromValue(mrb, opt_v);
+	if (mrb_string_p(enc_v))
+		options |= regexpOptionsFromChars(mrb, RSTRING_PTR(enc_v),
+			(size_t)RSTRING_LEN(enc_v));
+
+	return regexpNew(mrb, cls,
+		utf8ToWide(RSTRING_PTR(src_v), (size_t)RSTRING_LEN(src_v)), options);
+}
+
+// Characters Ruby's Regexp.escape escapes.  '-' and '#' are in there because
+// they are special inside a character class and under /x respectively.
+static mrb_value regexp_s_escape(mrb_state *mrb, mrb_value)
+{
+	const char *p = nullptr;
+	mrb_int len = 0;
+	mrb_get_args(mrb, "s", &p, &len);
+
+	std::string out;
+	out.reserve((size_t)len);
+	for (mrb_int i = 0; i < len; ++i) {
+		char c = p[i];
+		switch (c) {
+		case '\n': out += "\\n"; continue;
+		case '\r': out += "\\r"; continue;
+		case '\t': out += "\\t"; continue;
+		case '\f': out += "\\f"; continue;
+		case '\v': out += "\\v"; continue;
+		default: break;
+		}
+		if (strchr(".*?+^$()[]{}|\\/- #", c) != nullptr && c != '\0')
+			out += '\\';
+		out += c;
+	}
+	return mrb_str_new(mrb, out.c_str(), (mrb_int)out.size());
+}
+
+static mrb_value regexp_source(mrb_state *mrb, mrb_value self)
+{
+	return wideToStr(mrb, regexpPtrOrRaise(mrb, self)->source);
+}
+
+// Not a Ruby method: the pattern actually compiled, i.e. the source after the
+// /x transformation.  This is what goes on the wire.
+static mrb_value regexp_pattern(mrb_state *mrb, mrb_value self)
+{
+	return wideToStr(mrb, regexpPtrOrRaise(mrb, self)->re.str());
+}
+
+static mrb_value regexp_options(mrb_state *mrb, mrb_value self)
+{
+	return mrb_int_value(mrb, (mrb_int)regexpPtrOrRaise(mrb, self)->options);
+}
+
+static mrb_value regexp_inspect(mrb_state *mrb, mrb_value self)
+{
+	RegexpData *d = regexpPtrOrRaise(mrb, self);
+	std::string s = "/" + wideToUtf8(d->source) + "/" +
+		regexpFlagString(d->options);
+	return mrb_str_new(mrb, s.c_str(), (mrb_int)s.size());
+}
+
+// Ruby renders a Regexp as "(?on-off:source)".
+static mrb_value regexp_to_s(mrb_state *mrb, mrb_value self)
+{
+	RegexpData *d = regexpPtrOrRaise(mrb, self);
+	static const struct { uint32_t bit; char letter; } table[] = {
+		{ RE_MULTILINE,  'm' },
+		{ RE_IGNORECASE, 'i' },
+		{ RE_EXTENDED,   'x' },
+	};
+	std::string on, off;
+	for (const auto &t : table)
+		((d->options & t.bit) ? on : off) += t.letter;
+
+	std::string s = "(?" + on;
+	if (!off.empty())
+		s += "-" + off;
+	s += ":" + wideToUtf8(d->source) + ")";
+	return mrb_str_new(mrb, s.c_str(), (mrb_int)s.size());
+}
+
+static mrb_value regexp_eq(mrb_state *mrb, mrb_value self)
+{
+	mrb_value other_v = mrb_nil_value();
+	mrb_get_args(mrb, "o", &other_v);
+	RegexpData *a = regexpPtrOrRaise(mrb, self);
+	RegexpData *b = regexpPtr(mrb, other_v);
+	return mrb_bool_value(b != nullptr &&
+		a->source == b->source && a->options == b->options);
+}
+
+// Number of leading UTF-16 units that count as characters, i.e. the mruby
+// string index of a wchar_t offset (MRB_UTF8_STRING indexes by character).
+static mrb_int wideOffsetToCharIndex(const std::wstring &i_s, size_t i_off)
+{
+	mrb_int n = 0;
+	size_t end = (i_off < i_s.size()) ? i_off : i_s.size();
+	for (size_t i = 0; i < end; ++i)
+		if ((i_s[i] & 0xFC00) != 0xDC00)
+			++n;
+	return n;
+}
+
+static size_t charIndexToWideOffset(const std::wstring &i_s, mrb_int i_index)
+{
+	if (i_index <= 0)
+		return 0;
+	mrb_int n = 0;
+	for (size_t i = 0; i < i_s.size(); ++i) {
+		if ((i_s[i] & 0xFC00) != 0xDC00) {
+			if (n == i_index)
+				return i;
+			++n;
+		}
+	}
+	return i_s.size();
+}
+
+static bool regexpSearch(const RegexpData *i_d, const std::wstring &i_subject,
+	size_t i_start, std::wsmatch *o_m)
+{
+	if (i_start > i_subject.size())
+		return false;
+	std::regex_constants::match_flag_type f =
+		std::regex_constants::match_default;
+	if (i_start > 0)
+		f |= std::regex_constants::match_prev_avail;
+	return std::regex_search(i_subject.cbegin() + i_start, i_subject.cend(),
+		*o_m, i_d->re, f);
+}
+
+static mrb_value makeMatchData(mrb_state *mrb, const std::wstring &i_subject,
+	size_t i_start, const std::wsmatch &i_m)
+{
+	MatchDataData *md = new MatchDataData();
+	md->subject = i_subject;
+	md->groups.reserve(i_m.size());
+	for (size_t i = 0; i < i_m.size(); ++i) {
+		MatchDataData::Group g = { false, 0, 0 };
+		if (i_m[i].matched) {
+			g.matched = true;
+			g.begin = i_start + (size_t)i_m.position((int)i);
+			g.end   = g.begin + (size_t)i_m.length((int)i);
+		}
+		md->groups.push_back(g);
+	}
+	struct RClass *cls = mrb_class_get_under(mrb,
+		mrb_module_get(mrb, "NYamy"), "MatchData");
+	return mrb_obj_value(
+		mrb_data_object_alloc(mrb, cls, md, &g_matchDataType));
+}
+
+static mrb_value matchGroup(mrb_state *mrb, MatchDataData *i_md, size_t i_n)
+{
+	if (i_n >= i_md->groups.size() || !i_md->groups[i_n].matched)
+		return mrb_nil_value();
+	const MatchDataData::Group &g = i_md->groups[i_n];
+	return wideToStr(mrb, i_md->subject.substr(g.begin, g.end - g.begin));
+}
+
+/** Publish the result of a match in $~ and $1..$9.
+
+    mruby compiles both of those to plain global variable reads, so setting the
+    globals is all it takes.  Unlike Ruby they are not frame local: the last
+    match stays visible across method boundaries.
+*/
+static void setLastMatch(mrb_state *mrb, mrb_value i_md)
+{
+	mrb_gv_set(mrb, mrb_intern_lit(mrb, "$~"), i_md);
+
+	MatchDataData *md = mrb_nil_p(i_md) ? nullptr
+		: static_cast<MatchDataData *>(DATA_PTR(i_md));
+	for (int i = 1; i <= 9; ++i) {
+		char name[3] = { '$', (char)('0' + i), '\0' };
+		mrb_gv_set(mrb, mrb_intern_cstr(mrb, name),
+			md ? matchGroup(mrb, md, (size_t)i) : mrb_nil_value());
+	}
+}
+
+// Shared body of Regexp#match / #=~ / #===.  Returns the MatchData (or nil)
+// and publishes it unless i_quiet.
+static mrb_value regexpMatchValue(mrb_state *mrb, mrb_value self,
+	mrb_value i_str, mrb_int i_pos, bool i_quiet)
+{
+	RegexpData *d = regexpPtrOrRaise(mrb, self);
+	if (mrb_nil_p(i_str)) {
+		if (!i_quiet)
+			setLastMatch(mrb, mrb_nil_value());
+		return mrb_nil_value();
+	}
+	if (!mrb_string_p(i_str))
+		mrb_raise(mrb, E_TYPE_ERROR, "expected String to match against");
+
+	std::wstring subject = utf8ToWide(RSTRING_PTR(i_str),
+		(size_t)RSTRING_LEN(i_str));
+	size_t start = charIndexToWideOffset(subject, i_pos);
+
+	std::wsmatch m;
+	if (!regexpSearch(d, subject, start, &m)) {
+		if (!i_quiet)
+			setLastMatch(mrb, mrb_nil_value());
+		return mrb_nil_value();
+	}
+	mrb_value md = makeMatchData(mrb, subject, start, m);
+	if (!i_quiet)
+		setLastMatch(mrb, md);
+	return md;
+}
+
+static mrb_value regexp_match(mrb_state *mrb, mrb_value self)
+{
+	mrb_value str = mrb_nil_value();
+	mrb_int pos = 0;
+	mrb_get_args(mrb, "o|i", &str, &pos);
+	return regexpMatchValue(mrb, self, str, pos, false);
+}
+
+// Ruby's match? deliberately leaves $~ alone.
+static mrb_value regexp_match_p(mrb_state *mrb, mrb_value self)
+{
+	mrb_value str = mrb_nil_value();
+	mrb_int pos = 0;
+	mrb_get_args(mrb, "o|i", &str, &pos);
+	return mrb_bool_value(!mrb_nil_p(regexpMatchValue(mrb, self, str, pos, true)));
+}
+
+// Character index of the match, or nil.  Shared by Regexp#=~ and String#=~.
+static mrb_value regexpMatchIndex(mrb_state *mrb, mrb_value i_re, mrb_value i_str)
+{
+	mrb_value md = regexpMatchValue(mrb, i_re, i_str, 0, false);
+	if (mrb_nil_p(md))
+		return mrb_nil_value();
+	MatchDataData *m = static_cast<MatchDataData *>(DATA_PTR(md));
+	return mrb_int_value(mrb,
+		wideOffsetToCharIndex(m->subject, m->groups[0].begin));
+}
+
+static mrb_value regexp_match_op(mrb_state *mrb, mrb_value self)
+{
+	mrb_value str = mrb_nil_value();
+	mrb_get_args(mrb, "o", &str);
+	return regexpMatchIndex(mrb, self, str);
+}
+
+static mrb_value regexp_eqq(mrb_state *mrb, mrb_value self)
+{
+	mrb_value str = mrb_nil_value();
+	mrb_get_args(mrb, "o", &str);
+	if (!mrb_string_p(str))
+		return mrb_false_value();
+	return mrb_bool_value(!mrb_nil_p(regexpMatchValue(mrb, self, str, 0, false)));
+}
+
+static mrb_value regexp_s_last_match(mrb_state *mrb, mrb_value)
+{
+	mrb_int n = -1;
+	mrb_get_args(mrb, "|i", &n);
+	mrb_value md = mrb_gv_get(mrb, mrb_intern_lit(mrb, "$~"));
+	if (n < 0 || mrb_nil_p(md))
+		return md;
+	return matchGroup(mrb, matchPtrOrRaise(mrb, md), (size_t)n);
+}
+
+static mrb_value matchdata_aref(mrb_state *mrb, mrb_value self)
+{
+	mrb_int n = 0;
+	mrb_get_args(mrb, "i", &n);
+	MatchDataData *md = matchPtrOrRaise(mrb, self);
+	if (n < 0)
+		n += (mrb_int)md->groups.size();
+	if (n < 0)
+		return mrb_nil_value();
+	return matchGroup(mrb, md, (size_t)n);
+}
+
+static mrb_value matchdata_to_a(mrb_state *mrb, mrb_value self)
+{
+	MatchDataData *md = matchPtrOrRaise(mrb, self);
+	mrb_value ary = mrb_ary_new(mrb);
+	for (size_t i = 0; i < md->groups.size(); ++i)
+		mrb_ary_push(mrb, ary, matchGroup(mrb, md, i));
+	return ary;
+}
+
+static mrb_value matchdata_captures(mrb_state *mrb, mrb_value self)
+{
+	MatchDataData *md = matchPtrOrRaise(mrb, self);
+	mrb_value ary = mrb_ary_new(mrb);
+	for (size_t i = 1; i < md->groups.size(); ++i)
+		mrb_ary_push(mrb, ary, matchGroup(mrb, md, i));
+	return ary;
+}
+
+static mrb_value matchdata_size(mrb_state *mrb, mrb_value self)
+{
+	return mrb_int_value(mrb,
+		(mrb_int)matchPtrOrRaise(mrb, self)->groups.size());
+}
+
+static mrb_value matchdata_to_s(mrb_state *mrb, mrb_value self)
+{
+	return matchGroup(mrb, matchPtrOrRaise(mrb, self), 0);
+}
+
+static mrb_value matchdata_pre_match(mrb_state *mrb, mrb_value self)
+{
+	MatchDataData *md = matchPtrOrRaise(mrb, self);
+	return wideToStr(mrb, md->subject.substr(0, md->groups[0].begin));
+}
+
+static mrb_value matchdata_post_match(mrb_state *mrb, mrb_value self)
+{
+	MatchDataData *md = matchPtrOrRaise(mrb, self);
+	return wideToStr(mrb, md->subject.substr(md->groups[0].end));
+}
+
+static mrb_value matchdata_begin(mrb_state *mrb, mrb_value self)
+{
+	mrb_int n = 0;
+	mrb_get_args(mrb, "i", &n);
+	MatchDataData *md = matchPtrOrRaise(mrb, self);
+	if (n < 0 || (size_t)n >= md->groups.size() || !md->groups[(size_t)n].matched)
+		return mrb_nil_value();
+	return mrb_int_value(mrb,
+		wideOffsetToCharIndex(md->subject, md->groups[(size_t)n].begin));
+}
+
+static mrb_value matchdata_end(mrb_state *mrb, mrb_value self)
+{
+	mrb_int n = 0;
+	mrb_get_args(mrb, "i", &n);
+	MatchDataData *md = matchPtrOrRaise(mrb, self);
+	if (n < 0 || (size_t)n >= md->groups.size() || !md->groups[(size_t)n].matched)
+		return mrb_nil_value();
+	return mrb_int_value(mrb,
+		wideOffsetToCharIndex(md->subject, md->groups[(size_t)n].end));
+}
+
+static mrb_value matchdata_inspect(mrb_state *mrb, mrb_value self)
+{
+	MatchDataData *md = matchPtrOrRaise(mrb, self);
+	std::string s = "#<MatchData " +
+		wideToUtf8(md->subject.substr(md->groups[0].begin,
+			md->groups[0].end - md->groups[0].begin)) + ">";
+	return mrb_str_new(mrb, s.c_str(), (mrb_int)s.size());
+}
+
+// String#to_regexp: also the hook the legacy .mayu path uses to turn a
+// NYsType_Regexp function argument into a Ruby object.
+static mrb_value string_to_regexp(mrb_state *mrb, mrb_value self)
+{
+	return regexpNew(mrb, regexpClass(mrb),
+		utf8ToWide(RSTRING_PTR(self), (size_t)RSTRING_LEN(self)), 0);
+}
+
+// A String pattern is accepted wherever a Regexp is, as in Ruby.
+static mrb_value stringToRegexp(mrb_state *mrb, mrb_value v)
+{
+	if (regexpPtr(mrb, v) != nullptr)
+		return v;
+	if (mrb_string_p(v))
+		return regexpNew(mrb, regexpClass(mrb),
+			utf8ToWide(RSTRING_PTR(v), (size_t)RSTRING_LEN(v)), 0);
+	mrb_raise(mrb, E_TYPE_ERROR, "expected Regexp or String");
+	return mrb_nil_value();	// not reached
+}
+
+// String#=~ and String#match / #match? are commented out in mruby's mrblib
+// because they need a Regexp; define them now that there is one.
+static mrb_value string_match_op(mrb_state *mrb, mrb_value self)
+{
+	mrb_value re = mrb_nil_value();
+	mrb_get_args(mrb, "o", &re);
+	if (mrb_string_p(re))
+		mrb_raise(mrb, E_TYPE_ERROR, "type mismatch: String given");
+	return regexpMatchIndex(mrb, stringToRegexp(mrb, re), self);
+}
+
+static mrb_value string_match(mrb_state *mrb, mrb_value self)
+{
+	mrb_value re = mrb_nil_value();
+	mrb_int pos = 0;
+	mrb_get_args(mrb, "o|i", &re, &pos);
+	return regexpMatchValue(mrb, stringToRegexp(mrb, re), self, pos, false);
+}
+
+static mrb_value string_match_p(mrb_state *mrb, mrb_value self)
+{
+	mrb_value re = mrb_nil_value();
+	mrb_int pos = 0;
+	mrb_get_args(mrb, "o|i", &re, &pos);
+	return mrb_bool_value(!mrb_nil_p(
+		regexpMatchValue(mrb, stringToRegexp(mrb, re), self, pos, true)));
+}
+
+
 // Convert a NYsFuncArgs* to an mrb Array of Ruby values.
 static mrb_value funcArgsToMrb(mrb_state *mrb, const NYsFuncArgs *fas)
 {
@@ -382,12 +1053,33 @@ static mrb_value funcArgsToMrb(mrb_state *mrb, const NYsFuncArgs *fas)
 	return ary;
 }
 
-// Extract a pattern string from a class:/title: keyword value.
-// Accepts String or Regexp (.source); returns empty string for nil.
-static std::string regexpOrStr(mrb_state *mrb, mrb_value v)
+/** Extract a pattern string from a class:/title: keyword value.
+
+    Accepts String or Regexp; returns an empty string for nil.  What a Regexp
+    contributes is the compiled pattern, not its source: with /x the two differ
+    and it is the compiled one the engine has to see.
+
+    Flags other than /x cannot be carried over the wire - the command stream
+    holds the pattern string alone - so their use is reported here, naming the
+    keymap and keyword so the line can be found.
+*/
+static std::string regexpOrStr(mrb_state *mrb, mrb_value v,
+	const char *i_keyword, const char *i_kw, const std::string &i_name)
 {
 	if (mrb_nil_p(v)) return std::string();
 	if (mrb_string_p(v)) return toStdStr(mrb, v);
+
+	if (RegexpData *d = regexpPtr(mrb, v)) {
+		if ((d->options & RE_NOT_ON_WIRE) != 0 && nysWouldLog(LogLevel::Warn))
+			nysLogUtf8(LogLevel::Warn,
+				("[mruby] " + std::string(i_keyword) + " \"" + i_name +
+				 "\": flags on " + i_kw +
+				 ": are ignored (always case-insensitive)").c_str());
+		return wideToUtf8(d->re.str());
+	}
+
+	// Anything else that answers to #source, so a script may pass its own
+	// pattern object.
 	mrb_value src = mrb_funcall(mrb, v, "source", 0);
 	return toStdStr(mrb, src);
 }
@@ -886,8 +1578,8 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 	mrb_value parent_v = getKw("parent");
 	mrb_value default_v = getKw("default");
 
-	std::string class_s  = regexpOrStr(mrb, class_v);
-	std::string title_s  = regexpOrStr(mrb, title_v);
+	std::string class_s  = regexpOrStr(mrb, class_v, keyword, "class", name);
+	std::string title_s  = regexpOrStr(mrb, title_v, keyword, "title", name);
 	std::string op_s     = !mrb_nil_p(op_v)     ? toStdStr(mrb, op_v)     : std::string();
 	std::string parent_s = !mrb_nil_p(parent_v) ? toStdStr(mrb, parent_v) : std::string();
 
@@ -1260,6 +1952,68 @@ static void nyamy_mruby_init_internal(mrb_state *mrb)
 		mrb->object_class);
 	mrb_define_method(mrb, mod_cls, "initialize",
 		modifier_initialize, MRB_ARGS_OPT(2));
+
+	// Regexp / MatchData.  The real names sit under NYamy like every other
+	// binding class; the top-level constants are aliases, because mruby's
+	// code generator looks up ::Regexp on Object for a /.../ literal.  The
+	// guard hands the name over without a code change should a future mruby
+	// ship a Regexp of its own.
+	struct RClass *re_cls = mrb_define_class_under(mrb, nyamy, "Regexp",
+		mrb->object_class);
+	MRB_SET_INSTANCE_TT(re_cls, MRB_TT_CDATA);
+	mrb_define_class_method(mrb, re_cls, "compile", regexp_s_compile, MRB_ARGS_ARG(1, 2));
+	mrb_define_class_method(mrb, re_cls, "new",     regexp_s_compile, MRB_ARGS_ARG(1, 2));
+	mrb_define_class_method(mrb, re_cls, "escape",  regexp_s_escape,  MRB_ARGS_REQ(1));
+	mrb_define_class_method(mrb, re_cls, "quote",   regexp_s_escape,  MRB_ARGS_REQ(1));
+	mrb_define_class_method(mrb, re_cls, "last_match",
+		regexp_s_last_match, MRB_ARGS_OPT(1));
+	mrb_define_method(mrb, re_cls, "source",  regexp_source,   MRB_ARGS_NONE());
+	mrb_define_method(mrb, re_cls, "pattern", regexp_pattern,  MRB_ARGS_NONE());
+	mrb_define_method(mrb, re_cls, "options", regexp_options,  MRB_ARGS_NONE());
+	mrb_define_method(mrb, re_cls, "inspect", regexp_inspect,  MRB_ARGS_NONE());
+	mrb_define_method(mrb, re_cls, "to_s",    regexp_to_s,     MRB_ARGS_NONE());
+	mrb_define_method(mrb, re_cls, "==",      regexp_eq,       MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, re_cls, "eql?",    regexp_eq,       MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, re_cls, "match",   regexp_match,    MRB_ARGS_ARG(1, 1));
+	mrb_define_method(mrb, re_cls, "match?",  regexp_match_p,  MRB_ARGS_ARG(1, 1));
+	mrb_define_method(mrb, re_cls, "=~",      regexp_match_op, MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, re_cls, "===",     regexp_eqq,      MRB_ARGS_REQ(1));
+	mrb_define_const(mrb, re_cls, "IGNORECASE",    mrb_int_value(mrb, RE_IGNORECASE));
+	mrb_define_const(mrb, re_cls, "EXTENDED",      mrb_int_value(mrb, RE_EXTENDED));
+	mrb_define_const(mrb, re_cls, "MULTILINE",     mrb_int_value(mrb, RE_MULTILINE));
+	mrb_define_const(mrb, re_cls, "FIXEDENCODING", mrb_int_value(mrb, RE_FIXEDENCODING));
+	mrb_define_const(mrb, re_cls, "NOENCODING",    mrb_int_value(mrb, RE_NOENCODING));
+
+	struct RClass *md_cls = mrb_define_class_under(mrb, nyamy, "MatchData",
+		mrb->object_class);
+	MRB_SET_INSTANCE_TT(md_cls, MRB_TT_CDATA);
+	mrb_define_method(mrb, md_cls, "[]",         matchdata_aref,       MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, md_cls, "to_a",       matchdata_to_a,       MRB_ARGS_NONE());
+	mrb_define_method(mrb, md_cls, "captures",   matchdata_captures,   MRB_ARGS_NONE());
+	mrb_define_method(mrb, md_cls, "size",       matchdata_size,       MRB_ARGS_NONE());
+	mrb_define_method(mrb, md_cls, "length",     matchdata_size,       MRB_ARGS_NONE());
+	mrb_define_method(mrb, md_cls, "to_s",       matchdata_to_s,       MRB_ARGS_NONE());
+	mrb_define_method(mrb, md_cls, "pre_match",  matchdata_pre_match,  MRB_ARGS_NONE());
+	mrb_define_method(mrb, md_cls, "post_match", matchdata_post_match, MRB_ARGS_NONE());
+	mrb_define_method(mrb, md_cls, "begin",      matchdata_begin,      MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, md_cls, "end",        matchdata_end,        MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, md_cls, "inspect",    matchdata_inspect,    MRB_ARGS_NONE());
+
+	if (!mrb_const_defined(mrb, mrb_obj_value(mrb->object_class),
+			mrb_intern_lit(mrb, "Regexp")))
+		mrb_define_const(mrb, mrb->object_class, "Regexp", mrb_obj_value(re_cls));
+	if (!mrb_const_defined(mrb, mrb_obj_value(mrb->object_class),
+			mrb_intern_lit(mrb, "MatchData")))
+		mrb_define_const(mrb, mrb->object_class, "MatchData", mrb_obj_value(md_cls));
+
+	// mruby leaves these commented out in mrblib/string.rb because they need
+	// a Regexp; there is one now.
+	mrb_define_method(mrb, mrb->string_class, "=~",        string_match_op, MRB_ARGS_REQ(1));
+	mrb_define_method(mrb, mrb->string_class, "match",     string_match,    MRB_ARGS_ARG(1, 1));
+	mrb_define_method(mrb, mrb->string_class, "match?",    string_match_p,  MRB_ARGS_ARG(1, 1));
+	mrb_define_method(mrb, mrb->string_class, "to_regexp", string_to_regexp, MRB_ARGS_NONE());
+
+	g_multilineNoticed.clear();
 
 	struct RClass *dsl_cls = mrb_define_class_under(mrb, nyamy, "DSL",
 		mrb->object_class);

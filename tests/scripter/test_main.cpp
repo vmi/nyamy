@@ -21,6 +21,7 @@
 #include "nyamy_scripter.h"   // parseScancodeMapBlob (exported test helper)
 
 #include <windows.h>
+#include <io.h>
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
@@ -1042,7 +1043,228 @@ int main()
 #endif // NYAMY_TEST_HOOKS
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 13;
+	// Regexp: mruby parses /.../ but has no Regexp class, so the binding
+	// supplies one on top of std::wregex.  The script asserts the contract and
+	// raises on any mismatch; buildSetting returns null if it did.
+	{
+		printf("[%d] Regexp / MatchData ... ", idx + 14);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__re_test__.rb",
+			// the real class lives under NYamy; ::Regexp is an alias
+			L"raise \"class name\" unless /a/.class.to_s == \"NYamy::Regexp\"\n"
+			L"raise \"alias\"      unless Regexp.equal?(NYamy::Regexp)\n"
+			L"raise \"md alias\"   unless MatchData.equal?(NYamy::MatchData)\n"
+			// source / pattern / options / inspect / to_s
+			L"raise \"source\"  unless /a\\d+/.source == \"a\\\\d+\"\n"
+			L"raise \"pattern\" unless /ab/.pattern == \"ab\"\n"
+			L"raise \"options\" unless /a/im.options == 5\n"
+			L"raise \"opt x\"   unless /a/x.options == Regexp::EXTENDED\n"
+			L"raise \"opt n\"   unless /a/n.options == 32\n"
+			L"raise \"inspect\" unless /a/xim.inspect == \"/a/mix\"\n"
+			L"raise \"to_s\"    unless /a/i.to_s == \"(?i-mx:a)\"\n"
+			// interpolation, and '/' as division where it is not a literal
+			L"x = \"b\"\n"
+			L"raise \"interp\" unless /a#{x}c/.source == \"abc\"\n"
+			L"y = 4\n"
+			L"raise \"div\"  unless 6/2 == 3\n"
+			L"raise \"div2\" unless y / 2 == 2\n"
+			// matching
+			L"raise \"match?\" unless /b+/.match?(\"abbbc\")\n"
+			L"raise \"=~\"     unless (/b+/ =~ \"abbbc\") == 1\n"
+			L"raise \"===\"    unless /b+/ === \"abbbc\"\n"
+			L"m = /a(b+)(z)?c/.match(\"xxabbbc\")\n"
+			L"raise \"md\"       if m.nil?\n"
+			L"raise \"md[0]\"    unless m[0] == \"abbbc\"\n"
+			L"raise \"md[1]\"    unless m[1] == \"bbb\"\n"
+			L"raise \"md[2]\"    unless m[2].nil?\n"
+			L"raise \"md size\"  unless m.size == 3\n"
+			L"raise \"captures\" unless m.captures == [\"bbb\", nil]\n"
+			L"raise \"pre\"      unless m.pre_match == \"xx\"\n"
+			L"raise \"post\"     unless m.post_match == \"\"\n"
+			L"raise \"begin\"    unless m.begin(0) == 2\n"
+			L"raise \"end\"      unless m.end(1) == 6\n"
+			// $~ / $1..$9 are plain globals in mruby
+			L"raise \"$~\"       unless $~[1] == \"bbb\"\n"
+			L"raise \"$1\"       unless $1 == \"bbb\"\n"
+			L"raise \"no match\" unless /zzz/.match(\"abc\").nil?\n"
+			L"raise \"$~ nil\"   unless $~.nil?\n"
+			L"/l+/ =~ \"hello\"\n"
+			L"raise \"last_match\" unless Regexp.last_match(0) == \"ll\"\n"
+			// String side
+			L"raise \"s =~\"      unless (\"hello\" =~ /l+/) == 2\n"
+			L"raise \"s match\"   unless \"hello\".match(/l+/)[0] == \"ll\"\n"
+			L"raise \"s match?\"  unless \"hello\".match?(/^he/)\n"
+			L"raise \"to_regexp\" unless \"a+\".to_regexp.source == \"a+\"\n"
+			L"raise \"escape\"    unless Regexp.escape(\"a.b\") == \"a\\\\.b\"\n"
+			// 'm' is ECMAScript multiline, not Ruby's dot-matches-newline
+			L"raise \"m anchors\"  unless (/^b$/m =~ \"a\\nb\") == 2\n"
+			L"raise \"no m\"       unless (/^b$/ =~ \"a\\nb\").nil?\n"
+			L"raise \"not dotall\" unless (/a.b/m =~ \"a\\nb\").nil?\n"
+			// 'x' rewrites the pattern; source keeps what was written
+			// a real tab, not the \t escape: /x drops literal whitespace, while
+			// an escape sequence stays, exactly as in Ruby
+			L"raise \"x ws\"      unless /a b\tc/x.pattern == \"abc\"\n"
+			L"raise \"x esc t\"   unless /a\\tb/x.pattern == \"a\\\\tb\"\n"
+			L"raise \"x source\"  unless /a b/x.source == \"a b\"\n"
+			L"raise \"x esc\"     unless /a\\ b/x.pattern == \"a\\\\ b\"\n"
+			L"raise \"x class\"   unless /[a b]/x.pattern == \"[a b]\"\n"
+			L"raise \"x comment\" unless /a # drop me\nb/x.pattern == \"ab\"\n"
+			L"raise \"x esc #\"   unless /a\\#b/x.pattern == \"a\\\\#b\"\n"
+			L"raise \"x cls #\"   unless /a[#]b/x.pattern == \"a[#]b\"\n"
+			L"raise \"no x\"      unless /a b/.pattern == \"a b\"\n"
+			// integer options, and the flag decoder as the one validation point
+			L"raise \"int opts\" unless Regexp.new(\"a\", Regexp::IGNORECASE) == /a/i\n"
+			L"def expect_err(cls)\n"
+			L"  yield\n"
+			L"  false\n"
+			L"rescue => e\n"
+			L"  e.is_a?(cls)\n"
+			L"end\n"
+			L"raise \"bad flag\" unless expect_err(ArgumentError) { Regexp.compile(\"a\", \"zz\") }\n"
+			L"raise \"bad pat\"  unless expect_err(RegexpError) { Regexp.compile(\"(\") }\n"
+			// Onigmo-only syntax the manual lists as unusable really is rejected
+			// rather than quietly meaning something else
+			// Onigmo-only syntax.  Group constructs are rejected outright, but
+			// the letter escapes are read as identity escapes and quietly match
+			// the bare letter - the manual has to warn about exactly this.
+			L"['(?<n>a)', '(?i)a', '(?<=a)b', '\\p{L}'].each do |p|\n"
+			L"  raise \"expected RegexpError: #{p}\" unless expect_err(RegexpError) { Regexp.compile(p) }\n"
+			L"end\n"
+			L"raise \"\\\\A is literal A\" unless (/\\A/ =~ \"xA\") == 1\n"
+			L"raise \"\\\\z is literal z\" unless (/\\z/ =~ \"xz\") == 1\n"
+			L"raise \"\\\\h is literal h\" unless (/\\h/ =~ \"xh\") == 1\n"
+			// the two examples the manual shows in "正規表現の制限"
+			L"host = \"desktop-01.example.jp\"\n"
+			L"raise \"doc =~\" unless (host =~ /^([^.]+)\\./) == 0\n"
+			L"raise \"doc $1\" unless $1.upcase == \"DESKTOP-01\"\n"
+			L"doc_re = /\n"
+			L"    EXPLORER\\.EXE :       # comment\n"
+			L"    .* SysListView32 $    # end\n"
+			L"  /x\n"
+			L"raise \"doc x\" unless doc_re.pattern == \"EXPLORER\\\\.EXE:.*SysListView32$\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__re_test__.rb", syms);
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (script raised or no commit)\n");
+			++failures;
+		}
+	}
+
+	// What a Regexp contributes to class: / title: is the compiled pattern,
+	// not its source: under /x the two differ, and it is the compiled one the
+	// engine has to see.  Proven by dumping both spellings and comparing.
+	{
+		printf("[%d] Regexp in class: / title: ... ", idx + 15);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__re_win_a__.rb",
+			L"keymap \"Global\"\n"
+			L"window \"W1\", class: /^Foo:Bar$/, parent: \"Global\"\n"
+			L"window \"W2\", class: /a b/x, title: /t x/x, parent: \"Global\"\n"
+			L"window \"W3\", class: /^Baz$/i, parent: \"Global\"\n");
+		writeUtf8File(exeDir + L"\\__re_win_b__.rb",
+			L"keymap \"Global\"\n"
+			L"window \"W1\", class: '^Foo:Bar$', parent: \"Global\"\n"
+			L"window \"W2\", class: 'ab', title: 'tx', parent: \"Global\"\n"
+			L"window \"W3\", class: '^Baz$', parent: \"Global\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> a =
+			buildSetting(exeDirU8 + "\\__re_win_a__.rb", syms);
+		std::shared_ptr<Setting> b =
+			buildSetting(exeDirU8 + "\\__re_win_b__.rb", syms);
+		if (!a || !b) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else {
+			std::wstring da = dumpSetting(*a);
+			std::wstring db = dumpSetting(*b);
+			if (da == db) {
+				printf("OK\n");
+			} else {
+				printf("\n  settings differ\n");
+				reportFirstDiff(da, db);
+				++failures;
+			}
+		}
+	}
+
+	// The two notices: 'm' is reported once per pattern because it does not
+	// mean what Ruby's /m means, and flags that cannot travel to the engine
+	// are reported where they are used.  'x' travels (it is folded into the
+	// pattern), so it must stay quiet.
+	{
+		printf("[%d] Regexp log output ... ", idx + 16);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__re_log__.rb",
+			L"keymap \"Global\"\n"
+			L"window \"WarnMe\",  class: /^a$/i, parent: \"Global\"\n"
+			L"window \"QuietX\",  class: /a b/x, parent: \"Global\"\n"
+			L"window \"QuietNo\", class: /^plain$/, parent: \"Global\"\n"
+			L"10.times { /^a$/m }\n");
+
+		// Capture stderr, where the scripter writes its log, by swapping the
+		// file descriptor rather than reopening the console afterwards: the
+		// test may well be running without one.
+		std::wstring logPath = exeDir + L"\\__re_log__.txt";
+		fflush(stderr);
+		int savedFd = _dup(_fileno(stderr));
+		FILE *redirected = nullptr;
+		_wfreopen_s(&redirected, logPath.c_str(), L"w", stderr);
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__re_log__.rb", syms);
+
+		fflush(stderr);
+		_dup2(savedFd, _fileno(stderr));
+		_close(savedFd);
+		clearerr(stderr);
+
+		std::vector<std::string> lines;
+		{
+			std::ifstream in(logPath.c_str());
+			std::string line;
+			while (std::getline(in, line)) {
+				if (!line.empty() && line.back() == '\r')
+					line.pop_back();
+				lines.push_back(line);
+			}
+		}
+		auto count = [&](const char *tag, const char *needle) {
+			int n = 0;
+			for (const std::string &l : lines)
+				if (l.compare(0, 2, tag) == 0 &&
+					l.find(needle) != std::string::npos)
+					++n;
+			return n;
+		};
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		check(s != nullptr, "script loaded");
+		check(count("W|", "\"WarnMe\"") == 1, "/i on class: warns");
+		check(count("W|", "\"QuietX\"") == 0, "/x on class: stays quiet");
+		check(count("W|", "\"QuietNo\"") == 0, "no flags stays quiet");
+		check(count("I|", "not dotall") == 1, "/m notice is emitted once");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 16;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);
