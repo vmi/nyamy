@@ -188,6 +188,86 @@ std::wostream &operator<<(std::wostream &i_ost, const wstringq &i_data)
 }
 
 
+/** Write a pattern as an ECMAScript /regexp/ literal.
+
+    Unlike the string above, what is being printed here is regular expression
+    source, so it is reproduced verbatim: doubling a backslash would turn `\.'
+    (a literal dot) into `\\.' (a backslash followed by anything), which is a
+    different pattern.  Only two things are touched.
+
+    The delimiter: a bare `/' is escaped, because it would otherwise look like
+    the end of the literal.  A backslash is copied together with the character
+    that follows it, both so that an already-escaped `\/' is left alone and so
+    that the escape is never split.
+
+    Characters that cannot be shown: the file format escapes ECMAScript
+    defines (\f \n \r \t \v), and \uXXXX for every other control character.
+    Not \xXX - that form takes exactly two hex digits, so \x0009 would read as
+    a NUL followed by the text "09", quietly meaning something else.  Not \a
+    either: ECMAScript has no such escape.  Note that \uXXXX is honoured by
+    MSVC's std::regex but is not in the C++ standard's grammar, so it is worth
+    revisiting if the engine is ever swapped out (see "Regular Expressions
+    (C++)" in the MSVC documentation).
+
+    The test is for control characters rather than iswprint() on purpose:
+    iswprint() answers by locale, and a window class holding Japanese would
+    come out as a run of \uXXXX on a machine running any other one.  A dump is
+    for reading.
+
+    A raw control character straight after a backslash is the one case this
+    cannot render faithfully - it is escaped on its own, which breaks the pair.
+    Such a pattern cannot be written inside /.../ at all.
+*/
+std::wostream &outputRegexp(std::wostream &i_ost, const std::wstring &i_pattern)
+{
+	i_ost << L"/";
+	for (size_t i = 0; i < i_pattern.size(); ++ i) {
+		wchar_t c = i_pattern[i];
+		if (c == L'\\' && i + 1 < i_pattern.size()) {
+			wchar_t next = i_pattern[i + 1];
+			if (!iswcntrl(next)) {
+				wchar_t buf[3] = { c, next, 0 };
+				i_ost << buf;
+				++ i;
+				continue;
+			}
+		}
+		switch (c) {
+		case L'/':
+			i_ost << L"\\/";
+			break;
+		case L'\f':
+			i_ost << L"\\f";
+			break;
+		case L'\n':
+			i_ost << L"\\n";
+			break;
+		case L'\r':
+			i_ost << L"\\r";
+			break;
+		case L'\t':
+			i_ost << L"\\t";
+			break;
+		case L'\v':
+			i_ost << L"\\v";
+			break;
+		default:
+			if (!iswcntrl(c)) {
+				wchar_t buf[2] = { c, 0 };
+				i_ost << buf;
+			} else {
+				wchar_t buf[8];
+				_snwprintf(buf, NUMBER_OF(buf), L"\\u%04x", c);
+				i_ost << buf;
+			}
+			break;
+		}
+	}
+	i_ost << L"/";
+	return i_ost;
+}
+
+
 // interpret meta characters such as \n
 std::wstring interpretMetaCharacters(const wchar_t *i_str, size_t i_len,
 								const wchar_t *i_quote,
@@ -372,7 +452,7 @@ std::string to_string(const std::wstring &i_str)
 /// stream output
 std::wostream &operator<<(std::wostream &i_ost, const wregex_stored &i_data)
 {
-	return i_ost << i_data.str();
+	return outputRegexp(i_ost, i_data.str());
 }
 
 

@@ -2302,6 +2302,12 @@ void Engine::funcCancelPrefix(FunctionParam *i_param)
 void Engine::funcExecUserFunc(FunctionParam *i_param, const wstringq &i_name,
 	const std::vector<FuncArg> &i_args)
 {
+	// Press only, like every other function that does something visible: an
+	// assignment that says nothing about U- / D- matches both edges, and
+	// running the handler twice per keystroke is never what was meant.
+	if (!i_param->m_isPressed)
+		return;
+
 	TriggerInfo ctx;
 
 	// Trigger key info: read from Current::m_mkey.m_key

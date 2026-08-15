@@ -341,7 +341,9 @@ end
 
 ブロック内では `exec_keyseq "アクション文字列"` で任意のキーシーケンスや `&FUNCTION` を実行できます (無限ループ防止のため、`&ExecUserFunc` を含む文字列は実行できません)。
 
-`&ExecUserFunc` に渡した引数はブロックの引数として受け取れます。文字列は `String`、数値は `Integer`、正規表現は `Regexp` として渡されます。
+ブロックが呼ばれるのは**キーを押したときだけ**です。離したときには呼ばれません。
+
+`&ExecUserFunc` に渡した引数はブロックの引数として受け取れます。文字列は `String`、数値は `Integer`、正規表現は `Regexp` として渡されます。`$キーシーケンス名` は [`NYamy::KeySeq`](#dsl_keyseq)、モディファイヤ (`M-` など) は `NYamy::Modifier`、括弧でくくったキーの並びは `String` の配列として渡されます。
 
 ### 正規表現の制限 {#dsl_regexp}
 

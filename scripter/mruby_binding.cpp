@@ -244,10 +244,15 @@ static void printPendingException(mrb_state *mrb, const char *prefix)
 		mrb_int n = RARRAY_LEN(bt);
 		for (mrb_int i = 0; i < n; ++i) {
 			mrb_value line = mrb_ary_ref(mrb, bt, i);
-			if (mrb_string_p(line))
-				nysLogUtf8(LogLevel::Error,
-						   (std::string("    from ") +
-							mrb_string_cstr(mrb, line)).c_str());
+			if (!mrb_string_p(line))
+				continue;
+			// Frames entered from C carry no debug info, and mruby spells that
+			// "(unknown):0".  It names nothing the reader can act on.
+			const char *s = mrb_string_cstr(mrb, line);
+			if (std::strncmp(s, "(unknown)", 9) == 0)
+				continue;
+			nysLogUtf8(LogLevel::Error,
+					   (std::string("    from ") + s).c_str());
 		}
 	}
 	mrb->exc = nullptr;	// in case inspect/backtrace raised

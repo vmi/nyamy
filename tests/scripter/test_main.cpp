@@ -1580,7 +1580,115 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 22;
+	// Every argument type has to survive the trip to a user function: the ctrl
+	// stream used to carry only strings and numbers, and an argument it could
+	// not write vanished while its count stayed - which desynchronized the
+	// reader and killed every request that followed.  Hence the second call.
+	{
+		printf("[%d] ExecUserFunc arguments ... ", idx + 23);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__uf_args__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"deffunc \"T13Args\" do |s, n, re, ks, mod, toks|\n"
+			L"  log.info \"T13 s=#{s} n=#{n} re=#{re.source}\" +\n"
+			L"           \" ks=#{ks.class} mod=#{mod.class} toks=#{toks.inspect}\"\n"
+			L"end\n");
+
+		ExecUserFuncRequest req;
+		req.name = wstringi(L"T13Args");
+		req.args.emplace_back(std::in_place_type<FuncArgString>, L"hello");
+		req.args.emplace_back(std::in_place_type<FuncArgNumber>, -42);
+		req.args.emplace_back(std::in_place_type<FuncArgRegexp>, L"a+b");
+		req.args.emplace_back(std::in_place_type<FuncArgKeySeqIdx>, 0u);
+		ModifierSpec ms;
+		ms.modifiers = 0x12;
+		ms.dontcares = 0x34;
+		req.args.emplace_back(std::in_place_type<FuncArgModifierSpec>, ms);
+		req.args.emplace_back(std::in_place_type<FuncArgTokenSeq>,
+			FuncArgTokenSeq{ wstringi(L"A"), wstringi(L"B") });
+		req.context.scanCode = 0x1e;
+		req.context.windowClass = L"cls";
+		req.context.windowTitle = L"ttl";
+		std::vector<ExecUserFuncRequest> execs = { req, req };
+
+		std::wstring logPath = exeDir + L"\\__uf_args__.txt";
+		fflush(stderr);
+		int savedFd = _dup(_fileno(stderr));
+		FILE *redirected = nullptr;
+		_wfreopen_s(&redirected, logPath.c_str(), L"w", stderr);
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__uf_args__.rb", syms, 1, &execs);
+
+		fflush(stderr);
+		_dup2(savedFd, _fileno(stderr));
+		_close(savedFd);
+		clearerr(stderr);
+
+		int hits = 0, calls = 0;
+		{
+			std::ifstream in(logPath.c_str());
+			std::string line;
+			const char *want =
+				"T13 s=hello n=-42 re=a+b ks=NYamy::KeySeq"
+				" mod=NYamy::Modifier toks=[\"A\", \"B\"]";
+			while (std::getline(in, line)) {
+				if (line.find("T13 ") != std::string::npos) ++calls;
+				if (line.find(want) != std::string::npos) ++hits;
+			}
+		}
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		check(s != nullptr, "script loaded");
+		check(calls == 2, "the handler ran once per request");
+		check(hits == 2,  "every argument type arrived intact, twice");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// A pattern is dumped as a regexp literal, so the delimiter and anything
+	// that cannot be shown have to be escaped - and nothing else, since the
+	// text is the pattern's own source.
+	{
+		printf("[%d] regexp literal in dumps ... ", idx + 24);
+		fflush(stdout);
+
+		// a/b\/c<TAB>d<e-acute>: a bare delimiter, one that is already escaped,
+		// a control character, and a letter no ASCII locale calls printable.
+		writeUtf8File(exeDir + L"\\__re_dump__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"window \"T13Re\", class: \"a/b\\\\/c\\td\\u00e9\","
+			L" parent: \"Global\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__re_dump__.rb", syms);
+
+		std::wstring dump = s ? dumpSetting(*s) : std::wstring();
+		const std::wstring want = L"/a\\/b\\/c\\td\u00e9/";
+
+		if (s && dump.find(want) != std::wstring::npos) {
+			printf("OK\n");
+		} else if (!s) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else {
+			printf("FAIL (expected literal not in the dump)\n");
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 24;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

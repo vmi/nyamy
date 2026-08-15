@@ -526,12 +526,16 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			out << L"scope=" << keymapScopeToString(data.scope)
 				<< L" keyword=\"" << data.keyword
 				<< L"\" name=\"" << data.name << L"\"";
-			if (!data.windowClassName.empty())
-				out << L" class=/" << data.windowClassName << L"/";
+			if (!data.windowClassName.empty()) {
+				out << L" class=";
+				outputRegexp(out, data.windowClassName);
+			}
 			if (!data.windowOp.empty())
 				out << L" op=" << data.windowOp;
-			if (!data.windowTitleName.empty())
-				out << L" title=/" << data.windowTitleName << L"/";
+			if (!data.windowTitleName.empty()) {
+				out << L" title=";
+				outputRegexp(out, data.windowTitleName);
+			}
 			if (!data.parentName.empty())
 				out << L" parent=\"" << data.parentName << L"\"";
 			if (data.defaultKeySeqIdx >= 0)

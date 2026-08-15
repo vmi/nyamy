@@ -44,6 +44,7 @@
 #include "nyamy_scripter.h"  // must come first so NYS_API = dllexport before nys_types.h re-includes it
 
 #include "misc.h"
+#include "errormessage.h"
 #include "nys_types.h"
 
 #include "ctrl_stream_reader.h"
@@ -321,9 +322,10 @@ static std::atomic<uint32_t> g_quitTimeoutMillisec{ 0 };
 // Job queue: ctrl reader thread (producer) -> script thread (consumer)
 //-----------------------------------------------------------------------------
 
-// A unit of work handed between the two threads.  Both payloads are
-// self-contained -- readExecUserFunc allocates no NYsStrs -- so a Job can cross
-// threads without the session allocator, which stays on the script thread.
+// A unit of work handed between the two threads.  Both payloads own everything
+// they point at -- a token-sequence argument keeps its list inside the request
+// itself -- so a Job can cross threads without the session allocator, which
+// stays on the script thread.
 struct Job {
 	enum class Kind { Start, ExecUserFunc, Quit };
 	Kind                 kind = Kind::Quit;
@@ -798,6 +800,12 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx)
 					nysSetLogLevelFromNyamy(ctrlReader.readSetLogLevel());
 				}
 			}
+		} catch (ErrorMessage &e) {
+			// A payload that cannot be parsed leaves the stream at an unknown
+			// offset - there is no length to skip past - so reading has to stop.
+			// Say why: silence here used to look like nyamy going quiet.
+			logLine(LogLevel::Error,
+					L"[nys] ctrl stream: " + e.getMessage());
 		} catch (...) {
 			// truncated payload: treat as end of stream
 		}

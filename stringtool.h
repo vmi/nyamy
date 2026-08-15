@@ -83,6 +83,11 @@ public:
 extern std::wostream &operator<<(std::wostream &i_ost, const wstringq &i_data);
 
 
+/// write a pattern as an ECMAScript /regexp/ literal
+extern std::wostream &outputRegexp(std::wostream &i_ost,
+								   const std::wstring &i_pattern);
+
+
 /// interpret meta characters such as \n
 std::wstring interpretMetaCharacters(const wchar_t *i_str, size_t i_len,
 								const wchar_t *i_quote = NULL,

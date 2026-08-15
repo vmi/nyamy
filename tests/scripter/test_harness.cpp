@@ -63,7 +63,9 @@ protected:
 
 std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
                                       const Symbols &i_symbols,
-                                      int i_loadCount)
+                                      int i_loadCount,
+                                      const std::vector<ExecUserFuncRequest>
+                                          *i_execs)
 {
 	// ctrl pipe: test (write) -> scripter (read, via NYS_CTRL)
 	// data pipe: scripter (write, via NYS_CMD) -> test (read)
@@ -125,6 +127,11 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	for (int i = 0; i < i_loadCount; ++i)
 		ctrlWriter.writeStart(wstringi(L"test"), wstringi(L""), i_symbols,
 							  kLogLevelNormal);
+	// Behind the Start commands: the ctrl stream is processed in order, so the
+	// script has been loaded and its handlers registered before these run.
+	if (i_execs)
+		for (const auto &e : *i_execs)
+			ctrlWriter.writeExecUserFunc(e.name, e.args, e.context);
 	// Quit goes right behind the Start commands: the ctrl stream is processed in
 	// order, so every load runs first.  Quitting closes dataW, which gives the
 	// consumer EOF even when a load failed and no Commit is coming.

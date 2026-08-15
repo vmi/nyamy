@@ -257,7 +257,7 @@ static std::wstring homeDirectory()
 // NYAMY_ROOT / NYAMY_HOME / NYAMY_CONFIG need no special case: NYamyPaths has
 // published them to this process' environment already.  HOME does: it is not in
 // the environment, so it is answered from homeDirectory() instead.
-// Unknown vars are left as-is and appended to *unknownVars if provided.
+// Unknown vars expand to nothing and are appended to *unknownVars if provided.
 // After each expansion, if the result ends with '\' and the next input char is also '\',
 // one backslash is consumed to prevent double separators.
 static std::wstring expandVars(const std::wstring &s,
@@ -281,7 +281,10 @@ static std::wstring expandVars(const std::wstring &s,
 				} else if (!home.empty()) {
 					result.append(home);
 				} else {
-					result += s.substr(i, end - i + 1);
+					// Expands to nothing, the way a shell treats an unset
+					// variable.  Leaving ${NAME} in place put the literal text
+					// on the command line, where it ended up as an argument to
+					// the script.
 					if (unknownVars) unknownVars->push_back(name);
 				}
 			}
