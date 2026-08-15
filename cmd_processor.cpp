@@ -320,7 +320,7 @@ void CmdProcessor::operator()(CmdArgsDefSymbol &data)
 }
 
 
-void CmdProcessor::operator()(CmdArgsBeginKeymap &data)
+void CmdProcessor::operator()(CmdArgsDefKeymap &data)
 {
 	Keymap::Type type = Keymap::Type_keymap;
 	if (!data.windowOp.empty()) {
@@ -329,7 +329,7 @@ void CmdProcessor::operator()(CmdArgsBeginKeymap &data)
 	} else if (data.keyword == L"window" && !data.windowClassName.empty()) {
 		type = Keymap::Type_windowAnd;
 	}
-	m_builder->setCurrentKeymap(m_builder->addKeymap(Keymap(type, data.name, data.windowClassName, data.windowTitleName, nullptr, nullptr)));
+	Keymap *keymap = m_builder->addKeymap(Keymap(type, data.name, data.windowClassName, data.windowTitleName, nullptr, nullptr));
 
 	Keymap *parent = nullptr;
 	if (!data.parentName.empty())
@@ -343,26 +343,31 @@ void CmdProcessor::operator()(CmdArgsBeginKeymap &data)
 		FunctionData *fd = createFunctionData(L"KeymapParent");
 		keySeq = m_builder->addKeySeq(KeySeq(data.name).add(ActionFunction(fd)));
 	}
-	m_builder->currentKeymap()->setIfNotYet(keySeq, parent);
+	keymap->setIfNotYet(keySeq, parent);
+
+	// Declaring the keymap is one thing; deciding where the assignments that
+	// follow it land is another.  Block saves the keymap it displaces so that
+	// the matching EndKeymap can put it back, which is how a `keymap`/`window`
+	// block keeps what is written after it out of its own keymap.
+	switch (data.scope) {
+	case CmdKeymapScope::Declare:
+		break;
+	case CmdKeymapScope::Block:
+		m_keymapStack.push_back(m_builder->currentKeymap());
+		[[fallthrough]];
+	case CmdKeymapScope::Enter:
+		m_builder->setCurrentKeymap(keymap);
+		break;
+	}
 }
 
 
-// Save the keymap a `keymap`/`window` block was entered from.  The BeginKeymap
-// that follows overwrites the current keymap; the matching PopKeymap puts this
-// one back, so definitions written after the block land where the author wrote
-// them rather than in the block's keymap.
-void CmdProcessor::operator()(CmdArgsPushKeymap)
+void CmdProcessor::operator()(CmdArgsEndKeymap)
 {
-	m_keymapStack.push_back(m_builder->currentKeymap());
-}
-
-
-void CmdProcessor::operator()(CmdArgsPopKeymap)
-{
-	// An unmatched Pop means the producer is broken.  Say so and carry on with
+	// An unmatched End means the producer is broken.  Say so and carry on with
 	// the current keymap: the rest of the setting is still worth having.
 	if (m_keymapStack.empty()) {
-		error(L"PopKeymap without a matching PushKeymap");
+		error(L"EndKeymap without a matching DefKeymap(Block)");
 		return;
 	}
 	m_builder->setCurrentKeymap(m_keymapStack.back());

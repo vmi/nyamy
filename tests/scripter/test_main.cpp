@@ -1265,10 +1265,11 @@ int main()
 		}
 	}
 
-	// A `keymap`/`window` written with a block is a scope: what follows the
-	// block belongs to the keymap that was in effect before it, not to the
-	// block's.  Written without a block it stays in effect, which is what
-	// .mayu does and what existing configurations are written against.
+	// In the Ruby DSL a keymap statement declares the keymap; where the
+	// assignments that follow it land is the block's business.  With a block,
+	// what follows the block belongs to the keymap that was in effect before
+	// it; without one, nothing moves at all and the assignments stay at the
+	// top level (Global).  .mayu keeps its own rule - see the test after this.
 	{
 		printf("[%d] keymap block scope ... ", idx + 17);
 		fflush(stdout);
@@ -1290,7 +1291,12 @@ int main()
 			L"end\n"
 			L"key[\"C-F\"] = \"Up\"\n"
 			L"window \"W3\", class: 'w3', parent: \"Global\"\n"
-			L"key[\"C-G\"] = \"Down\"\n");
+			L"key[\"C-G\"] = \"Down\"\n"
+			// declaring first and filling in later has to keep the parent
+			L"keymap \"K4\", parent: \"K2\"\n"
+			L"keymap \"K4\" do\n"
+			L"  key[\"C-H\"] = \"Left\"\n"
+			L"end\n");
 
 		Symbols syms;
 		std::shared_ptr<Setting> s =
@@ -1323,8 +1329,69 @@ int main()
 		check(assigned(L"K2", L"E"),     "C-E returns to the enclosing block");
 		check(!assigned(L"W2", L"E"),    "C-E does not leak out of the inner block");
 		check(assigned(L"Global", L"F"), "C-F returns to Global from a nested block");
-		check(assigned(L"W3", L"G"),     "blockless window stays in effect");
-		check(!assigned(L"Global", L"G"), "blockless window is not scoped");
+		check(assigned(L"Global", L"G"), "C-G stays at the top level");
+		check(!assigned(L"W3", L"G"),    "a blockless window takes nothing");
+		check(assigned(L"K4", L"H"),     "C-H lands in the block that fills K4 in");
+		const Keymap *k4 = s ? findKeymap(*s, L"K4") : nullptr;
+		check(k4 && k4->getParentKeymap() &&
+		      std::wstring(k4->getParentKeymap()->getName().c_str()) == L"K2",
+		      "a blockless declaration keeps its parent");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// Where a `load' leaves the keymap context.  A .mayu keymap statement stays
+	// in effect until the next one - inside that file - but the rule stops at
+	// the file: what the script writes after the load belongs to the script's
+	// own top level.  The same goes for a .rb that ends on a blockless keymap.
+	{
+		printf("[%d] keymap context across load ... ", idx + 18);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__scope_lib__.rb",
+			L"window \"L1\", class: 'l1', parent: \"Global\"\n");
+		writeUtf8File(exeDir + L"\\__scope_leg__.mayu",
+			L"include \"109.mayu\"\n"
+			L"keymap Global\n"
+			L"keymap KLeg : Global\n"
+			L"key C-B\t= End\n");
+		writeUtf8File(exeDir + L"\\__scope_load__.rb",
+			L"load \"__scope_leg__.mayu\"\n"
+			L"key[\"C-C\"] = \"Delete\"\n"
+			L"load \"__scope_lib__.rb\"\n"
+			L"key[\"C-A\"] = \"Home\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__scope_load__.rb", syms);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		auto assigned = [&](const wchar_t *keymapName, const wchar_t *keyName) {
+			if (!s) return false;
+			const Keymap *km = findKeymap(*s, keymapName);
+			if (!km) return false;
+			Keyboard &kb = const_cast<Keyboard &>(s->m_keyboard);
+			Key *key = kb.searchKey(wstringi(keyName));
+			if (!key) return false;
+			Held held;
+			held.ctrl = true;
+			return km->searchAssignment(physicalKey(key, true, held)) != nullptr;
+		};
+
+		check(s != nullptr, "script loaded");
+		check(assigned(L"KLeg", L"B"),   ".mayu keeps its own keymap context");
+		check(assigned(L"Global", L"C"), "the .mayu context does not escape");
+		check(!assigned(L"KLeg", L"C"),  "C-C does not land in the .mayu keymap");
+		check(assigned(L"Global", L"A"), "a blockless window in a .rb does not escape");
+		check(!assigned(L"L1", L"A"),    "C-A does not land in the loaded window");
 
 		if (bad == 0) {
 			printf("OK\n");
@@ -1338,7 +1405,7 @@ int main()
 	// Each include is compiled on its own, so the symbols have to be carried
 	// across; nesting an include has always worked, and these have to match.
 	{
-		printf("[%d] symbols across sibling includes ... ", idx + 18);
+		printf("[%d] symbols across sibling includes ... ", idx + 19);
 		fflush(stdout);
 
 		writeUtf8File(exeDir + L"\\__sib_a__.mayu", L"define SIB-A\n");
@@ -1367,7 +1434,7 @@ int main()
 
 	// ENV: a read-only view of the process environment.
 	{
-		printf("[%d] ENV ... ", idx + 19);
+		printf("[%d] ENV ... ", idx + 20);
 		fflush(stdout);
 
 		SetEnvironmentVariableW(L"NYAMY_TEST_ENV", L"hello");
@@ -1412,7 +1479,7 @@ int main()
 	// warning instead of failing the load: a stray environment variable should
 	// not be able to stop nyamy from starting.
 	{
-		printf("[%d] NYAMY_LOAD_PATH ... ", idx + 20);
+		printf("[%d] NYAMY_LOAD_PATH ... ", idx + 21);
 		fflush(stdout);
 
 		std::wstring lpDir = exeDir + L"\\__nlp__";
@@ -1440,7 +1507,7 @@ int main()
 
 	// The command line parser, which main() is the only production caller of.
 	{
-		printf("[%d] command line options ... ", idx + 21);
+		printf("[%d] command line options ... ", idx + 22);
 		fflush(stdout);
 
 		int bad = 0;
@@ -1513,7 +1580,7 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 21;
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 22;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

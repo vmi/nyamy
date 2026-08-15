@@ -542,12 +542,11 @@ static bool flushQueue()
 				[](const CmdArgsDefSubst& a)  { g_dataWriter->writeDefSubst(a); },
 				[](const CmdArgsDefOption& a) { g_dataWriter->writeDefOption(a); },
 				[](const CmdArgsDefSymbol& a) { g_dataWriter->writeDefSymbol(a); },
-				[](const CmdArgsBeginKeymap& a){ g_dataWriter->writeBeginKeymap(a); },
+				[](const CmdArgsDefKeymap& a) { g_dataWriter->writeDefKeymap(a); },
 				[](const CmdArgsAssignKey& a) { g_dataWriter->writeAssignKey(a); },
 				[](const CmdArgsAssignEvent& a){ g_dataWriter->writeAssignEvent(a); },
 				[](const CmdArgsAssignMod& a) { g_dataWriter->writeAssignMod(a); },
-				[](const CmdArgsPushKeymap&)  { g_dataWriter->writePushKeymap(); },
-				[](const CmdArgsPopKeymap&)   { g_dataWriter->writePopKeymap(); },
+				[](const CmdArgsEndKeymap&)   { g_dataWriter->writeEndKeymap(); },
 			}, entry.cmd);
 		} else {
 			// Include: parse + compile with the current keyseq count.
@@ -1178,16 +1177,22 @@ NYS_API bool nys_def_option(const char* option_name, const char* value)
 	return true;
 }
 
-NYS_API bool nys_begin_keymap(const char* keyword, const char* name,
+NYS_API bool nys_def_keymap(NYsKeymapScope scope,
+	const char* keyword, const char* name,
 	const char* window_class, const char* window_title,
 	const char* op, const char* parent_name,
 	int default_keyseq_idx)
 {
-	if (!checkInLoadSetting("nys_begin_keymap")) return false;
-	if (!keyword || !*keyword) return setError("nys_begin_keymap: keyword is empty");
-	if (!name    || !*name)    return setError("nys_begin_keymap: name is empty");
+	if (!checkInLoadSetting("nys_def_keymap")) return false;
+	if (!keyword || !*keyword) return setError("nys_def_keymap: keyword is empty");
+	if (!name    || !*name)    return setError("nys_def_keymap: name is empty");
+	if (scope != NYsKeymapScope_Declare &&
+	    scope != NYsKeymapScope_Enter &&
+	    scope != NYsKeymapScope_Block)
+		return setError("nys_def_keymap: unknown scope");
 
-	CmdArgsBeginKeymap d;
+	CmdArgsDefKeymap d;
+	d.scope             = static_cast<CmdKeymapScope>(scope);
 	d.keyword           = from_UTF8(keyword);
 	d.name              = from_UTF8(name);
 	d.defaultKeySeqIdx  = default_keyseq_idx;  // -1 = none
@@ -1206,17 +1211,10 @@ NYS_API bool nys_begin_keymap(const char* keyword, const char* name,
 	return true;
 }
 
-NYS_API bool nys_push_keymap(void)
+NYS_API bool nys_end_keymap(void)
 {
-	if (!checkInLoadSetting("nys_push_keymap")) return false;
-	g_cmdQueue.push_back(QueueEntry::makeDirect(CmdArgsPushKeymap{}));
-	return true;
-}
-
-NYS_API bool nys_pop_keymap(void)
-{
-	if (!checkInLoadSetting("nys_pop_keymap")) return false;
-	g_cmdQueue.push_back(QueueEntry::makeDirect(CmdArgsPopKeymap{}));
+	if (!checkInLoadSetting("nys_end_keymap")) return false;
+	g_cmdQueue.push_back(QueueEntry::makeDirect(CmdArgsEndKeymap{}));
 	return true;
 }
 

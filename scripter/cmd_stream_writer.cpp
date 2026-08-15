@@ -214,9 +214,10 @@ void CmdStreamWriter::writeDefSymbol(const CmdArgsDefSymbol &data)
 }
 
 
-void CmdStreamWriter::writeBeginKeymap(const CmdArgsBeginKeymap &data)
+void CmdStreamWriter::writeDefKeymap(const CmdArgsDefKeymap &data)
 {
-	writeU8(static_cast<uint8_t>(CmdId::BeginKeymap));
+	writeU8(static_cast<uint8_t>(CmdId::DefKeymap));
+	writeU8(static_cast<uint8_t>(data.scope));
 	writeString(data.keyword);
 	writeString(data.name);
 	writeString(data.windowClassName);
@@ -264,15 +265,9 @@ void CmdStreamWriter::writeAssignMod(const CmdArgsAssignMod &data)
 
 
 
-void CmdStreamWriter::writePushKeymap()
+void CmdStreamWriter::writeEndKeymap()
 {
-	writeU8(static_cast<uint8_t>(CmdId::PushKeymap));
-}
-
-
-void CmdStreamWriter::writePopKeymap()
-{
-	writeU8(static_cast<uint8_t>(CmdId::PopKeymap));
+	writeU8(static_cast<uint8_t>(CmdId::EndKeymap));
 }
 
 

@@ -1310,6 +1310,28 @@ static mrb_value modifier_initialize(mrb_state *mrb, mrb_value self)
 // NYamy::DSL  (main DSL object; .rb script is instance_eval'd on it)
 //=============================================================================
 
+/** Bracket a .mayu file so that its keymap context does not escape.
+
+    In .mayu a keymap statement stays in effect until the next one, so a file
+    that ends inside a keymap would otherwise decide where the assignments
+    written after the `load' land.  Bracketing the include keeps that rule
+    inside the file and hands the caller back its own context - Global at the
+    top level of a script.  Global always exists (Reset creates it) and
+    re-declaring it changes nothing.
+*/
+static void beginMayuScope(mrb_state *mrb)
+{
+	if (!nys_def_keymap(NYsKeymapScope_Block, "keymap", "Global",
+			nullptr, nullptr, nullptr, nullptr, -1))
+		raiseApiError(mrb, "nys_def_keymap failed");
+}
+
+static void endMayuScope(mrb_state *mrb)
+{
+	if (!nys_end_keymap())
+		raiseApiError(mrb, "nys_end_keymap failed");
+}
+
 static mrb_value dsl_load(mrb_state *mrb, mrb_value self)
 {
 	const char *path_cstr = nullptr;
@@ -1322,8 +1344,10 @@ static mrb_value dsl_load(mrb_state *mrb, mrb_value self)
 	if (is_rb) {
 		evalRbFile(mrb, self, resolveRbPath(mrb, path));
 	} else {
+		beginMayuScope(mrb);
 		if (!nys_include_mayu(path.c_str()))
 			raiseApiError(mrb, "nys_include_mayu failed");
+		endMayuScope(mrb);
 	}
 	return mrb_true_value();
 }
@@ -1365,7 +1389,9 @@ static mrb_value dsl_require(mrb_state *mrb, mrb_value self)
 static mrb_value dsl_load_mayu(mrb_state *mrb, mrb_value self)
 {
 	(void)self;
+	beginMayuScope(mrb);
 	if (!nys_load_mayu()) raiseApiError(mrb, "nys_load_mayu failed");
+	endMayuScope(mrb);
 	return mrb_true_value();
 }
 
@@ -1559,7 +1585,7 @@ static mrb_value dsl_defoption(mrb_state *mrb, mrb_value self)
 }
 
 // Shared implementation for keymap / keymap2 / window.
-static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
+static mrb_value defineKeymap(mrb_state *mrb, mrb_value self,
 	const char *keyword)
 {
 	mrb_value name_v, kw_hash = mrb_nil_value(), blk = mrb_nil_value();
@@ -1589,15 +1615,16 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 	if (!mrb_nil_p(default_v))
 		default_idx = resolveRhs(mrb, default_v);
 
-	// With a block, the keymap is a scope: the keymap in effect on the way in
-	// is restored on the way out, so a `key` written after the block goes where
-	// it looks like it goes.  Without one, the keymap stays in effect until the
-	// next one - the .mayu behaviour, which existing configurations rely on.
+	// A keymap statement declares the keymap; it does not decide where the
+	// assignments that follow it go.  With a block, the block is that place and
+	// the keymap in effect on the way in is restored on the way out; without
+	// one, nothing moves and the assignments stay where they were written.
+	// (.mayu keeps its own rule: its compiler emits Enter, which this DSL never
+	// does.)
 	bool scoped = !mrb_nil_p(blk) && mrb_proc_p(blk);
-	if (scoped && !nys_push_keymap())
-		raiseApiError(mrb, "nys_push_keymap failed");
 
-	if (!nys_begin_keymap(
+	if (!nys_def_keymap(
+			scoped ? NYsKeymapScope_Block : NYsKeymapScope_Declare,
 			keyword,
 			name.c_str(),
 			class_s.empty()  ? nullptr : class_s.c_str(),
@@ -1605,16 +1632,16 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 			op_s.empty()     ? nullptr : op_s.c_str(),
 			parent_s.empty() ? nullptr : parent_s.c_str(),
 			default_idx))
-		raiseApiError(mrb, "nys_begin_keymap failed");
+		raiseApiError(mrb, "nys_def_keymap failed");
 
 	if (scoped) {
 		mrb_funcall_with_block(mrb, self,
 			mrb_intern_lit(mrb, "instance_eval"), 0, nullptr, blk);
-		// An exception in the block unwinds past this, leaving the Push
-		// unmatched.  That is harmless: the setting is discarded wholesale when
+		// An exception in the block unwinds past this, leaving the block
+		// unclosed.  That is harmless: the setting is discarded wholesale when
 		// on_load_setting reports failure, so no half-scoped stream is applied.
-		if (!nys_pop_keymap())
-			raiseApiError(mrb, "nys_pop_keymap failed");
+		if (!nys_end_keymap())
+			raiseApiError(mrb, "nys_end_keymap failed");
 	}
 
 	return mrb_true_value();
@@ -1623,19 +1650,19 @@ static mrb_value dsl_begin_keymap(mrb_state *mrb, mrb_value self,
 static mrb_value dsl_keymap(mrb_state *mrb, mrb_value self)
 {
 	traceDslCall(mrb, "keymap");
-	return dsl_begin_keymap(mrb, self, "keymap");
+	return defineKeymap(mrb, self, "keymap");
 }
 
 static mrb_value dsl_keymap2(mrb_state *mrb, mrb_value self)
 {
 	traceDslCall(mrb, "keymap2");
-	return dsl_begin_keymap(mrb, self, "keymap2");
+	return defineKeymap(mrb, self, "keymap2");
 }
 
 static mrb_value dsl_window(mrb_state *mrb, mrb_value self)
 {
 	traceDslCall(mrb, "window");
-	return dsl_begin_keymap(mrb, self, "window");
+	return defineKeymap(mrb, self, "window");
 }
 
 // key  -> NYamy::KeyMap singleton on the DSL instance

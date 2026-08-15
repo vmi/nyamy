@@ -24,12 +24,11 @@ public:
 	void writeDefSubst(const CmdArgsDefSubst &data);
 	void writeDefOption(const CmdArgsDefOption &data);
 	void writeDefSymbol(const CmdArgsDefSymbol &data);
-	void writeBeginKeymap(const CmdArgsBeginKeymap &data);
+	void writeDefKeymap(const CmdArgsDefKeymap &data);
 	void writeAssignKey(const CmdArgsAssignKey &data);
 	void writeAssignEvent(const CmdArgsAssignEvent &data);
 	void writeAssignMod(const CmdArgsAssignMod &data);
-	void writePushKeymap();
-	void writePopKeymap();
+	void writeEndKeymap();
 	void writeReset();
 	void writeCommit();
 	// The following can be executed only after running writeCommit.

@@ -42,12 +42,11 @@ public:
 	void operator()(CmdArgsDefSubst &);
 	void operator()(CmdArgsDefOption &);
 	void operator()(CmdArgsDefSymbol &);
-	void operator()(CmdArgsBeginKeymap &);
+	void operator()(CmdArgsDefKeymap &);
 	void operator()(CmdArgsAssignKey &);
 	void operator()(CmdArgsAssignEvent &);
 	void operator()(CmdArgsAssignMod &);
-	void operator()(CmdArgsPushKeymap);
-	void operator()(CmdArgsPopKeymap);
+	void operator()(CmdArgsEndKeymap);
 	void operator()(CmdArgsCommit);
 
 private:
@@ -69,9 +68,9 @@ private:
 	std::vector<std::pair<KeySeq *, CmdArgsRegKeySeq>> m_pendingKeySeqs;
 	std::vector<CmdArgsDefSubst>                       m_pendingSubsts;
 
-	/// Keymaps saved by PushKeymap, innermost last.  Only the block form of
-	/// `keymap`/`window` brackets itself with Push/Pop, so this is empty
-	/// whenever the stream uses the blockless (.mayu) form only.
+	/// Keymaps displaced by a Block-scoped DefKeymap, innermost last.  Only the
+	/// block form of `keymap`/`window` opens one, so this stays empty for a
+	/// stream that comes from .mayu (which only ever emits Enter).
 	std::vector<Keymap *>                              m_keymapStack;
 
 	std::shared_ptr<Setting>        m_setting;   ///< Setting being built (Reset .. Commit)

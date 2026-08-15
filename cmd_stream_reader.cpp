@@ -32,12 +32,11 @@ std::optional<CmdArgs> CmdStreamReader::readCmd()
 	case CmdId::DefSubst: return readDefSubst();
 	case CmdId::DefOption:     return readDefOption();
 	case CmdId::DefSymbol:     return readDefSymbol();
-	case CmdId::BeginKeymap:     return readBeginKeymap();
+	case CmdId::DefKeymap:     return readDefKeymap();
 	case CmdId::AssignKey:     return readAssignKey();
 	case CmdId::AssignEvent:   return readAssignEvent();
 	case CmdId::AssignMod:     return readAssignMod();
-	case CmdId::PushKeymap:    return CmdArgsPushKeymap{};
-	case CmdId::PopKeymap:     return CmdArgsPopKeymap{};
+	case CmdId::EndKeymap:     return CmdArgsEndKeymap{};
 	case CmdId::Reset:         return CmdArgsReset{};
 	case CmdId::Commit:        return CmdArgsCommit{};
 	default:                   return std::nullopt;
@@ -299,9 +298,13 @@ CmdArgsDefSymbol CmdStreamReader::readDefSymbol()
 }
 
 
-CmdArgsBeginKeymap CmdStreamReader::readBeginKeymap()
+CmdArgsDefKeymap CmdStreamReader::readDefKeymap()
 {
-	CmdArgsBeginKeymap data;
+	CmdArgsDefKeymap data;
+	uint8_t scope = readU8();
+	if (scope > static_cast<uint8_t>(CmdKeymapScope::Block))
+		throw ErrorMessage() << L"DefKeymap: unknown scope " << scope;
+	data.scope = static_cast<CmdKeymapScope>(scope);
 	data.keyword = readString();
 	data.name = readString();
 	data.windowClassName = readString();
@@ -394,6 +397,17 @@ void CmdStreamReader::dumpAction(std::wostream &out, const CmdAction &action,
 }
 
 
+static const wchar_t *keymapScopeToString(CmdKeymapScope scope)
+{
+	switch (scope) {
+	case CmdKeymapScope::Declare: return L"Declare";
+	case CmdKeymapScope::Enter:   return L"Enter";
+	case CmdKeymapScope::Block:   return L"Block";
+	default:                      return L"???";
+	}
+}
+
+
 static const wchar_t *cmdIdToString(CmdId id)
 {
 	switch (id) {
@@ -406,12 +420,11 @@ static const wchar_t *cmdIdToString(CmdId id)
 	case CmdId::DefSubst:return L"DefSubst";
 	case CmdId::DefOption:    return L"DefOption";
 	case CmdId::DefSymbol:    return L"DefSymbol";
-	case CmdId::BeginKeymap:    return L"BeginKeymap";
+	case CmdId::DefKeymap:    return L"DefKeymap";
 	case CmdId::AssignKey:    return L"AssignKey";
 	case CmdId::AssignEvent:  return L"AssignEvent";
 	case CmdId::AssignMod:    return L"AssignMod";
-	case CmdId::PushKeymap:   return L"PushKeymap";
-	case CmdId::PopKeymap:    return L"PopKeymap";
+	case CmdId::EndKeymap:    return L"EndKeymap";
 	case CmdId::Reset:        return L"Reset";
 	case CmdId::Commit:       return L"Commit";
 	default:                  return L"???";
@@ -508,9 +521,10 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			out << L"symbol=\"" << data.symbolName << L"\"";
 			break;
 		}
-		case CmdId::BeginKeymap: {
-			auto data = reader.readBeginKeymap();
-			out << L"keyword=\"" << data.keyword
+		case CmdId::DefKeymap: {
+			auto data = reader.readDefKeymap();
+			out << L"scope=" << keymapScopeToString(data.scope)
+				<< L" keyword=\"" << data.keyword
 				<< L"\" name=\"" << data.name << L"\"";
 			if (!data.windowClassName.empty())
 				out << L" class=/" << data.windowClassName << L"/";
@@ -553,8 +567,7 @@ void CmdStreamReader::dump(std::istream &in, std::wostream &out)
 			out << L"]";
 			break;
 		}
-		case CmdId::PushKeymap:
-		case CmdId::PopKeymap:
+		case CmdId::EndKeymap:
 		case CmdId::Reset:
 		case CmdId::Commit:
 			break;

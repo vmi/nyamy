@@ -534,7 +534,10 @@ void MayuCompiler::visit(const AstDefOption &node)
 
 void MayuCompiler::visit(const AstKeymapDef &node)
 {
-	CmdArgsBeginKeymap data;
+	// A .mayu keymap statement stays in effect until the next one: there is no
+	// block form in that language, so Enter is the only scope it ever emits.
+	CmdArgsDefKeymap data;
+	data.scope = CmdKeymapScope::Enter;
 	data.keyword = node.keyword;
 	data.name = node.name;
 	if (node.window) {
@@ -546,7 +549,7 @@ void MayuCompiler::visit(const AstKeymapDef &node)
 	if (node.defaultKeySeq)
 		data.defaultKeySeqIdx = static_cast<int32_t>(
 			compileKeySequence(*node.defaultKeySeq, ModifierContext::KeySeq));
-	m_writer.writeBeginKeymap(data);
+	m_writer.writeDefKeymap(data);
 }
 
 
