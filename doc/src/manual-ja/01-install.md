@@ -5,11 +5,14 @@
 1. NYamy 以外のキーボードカスタマイズソフトを利用している場合は、動作の衝突を避けるため終了 (またはアンインストール) しておくことをお勧めします。
 2. 以前のバージョンの NYamy を利用している場合は、終了させます。
     - そのまま `install.cmd` を実行して上書きインストールして構いません。アンインストールする必要はありません。
+    - 上書きインストールでもスタートメニューのショートカットは作り直されます。以前に削除したものを復活させたくない場合は `install.cmd --skip-startmenu` を実行してください。
 3. 配布 zip をダウンロードフォルダなど任意のフォルダに展開します (一時的な場所で構いません)。
 4. 展開したフォルダの `install.cmd` を実行します。
     - ファイル一式が `%LOCALAPPDATA%\Programs\NYamy` にコピーされます (`install.cmd`/`install.ps1` 自身はコピー対象に含まれません)。
-    - 途中でスタートアップ (ログイン時の自動起動) 用ショートカットを作成するか尋ねられます。何も入力せず Enter を押すと作成しません。あとから作成/削除したい場合は、配布 zip を再度展開し、その中の `install.cmd --startup-only` / `install.cmd --no-startup-only` を実行してください (`install.cmd --help` でオプション一覧を表示できます)。
-5. `%LOCALAPPDATA%\Programs\NYamy\nyamy.exe` を実行すると、タスクトレイに NYamy のアイコンが表示されます。
+    - スタートメニューに NYamy のショートカットが作成されます。作成したくない場合は `install.cmd --skip-startmenu` を実行してください。
+    - 途中でスタートアップ (ログイン時の自動起動) 用ショートカットを作成するか尋ねられます。何も入力せず Enter を押すと作成しません。
+    - ショートカットをあとから作成/削除したい場合は、配布 zip を再度展開し、その中の `install.cmd` に `--startmenu-only` / `--no-startmenu-only` / `--startup-only` / `--no-startup-only` のいずれかを付けて実行してください (`install.cmd --help` でオプション一覧を表示できます)。
+5. スタートメニューの「NYamy」(または `%LOCALAPPDATA%\Programs\NYamy\nyamy.exe`) を実行すると、タスクトレイに NYamy のアイコンが表示されます。
 6. タスクトレイメニューの[選択(<u>C</u>) ►](#menu-c)で、キーボードに合った設定を選びます。
 
 ### 設定の保存先 {#install_config}

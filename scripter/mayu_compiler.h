@@ -130,6 +130,13 @@ public:
 	/// Check if there were any errors
 	bool hasErrors() const { return m_hasErrors; }
 
+	/// The symbol set after compilation: the initial one plus every `define`
+	/// the file (and anything it included) executed.  The caller merges this
+	/// back, so that a symbol defined by one included .mayu is visible to the
+	/// `if` of the next one - which is how it behaved when includes were one
+	/// pass, and what nesting an include still does today.
+	const Symbols &symbols() const { return m_symbols; }
+
 	/// Return the next keyseq index that would be assigned.
 	/// After compile(), this equals initialKeySeqIdx + number of keyseqs emitted.
 	uint32_t nextKeySeqIdx() const { return m_nextKeySeqIdx; }

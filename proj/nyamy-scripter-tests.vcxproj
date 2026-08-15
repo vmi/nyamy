@@ -101,6 +101,7 @@
     <ClCompile Include="..\tests\scripter\setting_dump.cpp" />
     <!-- mruby DSL binding (on_load_setting callback); calls the DLL's ys_* API -->
     <ClCompile Include="..\scripter\mruby_binding.cpp" />
+    <ClCompile Include="..\scripter\cli_options.cpp" />
     <!-- engine consumer side (mirrors nyamy.vcxproj minus mayu.cpp / scripter_manager.cpp) -->
     <ClCompile Include="..\cmd_processor.cpp" />
     <ClCompile Include="..\cmd_stream_reader.cpp" />

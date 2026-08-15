@@ -13,18 +13,30 @@ $installRoot = Split-Path $targetDir -Parent
 
 function Show-Usage {
     Write-Host @'
-Usage: install.ps1 [option]
+Usage: install.ps1 [options]
 
 Options:
-  --help              Show this help and exit
-  --startup           Create/recreate the Startup shortcut (also runs the normal install)
-  --startup-only      Create/recreate the Startup shortcut only (no file copy)
-  --no-startup        Remove the Startup shortcut if present (also runs the normal install)
-  --no-startup-only   Remove the Startup shortcut only (no file copy)
-  --skip-startup      Run the normal install only, without asking about the Startup shortcut
+  --help                Show this help and exit
 
-With no option, the normal install runs and then you are asked whether to
-create or remove a Startup shortcut.
+  --startup             Create/recreate the Startup shortcut (also runs the normal install)
+  --startup-only        Create/recreate the Startup shortcut only (no file copy)
+  --no-startup          Remove the Startup shortcut if present (also runs the normal install)
+  --no-startup-only     Remove the Startup shortcut only (no file copy)
+  --skip-startup        Leave the Startup shortcut as it is, without asking
+
+  --startmenu           Create/recreate the Start Menu shortcut (same as the default)
+  --startmenu-only      Create/recreate the Start Menu shortcut only (no file copy)
+  --no-startmenu        Remove the Start Menu shortcut if present (also runs the normal install)
+  --no-startmenu-only   Remove the Start Menu shortcut only (no file copy)
+  --skip-startmenu      Leave the Start Menu shortcut as it is
+
+With no option, the normal install runs, the Start Menu shortcut is created,
+and you are asked whether to create or remove a Startup shortcut.
+
+One option from each group may be given.  Any --*-only option skips the file
+copy and leaves the group it does not name alone, so --startup-only does not
+create the Start Menu shortcut that a plain install would.
+--skip-startup --skip-startmenu together install the files and nothing else.
 '@
 }
 
@@ -79,7 +91,9 @@ function Move-InstalledFilesAside([string]$Dir) {
 # Argument parsing
 #
 $startupModes = @('--startup', '--startup-only', '--no-startup', '--no-startup-only', '--skip-startup')
+$startmenuModes = @('--startmenu', '--startmenu-only', '--no-startmenu', '--no-startmenu-only', '--skip-startmenu')
 $startupMode = $null
+$startmenuMode = $null
 
 foreach ($arg in $args) {
     if ($arg -eq '--help') {
@@ -94,6 +108,14 @@ foreach ($arg in $args) {
         }
         $startupMode = $arg
     }
+    elseif ($startmenuModes -contains $arg) {
+        if ($startmenuMode) {
+            Write-Host "ERROR: Only one of $($startmenuModes -join ', ') may be specified." -ForegroundColor Red
+            Show-Usage
+            exit 1
+        }
+        $startmenuMode = $arg
+    }
     else {
         Write-Host "ERROR: Unknown option: $arg" -ForegroundColor Red
         Show-Usage
@@ -101,13 +123,18 @@ foreach ($arg in $args) {
     }
 }
 
-$startupOnly = ($startupMode -eq '--startup-only') -or ($startupMode -eq '--no-startup-only')
+# An --*-only option asks for shortcut maintenance without a file copy.  It also
+# means "just this one": the group it does not name is left alone, so that
+# --startup-only does not quietly create the Start Menu shortcut a plain install
+# would have created.
+$onlyModes = @('--startup-only', '--no-startup-only', '--startmenu-only', '--no-startmenu-only')
+$shortcutOnly = ($onlyModes -contains $startupMode) -or ($onlyModes -contains $startmenuMode)
 
-if ($startupOnly -and -not (Test-Path (Join-Path $targetDir 'nyamy.exe'))) {
-    throw "NYamy is not installed in $targetDir yet. Run install without --startup-only/--no-startup-only first."
+if ($shortcutOnly -and -not (Test-Path (Join-Path $targetDir 'nyamy.exe'))) {
+    throw "NYamy is not installed in $targetDir yet. Run install without any --*-only option first."
 }
 
-if (-not $startupOnly) {
+if (-not $shortcutOnly) {
     Write-NYamyPhase "Installation started: $targetDir"
 
     if ($sourceDir.TrimEnd('\').Equals($targetDir.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase) -or
@@ -155,9 +182,37 @@ if (-not $startupOnly) {
 }
 
 #
-# Startup shortcut
+# Start Menu shortcut.  Unlike the Startup one this is created by default and
+# without asking, so that a plain install always leaves a way to start NYamy:
+# the install directory itself is not somewhere anyone goes looking.
 #
-if (-not $startupMode) {
+if ($startmenuMode) {
+    switch ($startmenuMode) {
+        '--startmenu'         { New-NYamyStartMenuShortcut $targetDir }
+        '--startmenu-only'    { New-NYamyStartMenuShortcut $targetDir }
+        '--no-startmenu'      { Remove-NYamyStartMenuShortcut $targetDir }
+        '--no-startmenu-only' { Remove-NYamyStartMenuShortcut $targetDir }
+        '--skip-startmenu'    { }
+    }
+}
+elseif (-not $shortcutOnly) {
+    New-NYamyStartMenuShortcut $targetDir
+}
+
+#
+# Startup shortcut.  Asked about rather than assumed: starting with Windows is
+# a choice, and the answer defaults to leaving things as they are.
+#
+if ($startupMode) {
+    switch ($startupMode) {
+        '--startup'         { New-NYamyStartupShortcut $targetDir }
+        '--startup-only'    { New-NYamyStartupShortcut $targetDir }
+        '--no-startup'      { Remove-NYamyStartupShortcut $targetDir }
+        '--no-startup-only' { Remove-NYamyStartupShortcut $targetDir }
+        '--skip-startup'    { }
+    }
+}
+elseif (-not $shortcutOnly) {
     Write-Host ""
     Write-Host "Create a Startup shortcut for NYamy?"
     $action = $null
@@ -174,14 +229,5 @@ if (-not $startupMode) {
     switch ($action) {
         'Create' { New-NYamyStartupShortcut $targetDir }
         'Remove' { Remove-NYamyStartupShortcut $targetDir }
-    }
-}
-else {
-    switch ($startupMode) {
-        '--startup'         { New-NYamyStartupShortcut $targetDir }
-        '--startup-only'    { New-NYamyStartupShortcut $targetDir }
-        '--no-startup'      { Remove-NYamyStartupShortcut $targetDir }
-        '--no-startup-only' { Remove-NYamyStartupShortcut $targetDir }
-        '--skip-startup'    { }
     }
 }

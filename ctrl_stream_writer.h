@@ -8,6 +8,7 @@
 
 #  include "ctrl_stream.h"
 #  include <ostream>
+#  include <string>
 #  include <vector>
 
 
@@ -40,10 +41,19 @@ public:
 private:
 	std::ostream &m_out;
 
+	/// While set, the primitives append here instead of writing to the stream.
+	/// writeExecUserFunc() uses it to serialize the arguments before the count
+	/// that describes them is committed to the stream.
+	std::string *m_buf = nullptr;
+
 	// Primitive writers (little-endian, same convention as CmdStreamWriter)
 	void writeU8(uint8_t v);
 	void writeU16(uint16_t v);
+	void writeU32(uint32_t v);
+	void writeI32(int32_t v);
+	void writeU64(uint64_t v);
 	void writeString(const wstringi &s);
+	void writeFuncArg(const FuncArg &arg);
 };
 
 

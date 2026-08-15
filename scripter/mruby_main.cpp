@@ -2,14 +2,17 @@
 // mruby_main.cpp
 //
 // Entry point for nyamy-scripter.exe (mruby variant).
-// argv[1] is the script path; argv[2..] are passed as ARGV.
+// The command line is [options] <script> [args...]; see cli_options.h.
+// Arguments after <script> are passed to the script as ARGV.
 //
 // argv is UTF-8 (guaranteed by the UTF-8 activeCodePage manifest).
 
 #include "nyamy_scripter.h"
 #include "mruby_binding.h"
+#include "cli_options.h"
 #include "ctrl_stream.h"
 #include <stdio.h>
+#include <vector>
 #include <windows.h>
 
 
@@ -18,31 +21,50 @@
 // process, so a missing script has to be caught before nys_start().
 static const int kUsageExitCode = 2;
 
-static void printUsage(const char *i_argv0)
-{
-	fprintf(stderr,
-		"usage: %s <script> [args...]\n"
-		"\n"
-		"  script   configuration script (.rb, or .mayu to compile).  A\n"
-		"           relative path is searched in NYAMY_CONFIG then NYAMY_ROOT;\n"
-		"           the current directory is not searched.\n"
-		"  args     passed to the script as ARGV\n"
-		"\n"
-		"NYAMY_ROOT=%s\n"
-		"NYAMY_HOME=%s\n"
-		"NYAMY_CONFIG=%s\n",
-		i_argv0, nys_paths_root(), nys_paths_home(), nys_paths_config());
-}
-
 
 int main(int argc, char *argv[])
 {
-	if (argc < 2) {
-		printUsage(0 < argc ? argv[0] : "nyamy-scripter");
+	const char *argv0 = 0 < argc ? argv[0] : "nyamy-scripter";
+
+	CliOptions options;
+	std::string error;
+	if (!parseCliOptions(argc, argv, &options, &error)) {
+		fprintf(stderr, "%s: %s\n\n", argv0, error.c_str());
+		printCliUsage(argv0);
+		return kUsageExitCode;
+	}
+	if (options.showVersion) {
+		printCliVersion();
+		return 0;
+	}
+	if (options.showHelp) {
+		printCliUsage(argv0);
+		return 0;
+	}
+	if (options.scriptArgIndex == 0) {
+		printCliUsage(argv0);
 		return kUsageExitCode;
 	}
 
-	MRubyContext ctx = { argc, (const char* const*)argv, nullptr };
+	// -D means the same as a symbol carried by the Start command, and has to be
+	// in place before the first load; nys_add_default_symbol re-applies it to
+	// every Start, so it survives reloads too.
+	for (const auto &symbol : options.symbols)
+		nys_add_default_symbol(symbol.c_str());
+
+	// A NULL-terminated view of the -I directories.  options owns the strings
+	// and outlives nys_start(), which reads them again on every reload.
+	std::vector<const char *> includeDirs;
+	for (const auto &dir : options.includeDirs)
+		includeDirs.push_back(dir.c_str());
+	includeDirs.push_back(nullptr);
+
+	MRubyContext ctx = {};
+	ctx.argc           = argc;
+	ctx.argv           = (const char *const *)argv;
+	ctx.mrb            = nullptr;
+	ctx.scriptArgIndex = options.scriptArgIndex;
+	ctx.includeDirs    = includeDirs.data();
 
 	NYsCallbacks callbacks = {};
 	callbacks.on_load_setting = mruby_on_load_setting;

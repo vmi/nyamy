@@ -85,6 +85,11 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx);
 // nys_start() の前に呼ぶこと。
 NYS_API void nys_set_quit_timeout(uint32_t millisec);
 
+// Start コマンドが運ぶシンボル集合に上乗せするシンボルを登録する (-D オプションの実体)。
+// nys_start() の前に呼ぶこと。Start のたびに再適用されるのでリロードしても残り、
+// on_load_setting より前に確定する。冪等。
+NYS_API bool nys_add_default_symbol(const char* name);
+
 // バージョン確認 (FFI 利用時の互換性検証用)
 // NYamy が 0.9.x の間は NYamy 本体と同じ値。1.0.0 リリース時に 1.0.0 で固定し、
 // 以後は本 C API が変わったときだけ動かす。
@@ -142,6 +147,13 @@ NYS_API bool nys_begin_keymap(const char* keyword, const char* name,
                             const char* window_class, const char* window_title,
                             const char* op, const char* parent_name,
                             int default_keyseq_idx);
+
+// キーマップのスコープを囲む。nys_push_keymap() が現在のキーマップを退避し、
+// nys_pop_keymap() がそれを戻す。ブロック付きの keymap / window は
+// push → nys_begin_keymap → ブロック実行 → pop の順に呼ぶ。
+// ブロック無しの形式はどちらも呼ばず、次の nys_begin_keymap まで有効なまま。
+NYS_API bool nys_push_keymap(void);
+NYS_API bool nys_pop_keymap(void);
 
 // key KEY = ... 相当
 // lhs_mod_keys: 左辺の修飾キー文字列のNYsStrs(全ての要素は文字列であること) (例: "A", "S-A", "~S-A")

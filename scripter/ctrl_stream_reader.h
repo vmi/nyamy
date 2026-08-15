@@ -9,6 +9,8 @@
 #  include "../ctrl_stream.h"
 #  include "nys_types.h"
 #  include <istream>
+#  include <memory>
+#  include <vector>
 
 
 /// Payload of the Start control command (pairs with CtrlId::Start)
@@ -25,6 +27,13 @@ struct CtrlArgsExecUserFunc {
 	wstringi    name;
 	NYsFuncArgs  args;     // move-only
 	TriggerInfo context;
+
+	/// Backing store for the token-sequence arguments.  NYsFuncArg::strs does
+	/// not own what it points at, and the ctrl stream is read outside the
+	/// callback session that owns everything else, so the lists live here -
+	/// for as long as the request itself does.  unique_ptr keeps the pointers
+	/// valid however this vector grows or moves.
+	std::vector<std::unique_ptr<NYsStrs>> tokenSeqs;
 };
 
 
@@ -55,7 +64,13 @@ private:
 	// Primitive readers (little-endian, same convention as CmdStreamReader)
 	uint8_t readU8();
 	uint16_t readU16();
+	uint32_t readU32();
+	uint64_t readU64();
 	wstringi readString();
+
+	/// Read one function argument into o_data (token sequences are appended to
+	/// its backing store).  Throws on a tag it does not know.
+	NYsFuncArg readFuncArg(CtrlArgsExecUserFunc *o_data);
 };
 
 

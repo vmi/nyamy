@@ -407,16 +407,22 @@ void Keymap::describe(std::wostream &i_ost, DescribeParam *i_dp) const
 		break;
 	case Type_windowAnd:
 		i_ost << L"window " << m_name << L" ";
-		if (m_windowTitle.str() == L".*")
-			i_ost << L"/" << m_windowClass.str() << L"/";
-		else
-			i_ost << L"( /" << m_windowClass.str() << L"/ && /"
-			<< m_windowTitle.str() << L"/ )";
+		if (m_windowTitle.str() == L".*") {
+			outputRegexp(i_ost, m_windowClass.str());
+		} else {
+			i_ost << L"( ";
+			outputRegexp(i_ost, m_windowClass.str());
+			i_ost << L" && ";
+			outputRegexp(i_ost, m_windowTitle.str());
+			i_ost << L" )";
+		}
 		break;
 	case Type_windowOr:
-		i_ost << L"window " << m_name << L" ( /"
-		<< m_windowClass.str() << L"/ || /" << m_windowTitle.str()
-		<< L"/ )";
+		i_ost << L"window " << m_name << L" ( ";
+		outputRegexp(i_ost, m_windowClass.str());
+		i_ost << L" || ";
+		outputRegexp(i_ost, m_windowTitle.str());
+		i_ost << L" )";
 		break;
 	}
 	if (m_parentKeymap)

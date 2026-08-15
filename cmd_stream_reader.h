@@ -30,7 +30,7 @@ public:
 	CmdArgsDefSubst readDefSubst();
 	CmdArgsDefOption readDefOption();
 	CmdArgsDefSymbol readDefSymbol();
-	CmdArgsBeginKeymap readBeginKeymap();
+	CmdArgsDefKeymap readDefKeymap();
 	CmdArgsAssignKey readAssignKey();
 	CmdArgsAssignEvent readAssignEvent();
 	CmdArgsAssignMod readAssignMod();

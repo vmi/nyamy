@@ -173,10 +173,12 @@ Write-Host "NOTE: %LOCALAPPDATA%\NYamy will NOT be removed."
 Write-Host ""
 
 #
-# Remove the Startup shortcut, if any, before scheduling self-destruction
-# (this does not depend on this process exiting, unlike the directory removal below)
+# Remove the shortcuts, if any, before scheduling self-destruction (this does
+# not depend on this process exiting, unlike the directory removal below).
+# Either one is left alone if it points at a different installation.
 #
 Remove-NYamyStartupShortcut $installDir
+Remove-NYamyStartMenuShortcut $installDir
 
 #
 # Get the files out of the way, then have a detached process delete both what

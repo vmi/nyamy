@@ -42,10 +42,11 @@ public:
 	void operator()(CmdArgsDefSubst &);
 	void operator()(CmdArgsDefOption &);
 	void operator()(CmdArgsDefSymbol &);
-	void operator()(CmdArgsBeginKeymap &);
+	void operator()(CmdArgsDefKeymap &);
 	void operator()(CmdArgsAssignKey &);
 	void operator()(CmdArgsAssignEvent &);
 	void operator()(CmdArgsAssignMod &);
+	void operator()(CmdArgsEndKeymap);
 	void operator()(CmdArgsCommit);
 
 private:
@@ -66,6 +67,11 @@ private:
 	// substitutes read the contents of a materialized keyseq.
 	std::vector<std::pair<KeySeq *, CmdArgsRegKeySeq>> m_pendingKeySeqs;
 	std::vector<CmdArgsDefSubst>                       m_pendingSubsts;
+
+	/// Keymaps displaced by a Block-scoped DefKeymap, innermost last.  Only the
+	/// block form of `keymap`/`window` opens one, so this stays empty for a
+	/// stream that comes from .mayu (which only ever emits Enter).
+	std::vector<Keymap *>                              m_keymapStack;
 
 	std::shared_ptr<Setting>        m_setting;   ///< Setting being built (Reset .. Commit)
 	std::shared_ptr<Setting>        m_committed; ///< last committed Setting (used by ExecKeySeq)
