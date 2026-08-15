@@ -15,6 +15,39 @@
 #include <process.h>
 
 
+/** Thread whose focus m_focusOfThreads holds for this foreground window.
+
+    The hooks report a focus under the thread that observed it
+    (NotifySetFocus::m_threadId is the reporting thread), and an application is
+    free to own its top level window on one thread and the control that takes
+    the keyboard on another - WinUI 3 does exactly that, and Windows 11's
+    Notepad puts every tab on a thread of its own.  Those threads share an input
+    queue, so GetGUIThreadInfo() answers for any of them; asking the foreground
+    thread therefore names the window that actually has the focus, and the
+    thread owning that window is the one that reported it.
+
+    Keying off the foreground thread instead looks up an entry that no longer
+    describes where the keyboard is going: moving the focus to a window owned by
+    another thread of the same application notifies only that other thread, and
+    leaves the foreground thread's entry behind, pointing at whatever it saw
+    last.  Switching Notepad tabs left the keymaps on the tab that was open
+    before.
+*/
+static DWORD focusThreadOf(HWND i_hwndFore)
+{
+	DWORD threadId = GetWindowThreadProcessId(i_hwndFore, NULL);
+	GUITHREADINFO gti;
+	memset(&gti, 0, sizeof(gti));
+	gti.cbSize = sizeof(gti);
+	// hwndFocus is NULL whenever the queue has no focus window at all - during
+	// an activation change, or while a menu has taken the input - and then the
+	// foreground thread is still the best answer available.
+	if (GetGUIThreadInfo(threadId, &gti) && gti.hwndFocus)
+		threadId = GetWindowThreadProcessId(gti.hwndFocus, NULL);
+	return threadId;
+}
+
+
 // check focus window
 void Engine::checkFocusWindow()
 {
@@ -24,7 +57,7 @@ restart:
 	count ++;
 
 	HWND hwndFore = GetForegroundWindow();
-	DWORD threadId = GetWindowThreadProcessId(hwndFore, NULL);
+	DWORD threadId = focusThreadOf(hwndFore);
 
 	if (hwndFore) {
 		{
@@ -1817,8 +1850,16 @@ bool Engine::setFocus(HWND i_hwndFocus, DWORD i_threadId,
 	Lock lock(this);
 	if (m_isSynchronizing)
 		return false;
-	if (i_hwndFocus == NULL)
+	// A thread reporting no focus window teaches us nothing about it, so it
+	// stays unregistered - and an unregistered foreground thread is what makes
+	// checkFocusWindow() fall back to the global focus, which is otherwise hard
+	// to account for from the log alone.  notifySetFocus() no longer sends
+	// these, so one arriving means it came from somewhere else.
+	if (i_hwndFocus == NULL) {
+		Acquire a(&m_log, LogLevel::Debug);
+		m_log << L"NoFocusWindow: THREADID: " << i_threadId << std::endl;
 		return true;
+	}
 
 	// remove newly created thread's id from m_detachedThreadIds
 	if (!m_detachedThreadIds.empty()) {

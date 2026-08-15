@@ -73,9 +73,7 @@ static HookDataArch *s_hookDataArch;
 struct Globals {
 	HANDLE m_hHookData;				///
 	HANDLE m_hHookDataArch;			///
-	HWND m_hwndFocus;				///
 	HINSTANCE m_hInstDLL;				///
-	bool m_isInMenu;				///
 	UINT m_WM_MAYU_MESSAGE;			///
 	bool m_isImeLock;				///
 	bool m_isImeCompositioning;			///
@@ -98,6 +96,34 @@ struct Globals {
 };
 
 static Globals g;
+
+/** Hook state that belongs to one GUI thread rather than to the process.
+
+    A process can run its user interface on more than one thread: WinUI 3 puts
+    the top level window and the input control on different ones, and Windows
+    attaches the input queues of threads related that way, so GetFocus() answers
+    the same window whichever of them asks.
+
+    Held in Globals, these two were one value for the whole process, and the
+    threads overwrote each other:
+
+    - m_hwndFocus is what notifySetFocus() compares against to decide whether
+      anything changed.  Whichever thread reported the focus window first
+      silenced every other thread's report of the same window, so nyamy learned
+      the focus of one thread only.  It keys what it knows by the reporting
+      thread, and looks it up by the thread owning the foreground window - a
+      different thread here - so the lookup missed and the window specific
+      keymaps stopped applying.  Which thread won the race varied from run to
+      run, which is what made the symptom look intermittent.
+    - m_isInMenu makes getClassNameTitleName() report MENU.  One thread opening
+      a menu made every other thread's window report itself that way.
+*/
+struct ThreadLocals {
+	HWND m_hwndFocus;				/// focus window this thread last reported
+	bool m_isInMenu;				/// is this thread inside a menu loop ?
+};
+
+static thread_local ThreadLocals t;
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -436,7 +462,7 @@ static void notifyName(HWND i_hwnd, Notify::Type i_type = Notify::Type_name)
 {
 	wstringi className;
 	std::wstring titleName;
-	getClassNameTitleName(i_hwnd, g.m_isInMenu, &className, &titleName);
+	getClassNameTitleName(i_hwnd, t.m_isInMenu, &className, &titleName);
 
 	NotifySetFocus nfc;
 	nfc.m_type = i_type;
@@ -453,9 +479,17 @@ static void notifyName(HWND i_hwnd, Notify::Type i_type = Notify::Type_name)
 static void notifySetFocus(bool i_doesForce = false)
 {
 	HWND hwnd = GetFocus();
-	if (i_doesForce || hwnd != g.m_hwndFocus) {
-		g.m_hwndFocus = hwnd;
-		notifyName(hwnd, Notify::Type_setFocus);
+	if (i_doesForce || hwnd != t.m_hwndFocus) {
+		t.m_hwndFocus = hwnd;
+		// A thread with no focus window says nothing about it that nyamy can
+		// use, and nyamy drops such a notification on arrival.  This happens on
+		// every activation - WM_ACTIVATEAPP reaches us before the focus is
+		// assigned, WM_SETFOCUS follows some milliseconds later with the real
+		// window - and once per UI thread, so sending it is a mailslot write
+		// per thread per activation spent on nothing.  The assignment above
+		// still happens, so the real window that follows is seen as a change.
+		if (hwnd)
+			notifyName(hwnd, Notify::Type_setFocus);
 	}
 }
 
@@ -769,15 +803,15 @@ LRESULT CALLBACK callWndProc(int i_nCode, WPARAM i_wParam, LPARAM i_lParam)
 			}
 			break;
 		case WM_ENTERMENULOOP:
-			g.m_isInMenu = true;
+			t.m_isInMenu = true;
 			notifySetFocus(true);
 			break;
 		case WM_EXITMENULOOP:
-			g.m_isInMenu = false;
+			t.m_isInMenu = false;
 			notifySetFocus(true);
 			break;
 		case WM_SETFOCUS:
-			g.m_isInMenu = false;
+			t.m_isInMenu = false;
 			// for kana
 			if (g_hookData->m_correctKanaLockHandling) {
 				if (HIMC hIMC = ImmGetContext(cwps.hwnd)) {
