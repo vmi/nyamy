@@ -880,30 +880,19 @@ private:
 	}
 
 	void showBanner(bool i_isCleared) {
-		// Every log line already carries hh:mm:ss.SSS, and a bare [YYYY-MM-DD]
-		// line is emitted whenever the date changes, so the banner only needs
-		// the wall clock time - and no ruled lines to separate it.
-		wchar_t starttimebuf[64];
-		wcsftime(starttimebuf, NUMBER_OF(starttimebuf), L"%H:%M:%S",
-				 localtime(&m_startTime));
-
+		wchar_t modulebuf[1024];
+		CHECK_TRUE( GetModuleFileName(g_hInst, modulebuf,
+									  NUMBER_OF(modulebuf)) );
 		Acquire a(&m_log, LogLevel::Info);
 		m_log << loadString(IDS_mayu) << L" " WIDEN(VERSION);
 #ifndef NDEBUG
 		m_log << L" (DEBUG)";
 #endif
-		m_log << L" (UNICODE)";
-		m_log << std::endl;
+		m_log << L" (" << modulebuf << L")" << std::endl;
 		m_log << L"  built by "
 		<< WIDEN(LOGNAME) << L"@" << toLower(WIDEN(COMPUTERNAME))
-		<< L" (" << WIDEN(__DATE__) <<  L" "
-		<< WIDEN(__TIME__) << L", "
-		<< getCompilerVersionString() << L")" << std::endl;
-		wchar_t modulebuf[1024];
-		CHECK_TRUE( GetModuleFileName(g_hInst, modulebuf,
-									  NUMBER_OF(modulebuf)) );
-		m_log << L"  started at " << starttimebuf << std::endl;
-		m_log << L"  " << modulebuf << std::endl;
+		<< L" at " << WIDEN(__DATE__) <<  L" " << WIDEN(__TIME__) << std::endl;
+		m_log << L"  " << getCompilerVersionString() << L")" << std::endl;
 		m_log << (i_isCleared ? L"log was cleared." : L"log begins.")
 		<< std::endl;
 	}
