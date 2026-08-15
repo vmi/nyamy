@@ -1180,6 +1180,20 @@ key M-C = &ShellExecute("open", "C:/WINDOWS/system32/Control.exe", "sysdm.cpl",,
 key M-H = &ShellExecute("open", "https://www.example.com/",,, ShowNormal)
 ```
 
+##### キーリピートとの関係 {#function_ShellExecute_repeat}
+
+キーを押しっぱなしにしても実行は 1 回だけです。オートリピートによる発火は無視されるので、アプリケーションがいくつも起動することはありません。
+
+このため、[`R-`](#keyRepeat) を明示的に指定した `key R-M-B = &ShellExecute(...)` のような割り当ては一度も実行されません。
+
+##### 引数の評価タイミング {#function_ShellExecute_eval}
+
+`$Clipboard` などの[引数置換](#arg_subst)は、**キーを押した時点**で評価されます。プログラムの起動には時間がかかることがありますが、その間にクリップボードの内容やフォーカスが変わっても、キーを押した時点の値が使われます。
+
+```mayu
+key M-C-O = &ShellExecute("open", $Clipboard,,, ShowNormal)
+```
+
 #### `&Sync` {#function_Sync}
 
 それまでに Windows へ送ったキー入力がアプリケーションに届くまで、NYamyのキー処理を中断します。

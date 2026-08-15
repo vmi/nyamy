@@ -292,8 +292,9 @@ private:
 	      into stays alive.
 
 	    Entry points that do NOT check it (threadAttachNotify,
-	    threadDetachNotify, shellExecute, getHelpMessages) are safe only
-	    because of the first point above. */
+	    threadDetachNotify, getHelpMessages) are safe only because of the first
+	    point above.  shellExecute() is not among them: it takes no lock and
+	    reads no engine state at all. */
 	bool volatile m_isSynchronizing;
 	bool volatile m_isAborting;			/** shutdown cut a wait short;
                                                     stop generating events */
@@ -344,7 +345,23 @@ private:
 	// for functions
 	KeymapPtrList m_keymapPrefixHistory;		/// for &amp;KeymapPrevPrefix
 	EmacsEditKillLine m_emacsEditKillLine;	/// for &amp;EmacsEditKillLine
-	const ActionFunction *m_afShellExecute;	/// for &amp;ShellExecute
+	/** Arguments of a pending &amp;ShellExecute.  Allocated by funcShellExecute()
+	    on the engine thread and handed to the UI thread through the lParam of
+	    WM_APP_engineNotify, which takes ownership.
+
+	    The StrExprArgs are evaluated when the key is pressed and only the
+	    resulting strings cross threads, so nothing here points into the Setting
+	    that produced them - a reload is free to retire that Setting while the
+	    request is still in flight. */
+	struct ShellExecuteRequest {
+		std::wstring m_operation;			///
+		std::wstring m_file;				///
+		std::wstring m_parameters;			///
+		std::wstring m_directory;			///
+		int m_showCommand;				///
+		/// the &amp;ShellExecute(...) text, for the error message
+		std::wstring m_description;
+	};
 
 	WindowPositions m_windowPositions;		///
 	WindowsWithAlpha m_windowsWithAlpha;		///
@@ -775,8 +792,8 @@ public:
 	/// thread detach notify
 	bool threadDetachNotify(DWORD i_threadId);
 
-	/// shell execute
-	void shellExecute();
+	/// shell execute.  Takes ownership of the ShellExecuteRequest in i_lParam
+	void shellExecute(LPARAM i_lParam);
 
 	/// get help message
 	void getHelpMessages(std::wstring *o_helpMessage, std::wstring *o_helpTitle);

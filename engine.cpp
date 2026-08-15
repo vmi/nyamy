@@ -1523,7 +1523,6 @@ Engine::Engine(womsgstream &i_log)
 		m_currentKeymap(NULL),
 		m_currentFocusOfThread(NULL),
 		m_hwndFocus(NULL),
-		m_afShellExecute(NULL),
 		m_variable(0),
 		m_log(i_log) {
 #pragma warning(suppress: 6387)

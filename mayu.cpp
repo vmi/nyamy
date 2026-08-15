@@ -622,7 +622,7 @@ private:
 			case WM_APP_engineNotify: {
 				switch (i_wParam) {
 				case EngineNotify_shellExecute:
-					This->m_engine.shellExecute();
+					This->m_engine.shellExecute(i_lParam);
 					break;
 				case EngineNotify_loadSetting:
 					This->load();
