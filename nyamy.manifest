@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity type="win32" name="nyamy" version="1.0.0.0"/>
+  <!-- asm.v3 is the namespace windowsSettings is defined in; leaving the
+       element in the enclosing asm.v1 namespace is not the documented form -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <!-- Per-Monitor v2 brings the automatic scaling of dialogs, menus, the
+           non-client area and comctl32 controls, and sends child windows their
+           own DPI change notifications.  The older dpiAware element is kept
+           for hosts that do not read dpiAwareness; both are listed
+           most-capable-first so that whichever one is honoured picks the best
+           available level.
+
+           This is what makes USER32 report physical pixels: GetWindowRect,
+           GetCursorPos and GetSystemMetrics stop being virtualized into a
+           96 dpi space, which is what lets nyamy's coordinates agree with the
+           low level mouse hook and with the DWM attributes.  See
+           tasks/task06.md. -->
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor, system</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>

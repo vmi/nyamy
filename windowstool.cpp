@@ -10,6 +10,8 @@
 #include <windowsx.h>
 #include <malloc.h>
 #include <shlwapi.h>
+#include <shellscalingapi.h>
+#pragma comment(lib, "shcore.lib")
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -36,18 +38,24 @@ std::wstring loadString(UINT i_id)
 
 
 // load small icon resource
-HICON loadSmallIcon(UINT i_id)
+HICON loadSmallIcon(UINT i_id, UINT i_dpi)
 {
+	// SM_CXSMICON is 16 at 96 dpi, which is what this used to hardcode
+	int cx = GetSystemMetricsForDpi(SM_CXSMICON, i_dpi);
+	int cy = GetSystemMetricsForDpi(SM_CYSMICON, i_dpi);
 	return reinterpret_cast<HICON>(
-			   LoadImage(g_hInst, MAKEINTRESOURCE(i_id), IMAGE_ICON, 16, 16, 0));
+			   LoadImage(g_hInst, MAKEINTRESOURCE(i_id), IMAGE_ICON, cx, cy, 0));
 }
 
 
 // load big icon resource
-HICON loadBigIcon(UINT i_id)
+HICON loadBigIcon(UINT i_id, UINT i_dpi)
 {
+	// SM_CXICON is 32 at 96 dpi, which is what this used to hardcode
+	int cx = GetSystemMetricsForDpi(SM_CXICON, i_dpi);
+	int cy = GetSystemMetricsForDpi(SM_CYICON, i_dpi);
 	return reinterpret_cast<HICON>(
-			   LoadImage(g_hInst, MAKEINTRESOURCE(i_id), IMAGE_ICON, 32, 32, 0));
+			   LoadImage(g_hInst, MAKEINTRESOURCE(i_id), IMAGE_ICON, cx, cy, 0));
 }
 
 
@@ -55,7 +63,8 @@ HICON loadBigIcon(UINT i_id)
 // @return handle of previous icon or NULL
 HICON setSmallIcon(HWND i_hwnd, UINT i_id)
 {
-	HICON hicon = (i_id == static_cast<UINT>(-1)) ? NULL : loadSmallIcon(i_id);
+	HICON hicon = (i_id == static_cast<UINT>(-1))
+				  ? NULL : loadSmallIcon(i_id, GetDpiForWindow(i_hwnd));
 	return reinterpret_cast<HICON>(
 			   SendMessage(i_hwnd, WM_SETICON, static_cast<WPARAM>(ICON_SMALL),
 						   reinterpret_cast<LPARAM>(hicon)));
@@ -66,7 +75,8 @@ HICON setSmallIcon(HWND i_hwnd, UINT i_id)
 // @return handle of previous icon or NULL
 HICON setBigIcon(HWND i_hwnd, UINT i_id)
 {
-	HICON hicon = (i_id == static_cast<UINT>(-1)) ? NULL : loadBigIcon(i_id);
+	HICON hicon = (i_id == static_cast<UINT>(-1))
+				  ? NULL : loadBigIcon(i_id, GetDpiForWindow(i_hwnd));
 	return reinterpret_cast<HICON>(
 			   SendMessage(i_hwnd, WM_SETICON, static_cast<WPARAM>(ICON_BIG),
 						   reinterpret_cast<LPARAM>(hicon)));
@@ -153,12 +163,31 @@ void asyncMoveWindow(HWND i_hwnd, int i_x, int i_y)
 }
 
 
-// move window asynchronously
+/* move and resize window asynchronously
+
+   Asking for a position and a size in one request goes wrong when the
+   destination lies on a monitor of another DPI: the move makes Windows send
+   WM_DPICHANGED to the target, which rescales the window on top of the size
+   just asked for, so it arrives off by that factor (measured: 569x405 asked
+   for across a 125% -> 100% boundary, 455x324 delivered).  The position is
+   unaffected.
+
+   Splitting the request keeps the size out of the crossing.  Both parts are
+   posted to the thread owning the window and it runs them in order, so by the
+   time the size is applied the window already sits on the destination monitor
+   and its DPI change has been handled - there is no second boundary to cross.
+   Windows on the same DPI as now keep the single request; the split is visible
+   as an extra resize step and there is nothing to fix for them. */
 void asyncMoveWindow(HWND i_hwnd, int i_x, int i_y, int i_w, int i_h)
 {
+	RECT rcTarget = { i_x, i_y, i_x + i_w, i_y + i_h };
+	bool crossesDpi = dpiForRect(&rcTarget) != dpiForWindowMonitor(i_hwnd);
+
 	SetWindowPos(i_hwnd, NULL, i_x, i_y, i_w, i_h,
 				 SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_NOOWNERZORDER |
-				 SWP_NOZORDER);
+				 SWP_NOZORDER | (crossesDpi ? SWP_NOSIZE : 0));
+	if (crossesDpi)
+		asyncResize(i_hwnd, i_w, i_h);
 }
 
 
@@ -221,6 +250,128 @@ bool setForegroundWindow(HWND i_hwnd)
 	AttachThreadInput(nTargetID, nForegroundID, FALSE);
 	return true;
 }
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// DPI
+
+
+// query one DPI flavour of a monitor; 0 when it cannot be obtained
+//
+// GetDpiForMonitor lives in shcore.dll, which is linked statically.  Resolving
+// it at run time would protect nothing: this binary already imports
+// GetDpiForWindow and GetSystemMetricsForDpi from USER32, and the manifest asks
+// for Per-Monitor v2, so the process cannot load below Windows 10 1703 anyway.
+static UINT monitorDpi(HMONITOR i_hmonitor, MONITOR_DPI_TYPE i_type)
+{
+	if (!i_hmonitor)
+		return 0;
+	UINT dpiX = 0, dpiY = 0;
+	if (FAILED(GetDpiForMonitor(i_hmonitor, i_type, &dpiX, &dpiY)))
+		return 0;
+	// only the x axis is reported: Windows has never shipped a monitor whose
+	// two axes differ, and a single number keeps the callers readable
+	return dpiX;
+}
+
+
+// DPI of a monitor, falling back to 96 so that a failure scales nothing
+static UINT effectiveDpi(HMONITOR i_hmonitor)
+{
+	UINT dpi = monitorDpi(i_hmonitor, MDT_EFFECTIVE_DPI);
+	return dpi ? dpi : USER_DEFAULT_SCREEN_DPI;
+}
+
+
+// DPI of the monitor a point falls on
+UINT dpiForPoint(POINT i_pt)
+{
+	return effectiveDpi(MonitorFromPoint(i_pt, MONITOR_DEFAULTTONEAREST));
+}
+
+
+// DPI of the monitor a window sits on
+UINT dpiForWindowMonitor(HWND i_hwnd)
+{
+	return effectiveDpi(monitorFromWindow(i_hwnd, MONITOR_DEFAULTTONEAREST));
+}
+
+
+// DPI of the monitor a rectangle falls on
+UINT dpiForRect(const RECT *i_rc)
+{
+	return effectiveDpi(MonitorFromRect(i_rc, MONITOR_DEFAULTTONEAREST));
+}
+
+
+// scale a length written for 96 dpi to what i_dpi calls for
+int scaleFromLogical(int i_px, UINT i_dpi)
+{
+	if (i_px == 0 || i_dpi == USER_DEFAULT_SCREEN_DPI)
+		return i_px;
+
+	int scaled = MulDiv(i_px, static_cast<int>(i_dpi),
+						USER_DEFAULT_SCREEN_DPI);
+	// MulDiv rounds to nearest, so a 1 px value scaled by 1.25 lands back on 1
+	// - fine - but scaling down could take it to 0 and silently turn a nudge
+	// into a no-op.  Keep the sign and at least the smallest step.
+	if (scaled == 0)
+		return (i_px < 0) ? -1 : 1;
+	return scaled;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// DPI diagnostics
+
+
+//
+std::wstring warnUnexpectedDpiAwareness()
+{
+	DPI_AWARENESS_CONTEXT context = GetThreadDpiAwarenessContext();
+
+	// v1 and v2 share one DPI_AWARENESS value, so GetAwarenessFromDpiAwareness-
+	// Context() cannot tell them apart and neither can shcore's
+	// GetProcessDpiAwareness().  Only a context comparison distinguishes the
+	// two, and the difference matters: v2 is what brings the automatic dialog
+	// and non-client scaling nyamy's dialogs are written against.
+	if (AreDpiAwarenessContextsEqual(context,
+									 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+		return std::wstring();
+
+	const wchar_t *name;
+	switch (GetAwarenessFromDpiAwarenessContext(context)) {
+	case DPI_AWARENESS_UNAWARE:
+		name = L"unaware";
+		break;
+	case DPI_AWARENESS_SYSTEM_AWARE:
+		name = L"system";
+		break;
+	case DPI_AWARENESS_PER_MONITOR_AWARE:
+		name = L"per-monitor";
+		break;
+	default:
+		name = L"invalid";
+		break;
+	}
+
+	// The log prefixes every line with hh:mm:ss.SSS|L|, so the continuation
+	// lines line up on their own.  Two spaces of indent under that prefix:
+	// starting right after the '|' reads as too tight.
+	wchar_t buf[512];
+	_snwprintf(buf, NUMBER_OF(buf),
+			   L"*** DPI awareness is \"%s\" ***\n"
+			   L"  Not the per-monitor-v2 the manifest asks for.\n"
+			   L"  Window positions and sizes may be off on monitors whose "
+			   L"scaling is not %u%%.\n"
+			   L"  Check the compatibility tab of the executable for a high "
+			   L"DPI scaling override.",
+			   name, MulDiv(GetDpiForSystem(), 100, USER_DEFAULT_SCREEN_DPI));
+	buf[NUMBER_OF(buf) - 1] = L'\0';
+	return std::wstring(buf);
+}
+
+
 
 
 

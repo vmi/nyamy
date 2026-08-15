@@ -47,7 +47,8 @@ public:
 				   WIDEN(__DATE__) L" " WIDEN(__TIME__),
 				   getCompilerVersionString().c_str(),
 				   modulebuf);
-
+		// _snwprintf leaves the buffer unterminated when it truncates
+		buf[NUMBER_OF(buf) - 1] = L'\0';
 
 		Edit_SetText(GetDlgItem(m_hwnd, IDC_EDIT_builtBy), buf);
 

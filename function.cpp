@@ -1438,6 +1438,12 @@ void Engine::funcWindowMoveTo(FunctionParam *i_param,
 	if (!getSuitableMdiWindow(i_param, &hwnd, &i_twt, &rc, &rcd))
 		return;
 
+	// the offsets come from the config in 96 dpi pixels; the rectangles are
+	// already in the desktop's own space, so only the offsets are scaled
+	UINT dpi = dpiForWindowMonitor(hwnd);
+	i_dx = scaleFromLogical(i_dx, dpi);
+	i_dy = scaleFromLogical(i_dy, dpi);
+
 	int x = rc.left + i_dx;
 	int y = rc.top + i_dy;
 
@@ -1762,15 +1768,25 @@ void Engine::funcWindowResizeTo(FunctionParam *i_param, int i_width,
 	if (!getSuitableMdiWindow(i_param, &hwnd, &i_twt, &rc, &rcd))
 		return;
 
+	// Both readings of the argument are 96 dpi pixels out of the config: a
+	// positive one is the size to take, a negative one is how much smaller
+	// than the desktop to be.  The rectangles it combines with are already in
+	// the desktop's own space, so the argument is scaled either way.
+	UINT dpi = dpiForWindowMonitor(hwnd);
+
 	if (i_width == 0)
 		i_width = rcWidth(&rc);
 	else if (i_width < 0)
-		i_width += rcWidth(&rcd);
+		i_width = rcWidth(&rcd) + scaleFromLogical(i_width, dpi);
+	else
+		i_width = scaleFromLogical(i_width, dpi);
 
 	if (i_height == 0)
 		i_height = rcHeight(&rc);
 	else if (i_height < 0)
-		i_height += rcHeight(&rcd);
+		i_height = rcHeight(&rcd) + scaleFromLogical(i_height, dpi);
+	else
+		i_height = scaleFromLogical(i_height, dpi);
 
 	asyncResize(hwnd, i_width, i_height);
 }
@@ -1782,7 +1798,11 @@ void Engine::funcMouseMove(FunctionParam *i_param, int i_dx, int i_dy)
 		return;
 	POINT pt;
 	GetCursorPos(&pt);
-	SetCursorPos(pt.x + i_dx, pt.y + i_dy);
+	// the config states the step in 96 dpi pixels, so that one setting covers
+	// the same apparent distance on every monitor
+	UINT dpi = dpiForPoint(pt);
+	SetCursorPos(pt.x + scaleFromLogical(i_dx, dpi),
+				 pt.y + scaleFromLogical(i_dy, dpi));
 }
 
 // send a mouse-wheel-message to Windows

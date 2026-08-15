@@ -223,21 +223,27 @@ private:
 
 			bool isMDI = true;
 			HWND hwnd = getToplevelWindow(n->getHwnd(), &isMDI);
-			RECT rc;
+			// zeroed because the queries below fail for a NULL window - a
+			// notification can carry one - and used to print whatever the
+			// stack happened to hold
+			RECT rc = {};
 			if (isMDI) {
-				getChildWindowRect(hwnd, &rc);
-				m_log << L"MDI Window Position/Size: ("
-				<< rc.left << L", " << rc.top << L") / ("
-				<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
-				<< std::endl;
+				if (getChildWindowRect(hwnd, &rc))
+					m_log << L"MDI Window Position/Size: ("
+					<< rc.left << L", " << rc.top << L") / ("
+					<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
+					<< std::endl;
 				hwnd = getToplevelWindow(n->getHwnd(), NULL);
 			}
 
-			GetWindowRect(hwnd, &rc);
-			m_log << L"Toplevel Window Position/Size: ("
-			<< rc.left << L", " << rc.top << L") / ("
-			<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
-			<< std::endl;
+			if (GetWindowRect(hwnd, &rc))
+				m_log << L"Toplevel Window Position/Size: ("
+				<< rc.left << L", " << rc.top << L") / ("
+				<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
+				<< std::endl;
+			else
+				m_log << L"Toplevel Window Position/Size: (unavailable)"
+				<< std::endl;
 
 			SystemParametersInfo(SPI_GETWORKAREA, 0, (void *)&rc, FALSE);
 			m_log << L"Desktop Window Position/Size: ("
@@ -1156,9 +1162,12 @@ public:
 		m_engine.setAssociatedWndow(m_hwndTaskTray);
 		m_engine.start();
 
-		// show tasktray icon
-		m_tasktrayIcon[0] = loadSmallIcon(IDI_ICON_mayu_disabled);
-		m_tasktrayIcon[1] = loadSmallIcon(IDI_ICON_mayu);
+		// show tasktray icon.  Sized for the system DPI rather than for our own
+		// hidden window: the icon is drawn by the notification area, not by us,
+		// and the shell asks for a system-DPI sized one.
+		m_tasktrayIcon[0] = loadSmallIcon(IDI_ICON_mayu_disabled,
+										  GetDpiForSystem());
+		m_tasktrayIcon[1] = loadSmallIcon(IDI_ICON_mayu, GetDpiForSystem());
 		std::memset(&m_ni, 0, sizeof(m_ni));
 		m_ni.uID    = ID_TaskTrayIcon;
 		m_ni.hWnd   = m_hwndTaskTray;
@@ -1309,6 +1318,13 @@ public:
 	/// message loop
 	WPARAM messageLoop() {
 		showBanner(false);
+		// Only here, not in showBanner(): that runs again whenever the log is
+		// cleared, and this says nothing new the second time.
+		if (std::wstring warning = warnUnexpectedDpiAwareness();
+				!warning.empty()) {
+			Acquire a(&m_log, LogLevel::Warn);
+			m_log << warning << std::endl;
+		}
 		load();
 
 		startNotifyReader();

@@ -678,6 +678,29 @@ void Engine::beginGeneratingKeyboardEvents(
 }
 
 
+/** Convert a screen point for MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK.
+
+    The normalized range covers the whole virtual desktop, so the conversion has
+    to start from its origin: that is negative whenever a secondary monitor sits
+    left of or above the primary one, and leaving it out sent the cursor to the
+    wrong place on such an arrangement.  The range is also inclusive at both
+    ends, hence the division by one less than the extent.
+*/
+static void toVirtualDesktopAbsolute(POINT i_pt, LONG *o_dx, LONG *o_dy)
+{
+	int width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+	int height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+	*o_dx = (1 < width)
+			? MulDiv(i_pt.x - GetSystemMetrics(SM_XVIRTUALSCREEN),
+					 65535, width - 1)
+			: 0;
+	*o_dy = (1 < height)
+			? MulDiv(i_pt.y - GetSystemMetrics(SM_YVIRTUALSCREEN),
+					 65535, height - 1)
+			: 0;
+}
+
+
 unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHOOKSTRUCT *i_kidRaw)
 {
 	if (i_kid->Flags & KEYBOARD_INPUT_DATA::E1) {
@@ -779,13 +802,12 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 				}
 			}
 			if (m_dragging) {
-				kid[0].mi.dx = 65535 * m_msllHookCurrent.pt.x / GetSystemMetrics(SM_CXVIRTUALSCREEN);
-				kid[0].mi.dy = 65535 * m_msllHookCurrent.pt.y / GetSystemMetrics(SM_CYVIRTUALSCREEN);
+				toVirtualDesktopAbsolute(m_msllHookCurrent.pt,
+										 &kid[0].mi.dx, &kid[0].mi.dy);
 				kid[0].mi.dwFlags |= MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
 
 				kid[1].type = INPUT_MOUSE;
-				kid[1].mi.dx = 65535 * pt.x / GetSystemMetrics(SM_CXVIRTUALSCREEN);
-				kid[1].mi.dy = 65535 * pt.y / GetSystemMetrics(SM_CYVIRTUALSCREEN);
+				toVirtualDesktopAbsolute(pt, &kid[1].mi.dx, &kid[1].mi.dy);
 				kid[1].mi.time = 0;
 				kid[1].mi.mouseData = 0;
 				kid[1].mi.dwExtraInfo = 0;
@@ -1083,8 +1105,8 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			LONG dr = 0;
 			dr += (i_mid->pt.x - m_msllHookCurrent.pt.x) * (i_mid->pt.x - m_msllHookCurrent.pt.x);
 			dr += (i_mid->pt.y - m_msllHookCurrent.pt.y) * (i_mid->pt.y - m_msllHookCurrent.pt.y);
-			if (m_buttonPressed && !m_dragging && s->m_dragThreshold &&
-				(s->m_dragThreshold * s->m_dragThreshold < dr)) {
+			if (m_buttonPressed && !m_dragging && m_dragThresholdPx &&
+				(m_dragThresholdPx * m_dragThresholdPx < dr)) {
 				kid.MakeCode = 0;
 				WaitForSingleObject(m_queueMutex, INFINITE);
 				m_dragging = true;
@@ -1145,6 +1167,15 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			break;
 		}
 
+		// Nothing slow belongs here.  This runs in the low level mouse hook,
+		// which Windows skips for an event whose hook takes longer than
+		// LowLevelHooksTimeout - and a skipped button release leaves the
+		// engine believing the button is still down.  An earlier version
+		// logged a coordinate comparison at this point, which meant taking the
+		// log lock while the UI thread could be holding it, and produced
+		// exactly that: stuck buttons and modifiers shortly after startup,
+		// when the log is busiest.
+
 		WaitForSingleObject(m_queueMutex, INFINITE);
 
 		if (kid.Flags & KEYBOARD_INPUT_DATA::BREAK) {
@@ -1163,6 +1194,11 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 		} else if (i_message != WM_MOUSEWHEEL && i_message != WM_MOUSEHWHEEL) {
 			m_buttonPressed = true;
 			m_msllHookCurrent = *i_mid;
+			// the config states the threshold in 96 dpi pixels, so that the
+			// same setting means the same apparent distance on every monitor
+			m_dragThresholdPx =
+				scaleFromLogical(static_cast<int>(s->m_dragThreshold),
+								 dpiForPoint(i_mid->pt));
 		}
 
 		m_inputQueue->push_back(kid);
@@ -1491,6 +1527,7 @@ Engine::Engine(womsgstream &i_log)
 	m_msllHookCurrent.flags = 0;
 	m_msllHookCurrent.time = 0;
 	m_msllHookCurrent.dwExtraInfo = 0;
+	m_dragThresholdPx = 0;
 }
 
 
