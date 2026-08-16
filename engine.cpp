@@ -1160,6 +1160,92 @@ static inline unsigned buttonBit(USHORT i_makeCode)
 }
 
 
+/// integrity level of a token, as the RID of its mandatory label
+static bool tokenIntegrityLevel(HANDLE i_token, DWORD *o_level)
+{
+	BYTE buf[sizeof(TOKEN_MANDATORY_LABEL) + SECURITY_MAX_SID_SIZE];
+	DWORD size = 0;
+	if (!GetTokenInformation(i_token, TokenIntegrityLevel, buf, sizeof(buf),
+							 &size))
+		return false;
+	TOKEN_MANDATORY_LABEL *label =
+		reinterpret_cast<TOKEN_MANDATORY_LABEL *>(buf);
+	UCHAR *count = GetSidSubAuthorityCount(label->Label.Sid);
+	if (!count || !*count)
+		return false;
+	*o_level = *GetSidSubAuthority(label->Label.Sid, *count - 1);
+	return true;
+}
+
+
+/// integrity level of this process; queried once
+static DWORD ownIntegrityLevel()
+{
+	static const DWORD level = [] {
+		DWORD l = SECURITY_MANDATORY_MEDIUM_RID;
+		HANDLE token = NULL;
+		if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+			tokenIntegrityLevel(token, &l);
+			CloseHandle(token);
+		}
+		return l;
+	}();
+	return level;
+}
+
+
+/** Can this process inject input into that one ?
+
+    UIPI allows injection only into processes at this one's integrity level or
+    below.  A process whose token cannot even be opened is taken to be out of
+    reach: answering "no" costs a remap that does not happen, answering "yes"
+    wrongly costs the event itself.
+*/
+static bool canInjectInto(DWORD i_pid)
+{
+	HANDLE process =
+		OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, i_pid);
+	if (!process)
+		return false;
+	HANDLE token = NULL;
+	DWORD level = 0;
+	bool ok = !!OpenProcessToken(process, TOKEN_QUERY, &token);
+	if (ok) {
+		ok = tokenIntegrityLevel(token, &level);
+		CloseHandle(token);
+	}
+	CloseHandle(process);
+	return ok && level <= ownIntegrityLevel();
+}
+
+
+/** Would UIPI drop the input this engine injects ?
+
+    SendInput() from this process is discarded while the foreground window
+    belongs to a process at a higher integrity level, and it is discarded
+    whole: the window the click is aimed at makes no difference.  The low
+    level mouse hook is still called for clicks aimed at ordinary windows -
+    only clicks aimed at the elevated window itself bypass it - so an event
+    swallowed here in that state would simply vanish, and the mouse would stay
+    useless everywhere but inside the elevated window until it is closed.
+
+    The answer is cached against the foreground process, so the token query
+    runs once per foreground process rather than once per click.  Only the
+    mouse hook thread reaches this, hence no locking.
+*/
+bool Engine::isInjectionBlocked()
+{
+	DWORD pid = 0;
+	if (HWND foreground = GetForegroundWindow())
+		GetWindowThreadProcessId(foreground, &pid);
+	if (pid != m_uipiPid) {
+		m_uipiPid = pid;
+		m_uipiBlocked = pid && !canInjectInto(pid);
+	}
+	return m_uipiBlocked;
+}
+
+
 // queue the release of the drag pseudo key.  The caller holds m_queueMutex.
 void Engine::endDrag()
 {
@@ -1320,6 +1406,14 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 		// log lock while the UI thread could be holding it, and produced
 		// exactly that: stuck buttons and modifiers shortly after startup,
 		// when the log is busiest.
+
+		// Hand the event back to the system rather than swallow one this
+		// engine cannot re-inject; see isInjectionBlocked().  The mouse
+		// features are inactive while an elevated window is in the
+		// foreground, which is the limitation the manual already describes,
+		// instead of the mouse going dead.
+		if (isInjectionBlocked())
+			return 0;
 
 		WaitForSingleObject(m_queueMutex, INFINITE);
 
@@ -1614,6 +1708,8 @@ Engine::Engine(womsgstream &i_log)
 		m_buttonsPressed(0),
 		m_dragging(false),
 		m_dragButton(0),
+		m_uipiPid(0),
+		m_uipiBlocked(false),
 		m_keyboardHandler(installKeyboardHook, Engine::keyboardDetour),
 		m_mouseHandler(installMouseHook, Engine::mouseDetour),
 		m_isStopping(false),
@@ -1667,6 +1763,8 @@ Engine::Engine(womsgstream &i_log)
 								 PIPE_TYPE_BYTE, 1,
 								 0, 0, 0, NULL);
 	StrExprArg::setEngine(this);
+	// prime the one-time query so that the mouse hook never runs it
+	ownIntegrityLevel();
 
 	m_msllHookCurrent.pt.x = 0;
 	m_msllHookCurrent.pt.y = 0;

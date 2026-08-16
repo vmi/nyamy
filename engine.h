@@ -266,6 +266,10 @@ private:
 	bool m_dragging;
 	/// E1 scan code of the button that owns the drag, 0 when there is none
 	USHORT m_dragButton;
+	/** Foreground process the UIPI answer below was reached for, and that
+	    answer.  Only the mouse hook thread touches these. */
+	DWORD m_uipiPid;
+	bool m_uipiBlocked;
 	/** Setting::m_dragThreshold scaled to the monitor the drag started on.
 
 	    Resolved when the button goes down rather than per mouse move: the
@@ -404,6 +408,8 @@ private:
 	unsigned int keyboardDetour(KBDLLHOOKSTRUCT *i_kid);
 	///
 	unsigned int mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid);
+	/// would UIPI drop the input injected from here ?
+	bool isInjectionBlocked();
 	///
 	unsigned int injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHOOKSTRUCT *i_kidRaw);
 	/// inject an event that bypassed the keymap, updating the pressed state
