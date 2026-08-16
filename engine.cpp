@@ -344,6 +344,31 @@ Modifier Engine::getCurrentModifiers(Key *i_key, bool i_isPressed)
 }
 
 
+/** Does this key stand for a mouse button ?
+
+    mouseDetour() maps the buttons to E1 scan codes 1, 2, 3, 6 and 7; the wheel
+    (4, 5, 8, 9) and the drag pseudo key (0) are not buttons and have no
+    release worth delivering.
+*/
+static bool isMouseButtonKey(const Key *i_key)
+{
+	if (i_key->getScanCodesSize() != 1)
+		return false;
+	const ScanCode &sc = i_key->getScanCodes()[0];
+	if (!(sc.m_flags & ScanCode::E1))
+		return false;
+	switch (sc.m_scan) {
+	case 1:		// left
+	case 2:		// right
+	case 3:		// middle
+	case 6:		// X1
+	case 7:		// X2
+		return true;
+	}
+	return false;
+}
+
+
 // generate keyboard event for a key
 void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 {
@@ -357,6 +382,7 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 		}
 
 	bool isAlreadyReleased = false;
+	bool doGenerate = false;
 
 	if (!isEvent) {
 		if (i_doPress && !i_key->m_isPressedOnWin32)
@@ -374,7 +400,20 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 
 		Key *sync = s->m_keyboard.getSyncKey();
 
-		if (!isAlreadyReleased || i_key == sync) {
+		// A mouse button release is sent even when this engine has no record
+		// of the press.  Missing that record is normal: the press may have
+		// reached the application without passing through here at all - log
+		// mode injects mouse events raw, and the hook hands them straight back
+		// to the system while nothing this process injects would be delivered
+		// (see isInjectionBlocked()).  Either state can end between a press and
+		// its release, leaving only the release to us.  Dropping the release
+		// then leaves the application holding the button down, which turns a
+		// click on a title bar into a drag that never ends.  A duplicate
+		// release is ignored by applications; a missing one is not.
+		doGenerate = !isAlreadyReleased || i_key == sync ||
+					 isMouseButtonKey(i_key);
+
+		if (doGenerate) {
 			KEYBOARD_INPUT_DATA kid = { 0, 0, 0, 0, 0 };
 			const ScanCode *sc = i_key->getScanCodes();
 			for (size_t i = 0; i < i_key->getScanCodesSize(); ++ i) {
@@ -401,7 +440,10 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 	mkey.m_modifier.on(Modifier::Type_Up, !i_doPress);
 	mkey.m_modifier.on(Modifier::Type_Down, i_doPress);
 	outputToLog(i_key, mkey, LogLevel::Debug, L"OUT",
-				isAlreadyReleased ? L"(already released) " : NULL);
+				isAlreadyReleased
+				? (doGenerate ? L"(already released, sent anyway) "
+				   : L"(already released) ")
+				: NULL);
 }
 
 
@@ -868,6 +910,33 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 		SendInput(1, &kid, sizeof(kid));
 	}
 	return 1;
+}
+
+
+/** Inject an event that bypassed the keymap, keeping the pressed-on-Win32
+    bookkeeping in step.
+
+    Log mode hands mouse events straight to injectInput(), so generateKeyEvent()
+    never sees them and m_isPressedOnWin32 stays behind.  The flag is flipped
+    from the UI thread the moment the investigate dialog gains or loses focus,
+    which can happen between a button press and its release: the press goes out
+    raw, the release arrives through the normal path, and without this it would
+    be dropped as a release of a button this engine never saw pressed.
+*/
+unsigned int Engine::injectInputThrough(const KEYBOARD_INPUT_DATA *i_kid,
+										Key *i_key)
+{
+	if (i_key) {
+		bool doPress = !(i_kid->Flags & KEYBOARD_INPUT_DATA::BREAK);
+		if (doPress) {
+			if (!i_key->m_isPressedOnWin32)
+				++ m_currentKeyPressCountOnWin32;
+		} else if (i_key->m_isPressedOnWin32) {
+			-- m_currentKeyPressCountOnWin32;
+		}
+		i_key->m_isPressedOnWin32 = doPress;
+	}
+	return injectInput(i_kid, NULL);
 }
 
 
@@ -1426,7 +1495,7 @@ void Engine::keyboardHandler()
 			outputInputToLog(&key, c.m_mkey, LogLevel::Info);
 			if (kid.Flags & KEYBOARD_INPUT_DATA::E1) {
 				// through mouse event even if log mode
-				injectInput(&kid, NULL);
+				injectInputThrough(&kid, c.m_mkey.m_key);
 			}
 		} else if (am == Keymap::AM_true) {
 			// true modifier doesn't generate scan code

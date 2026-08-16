@@ -400,6 +400,8 @@ private:
 	unsigned int mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid);
 	///
 	unsigned int injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHOOKSTRUCT *i_kidRaw);
+	/// inject an event that bypassed the keymap, updating the pressed state
+	unsigned int injectInputThrough(const KEYBOARD_INPUT_DATA *i_kid, Key *i_key);
 
 private:
 	/// keyboard handler thread
