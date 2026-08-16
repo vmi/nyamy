@@ -645,7 +645,7 @@ int main()
 		}
 	}
 
-	// `key ⟨MODIFIER⟩ = ⟨MODIFIER⟩' changed the default modifiers of every line
+	// `key <MODIFIER> = <MODIFIER>' changed the default modifiers of every line
 	// below it.  The statement is gone and must be rejected, not read as an
 	// assignment to a key named "=".
 	{
@@ -1135,7 +1135,7 @@ int main()
 			L"raise \"\\\\A is literal A\" unless (/\\A/ =~ \"xA\") == 1\n"
 			L"raise \"\\\\z is literal z\" unless (/\\z/ =~ \"xz\") == 1\n"
 			L"raise \"\\\\h is literal h\" unless (/\\h/ =~ \"xh\") == 1\n"
-			// the two examples the manual shows in "正規表現の制限"
+			// the two examples the manual shows in the "Regexp limitations" section
 			L"host = \"desktop-01.example.jp\"\n"
 			L"raise \"doc =~\" unless (host =~ /^([^.]+)\\./) == 0\n"
 			L"raise \"doc $1\" unless $1.upcase == \"DESKTOP-01\"\n"
