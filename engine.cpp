@@ -978,8 +978,28 @@ void Engine::resetModifiersIfIdle()
 // returns 0 if the scan code has no reliable VK mapping.
 static USHORT scanCodeToVKey(const ScanCode &i_sc)
 {
-	if (i_sc.m_flags & ScanCode::E1)
+	if (i_sc.m_flags & ScanCode::E1) {
+		// mouse buttons, as numbered by mouseDetour().  The wheel (4, 5, 8, 9)
+		// and the drag pseudo key (0) hold nothing to verify.
+		switch (i_sc.m_scan) {
+		case 1:
+		case 2:
+			// With the buttons swapped, the hook, SendInput() and
+			// GetAsyncKeyState() do not agree on which virtual key stands for
+			// which button.  Guessing wrong would release a button that is
+			// really held, so leave these two unverified in that case.
+			if (GetSystemMetrics(SM_SWAPBUTTON))
+				return 0;
+			return (i_sc.m_scan == 1) ? VK_LBUTTON : VK_RBUTTON;
+		case 3:
+			return VK_MBUTTON;
+		case 6:
+			return VK_XBUTTON1;
+		case 7:
+			return VK_XBUTTON2;
+		}
 		return 0;
+	}
 	bool isE0 = !!(i_sc.m_flags & ScanCode::E0);
 	// fixed table for modifier keys; MAPVK_VSC_TO_VK_EX support for
 	// E0-prefixed scan codes varies between Windows versions
