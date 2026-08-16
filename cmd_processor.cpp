@@ -104,6 +104,14 @@ void CmdProcessor::process(CmdStreamReader &cr)
 		}
 		try { std::visit(*this, *cmd); }
 		catch (ErrorMessage &e) { error(e.getMessage()); }
+		// A malformed command reaches the generated loadFromCmd() as an
+		// argument of the wrong type, and std::get on the variant throws
+		// something that is not an ErrorMessage.  This runs on the scripter's
+		// data thread, where nothing else would catch it, so letting it past
+		// here ends the process over one bad line of configuration.
+		catch (std::exception &e) {
+			error(L"malformed command: " + to_wstring(e.what()));
+		}
 	}
 }
 

@@ -88,6 +88,7 @@ std::wostream& operator<<(std::wostream& out, const FuncArg& arg)
 			}
 			out << L"]";
 		},
+		[&](const FuncArgDollarName& a) { out << L"$" << a.m_name; },
 	}, arg);
 	return out;
 }

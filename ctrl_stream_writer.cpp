@@ -120,6 +120,13 @@ void CtrlStreamWriter::writeFuncArg(const FuncArg &arg)
 			for (const auto &t : a)
 				writeString(t);
 		},
+		[&](const FuncArgDollarName&   a) {
+			// funcExecUserFunc() resolves these before they reach us, because
+			// only the engine knows what $Clipboard stands for.  Should one
+			// arrive anyway, send the name rather than lose the argument.
+			writeU8(FuncArgTag_String);
+			writeString(a.m_name);
+		},
 	}, arg);
 }
 

@@ -999,10 +999,12 @@ std::unique_ptr<AstArgument> MayuParser::parseArgument()
 
 	Token *t = lookToken();
 
-	// $NAME -> Kind::KeySeqRef
+	// $NAME -> Kind::DollarName.  Not resolved here: whether it names a keyseq
+	// or an argument substitution depends on the parameter it lands on, and
+	// this parser does not know the signatures of the functions.
 	if (*t == L"$") {
 		getToken();
-		arg->kind = AstArgument::Kind::KeySeqRef;
+		arg->kind = AstArgument::Kind::DollarName;
 		arg->stringValue = getToken()->getString();
 		return arg;
 	}

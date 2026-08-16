@@ -157,6 +157,8 @@ FuncArg CmdStreamReader::readArgument()
 			ts[i] = readString();
 		return ts;
 	}
+	case FuncArgTag_DollarName:
+		return FuncArgDollarName{ readString() };
 	default:
 		return FuncArgString{};
 	}

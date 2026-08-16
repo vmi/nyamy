@@ -101,6 +101,7 @@ void CmdStreamWriter::writeArgument(const FuncArg &arg)
 			for (const auto &tok : a)
 				writeString(tok);
 		},
+		[&](const FuncArgDollarName& a) { writeU8(FuncArgTag_DollarName);  writeString(a.m_name); },
 	}, arg);
 }
 

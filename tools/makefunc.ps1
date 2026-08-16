@@ -245,13 +245,15 @@ foreach ($stmt in $statements) {
                     $null = $sb.AppendLine("    $member = i_ctx->resolveKeymap(getFuncArgString(i_args[$i]));")
                 }
                 "^const\s+KeySeq\s*\*$" {
-                    $null = $sb.AppendLine("    $member = i_ctx->resolveKeySeq(getFuncArgKeySeq(i_args[$i]));")
+                    # $NAME or a (...) literal; see loadKeySeqFromCmd in function.cpp
+                    $null = $sb.AppendLine("    $member = loadKeySeqFromCmd(i_args[$i], i_ctx);")
                 }
                 "^Modifier$" {
                     $null = $sb.AppendLine("    $member = i_ctx->resolveModifier(getFuncArgModifierSpec(i_args[$i]));")
                 }
                 "^StrExprArg$" {
-                    $null = $sb.AppendLine("    $member = StrExprArg(getFuncArgString(i_args[$i]), StrExprArg::Literal);")
+                    # literal or $NAME; see loadStrExprArgFromCmd in function.cpp
+                    $null = $sb.AppendLine("    $member = loadStrExprArgFromCmd(i_args[$i]);")
                 }
                 default {
                     # Enum types that have getTypeValue()

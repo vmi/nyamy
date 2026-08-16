@@ -298,8 +298,8 @@ FuncArg MayuCompiler::compileArgument(const AstArgument &arg)
 		return FuncArgNumber{ static_cast<int32_t>(arg.numberValue) };
 	case AstArgument::Kind::Regexp:
 		return FuncArgRegexp{ arg.stringValue };
-	case AstArgument::Kind::KeySeqRef:
-		return FuncArgString{ arg.stringValue };
+	case AstArgument::Kind::DollarName:
+		return FuncArgDollarName{ arg.stringValue };
 	case AstArgument::Kind::KeySeqLiteral:
 		if (arg.keySeq)
 			return FuncArgKeySeqIdx{

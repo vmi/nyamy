@@ -23,6 +23,8 @@ public:
 	virtual ~CmdLoadContext() = default;
 	virtual const Keymap *resolveKeymap(const wstringi &name) = 0;
 	virtual const KeySeq *resolveKeySeq(uint32_t index) = 0;
+	/// resolve a keyseq written as $name.  Throws ErrorMessage if unknown
+	virtual const KeySeq *resolveKeySeqByName(const wstringi &name) = 0;
 	virtual Modifier resolveModifier(const struct ModifierSpec &bm) = 0;
 };
 
@@ -264,12 +266,38 @@ public:
 	~StrExprArg();
 	StrExprArg &operator=(const StrExprArg &i_data);
 	wstringq eval() const;
+	/// is this a $NAME substitution, whose eval() has side effects ?
+	bool isBuiltin() const;
 	static void setEngine(const Engine *i_engine);
+
+	friend std::wostream &operator<<(std::wostream &i_ost,
+									 const StrExprArg &i_data);
 };
 
 
-/// stream output
+/** Stream output.  By default the expression is written as it was written in
+    the configuration: "the text" for a literal, $Clipboard for a substitution.
+    Nothing is evaluated, so this is safe in a description of the setting.
+
+    Between the resolveStrExpr and describeStrExpr manipulators, a substitution
+    additionally reports what it stands for, as $Clipboard = "the value".  Use
+    that only where the value is genuinely part of what happened. */
 std::wostream &operator<<(std::wostream &i_ost, const StrExprArg &i_data);
+/// ask the stream to append the value of every $NAME written to it
+std::wostream &resolveStrExpr(std::wostream &i_ost);
+/// stop appending values (the default)
+std::wostream &describeStrExpr(std::wostream &i_ost);
+
+
+/** Resolve a StrExprArg parameter, which may have been written as a literal or
+    as a $NAME substitution.  Called from generated loadFromCmd() only. */
+extern StrExprArg loadStrExprArgFromCmd(const FuncArg &arg);
+
+/** Resolve a keyseq parameter, written either as $NAME or as a (...) literal.
+    Called from generated loadFromCmd() only.  Throws ErrorMessage if the name
+    is unknown or the argument is not a key sequence at all. */
+extern const KeySeq *loadKeySeqFromCmd(const FuncArg &arg,
+									   CmdLoadContext *i_ctx);
 
 
 #endif // !_FUNCTION_H

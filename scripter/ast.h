@@ -115,7 +115,11 @@ public:
 		String,
 		Number,
 		Regexp,
-		KeySeqRef,		///< $name
+		/** $name.  Either a reference to a named keyseq or an argument
+		    substitution ($Clipboard and friends); the two are spelled alike and
+		    are told apart by the type of the parameter, which is not known
+		    until the engine side loads the call. */
+		DollarName,
 		KeySeqLiteral,	///< (key_sequence)
 		ModifierSeq,	///< modifier sequence as argument
 		TokenSeq,		///< multiple raw tokens as one argument (e.g. U- D- RButton)

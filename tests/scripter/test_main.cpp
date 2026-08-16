@@ -1688,7 +1688,88 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 24;
+	// $NAME in an argument means one of two things depending on the parameter
+	// it lands on, and the parser cannot tell which - it does not know the
+	// signatures.  So it travels as FuncArgDollarName and the generated
+	// loadFromCmd() decides.  Before that it was compiled to a plain string,
+	// which made $Clipboard the literal text "Clipboard" and made a keyseq
+	// argument throw std::bad_variant_access on a thread with no handler.
+	{
+		printf("[%d] $NAME resolves by parameter type ... ", idx + 25);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__dollar__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"keyseq \"$Foo\", \"A\"\n"
+			// a substitution, a literal that merely looks like one, and a
+			// keyseq reference - all three spelled into arguments
+			L"key[\"C-A-S-O\"] = "
+			L"'&ShellExecute(\"open\", $Clipboard,,, ShowNormal)'\n"
+			L"key[\"C-A-S-W\"] = '&ClipboardCopy($WindowClassName)'\n"
+			L"key[\"C-A-S-L\"] = '&ClipboardCopy(\"Clipboard\")'\n"
+			L"key[\"C-A-S-P\"] = '&Repeat($Foo, 3)'\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__dollar__.rb", syms);
+		std::wstring dump = s ? dumpSetting(*s) : std::wstring();
+
+		struct { const wchar_t *want; const char *why; } wants[] = {
+			{ L"&ShellExecute(\"open\", $Clipboard,",	"$Clipboard" },
+			{ L"&ClipboardCopy($WindowClassName)",		"$WindowClassName" },
+			{ L"&ClipboardCopy(\"Clipboard\")",		"quoted literal" },
+			{ L"&Repeat(",					"keyseq argument" },
+		};
+		const char *missing = NULL;
+		for (const auto &w : wants)
+			if (!missing && dump.find(w.want) == std::wstring::npos)
+				missing = w.why;
+
+		if (s && !missing) {
+			printf("OK\n");
+		} else if (!s) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else {
+			printf("FAIL (%s not as expected)\n", missing);
+			++failures;
+		}
+	}
+
+	// An unknown $NAME used to leave StrExprArg::m_expr null, so the first
+	// eval() dereferenced it.  It has to be reported instead, and the rest of
+	// the setting has to survive.
+	{
+		printf("[%d] unknown $NAME is reported ... ", idx + 26);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__dollar_bad__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"key[\"C-A-S-O\"] = "
+			L"'&ShellExecute(\"open\", $Clipbord,,, ShowNormal)'\n"
+			L"key[\"C-A-S-P\"] = '&Repeat($NoSuchKeySeq, 3)'\n"
+			L"key[\"C-A-S-B\"] = \"&DescribeBindings\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__dollar_bad__.rb", syms);
+		std::wstring dump = s ? dumpSetting(*s) : std::wstring();
+
+		// the good assignment survives, the two bad ones are dropped
+		if (s && dump.find(L"&DescribeBindings") != std::wstring::npos
+				&& dump.find(L"Clipbord") == std::wstring::npos
+				&& dump.find(L"NoSuchKeySeq") == std::wstring::npos) {
+			printf("OK\n");
+		} else if (!s) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else {
+			printf("FAIL (bad names not dropped, or good one lost)\n");
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 26;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);
