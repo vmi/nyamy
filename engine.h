@@ -258,8 +258,18 @@ private:
 	bool m_isStopping;
 	HANDLE m_queueMutex;
 	MSLLHOOKSTRUCT m_msllHookCurrent;
-	bool m_buttonPressed;
+	/** Mouse buttons the hook has seen pressed, as a bit per E1 scan code.
+	    One flag for every button was not enough: releasing any button cleared
+	    it, so letting go of the right button in the middle of a left drag left
+	    the drag with nothing to end it. */
+	unsigned m_buttonsPressed;
 	bool m_dragging;
+	/// E1 scan code of the button that owns the drag, 0 when there is none
+	USHORT m_dragButton;
+	/** Foreground process the UIPI answer below was reached for, and that
+	    answer.  Only the mouse hook thread touches these. */
+	DWORD m_uipiPid;
+	bool m_uipiBlocked;
 	/** Setting::m_dragThreshold scaled to the monitor the drag started on.
 
 	    Resolved when the button goes down rather than per mouse move: the
@@ -292,8 +302,9 @@ private:
 	      into stays alive.
 
 	    Entry points that do NOT check it (threadAttachNotify,
-	    threadDetachNotify, shellExecute, getHelpMessages) are safe only
-	    because of the first point above. */
+	    threadDetachNotify, getHelpMessages) are safe only because of the first
+	    point above.  shellExecute() is not among them: it takes no lock and
+	    reads no engine state at all. */
 	bool volatile m_isSynchronizing;
 	bool volatile m_isAborting;			/** shutdown cut a wait short;
                                                     stop generating events */
@@ -344,7 +355,23 @@ private:
 	// for functions
 	KeymapPtrList m_keymapPrefixHistory;		/// for &amp;KeymapPrevPrefix
 	EmacsEditKillLine m_emacsEditKillLine;	/// for &amp;EmacsEditKillLine
-	const ActionFunction *m_afShellExecute;	/// for &amp;ShellExecute
+	/** Arguments of a pending &amp;ShellExecute.  Allocated by funcShellExecute()
+	    on the engine thread and handed to the UI thread through the lParam of
+	    WM_APP_engineNotify, which takes ownership.
+
+	    The StrExprArgs are evaluated when the key is pressed and only the
+	    resulting strings cross threads, so nothing here points into the Setting
+	    that produced them - a reload is free to retire that Setting while the
+	    request is still in flight. */
+	struct ShellExecuteRequest {
+		std::wstring m_operation;			///
+		std::wstring m_file;				///
+		std::wstring m_parameters;			///
+		std::wstring m_directory;			///
+		int m_showCommand;				///
+		/// the &amp;ShellExecute(...) text, for the error message
+		std::wstring m_description;
+	};
 
 	WindowPositions m_windowPositions;		///
 	WindowsWithAlpha m_windowsWithAlpha;		///
@@ -381,8 +408,12 @@ private:
 	unsigned int keyboardDetour(KBDLLHOOKSTRUCT *i_kid);
 	///
 	unsigned int mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid);
+	/// would UIPI drop the input injected from here ?
+	bool isInjectionBlocked();
 	///
 	unsigned int injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHOOKSTRUCT *i_kidRaw);
+	/// inject an event that bypassed the keymap, updating the pressed state
+	unsigned int injectInputThrough(const KEYBOARD_INPUT_DATA *i_kid, Key *i_key);
 
 private:
 	/// keyboard handler thread
@@ -442,6 +473,9 @@ private:
 
 	/// drop pressed-key marks that no longer match the OS key state
 	void resyncKeyStates(bool i_force);
+
+	/// queue the release of the drag pseudo key; call with m_queueMutex held
+	void endDrag();
 
 	/// result of waitWhileUnlocked()
 	enum class WaitResult {
@@ -775,8 +809,8 @@ public:
 	/// thread detach notify
 	bool threadDetachNotify(DWORD i_threadId);
 
-	/// shell execute
-	void shellExecute();
+	/// shell execute.  Takes ownership of the ShellExecuteRequest in i_lParam
+	void shellExecute(LPARAM i_lParam);
 
 	/// get help message
 	void getHelpMessages(std::wstring *o_helpMessage, std::wstring *o_helpTitle);

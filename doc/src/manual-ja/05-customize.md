@@ -720,6 +720,16 @@ cmdLine="${NYAMY_ROOT}\nyamy-scripter.exe -I ${HOME}\nyamy-lib -D MYFLAG .mayu.r
 
 なお `cmdLine` は、scripter のプロトコルを話す別の実装に差し替えるためのものでもあります。通常は変更する必要はありません。
 
+#### ログ欄の保持文字数 (`logMaxSize`) {#logmaxsize}
+
+<span class="menu-item">ログ</span>ダイアログの編集欄が保持するテキスト量は、既定で 20000 文字です。これを超えると古い行から行単位で切り詰められます。`nyamy.ini` の `logMaxSize` で文字数を変更できます。
+
+```ini
+logMaxSize=50000
+```
+
+未指定・0 以下・数値として解釈できない値の場合は既定値 (20000) が使われます。上限はありませんが、値を大きくするほど追記のたびのコストが増える点に注意してください。この設定は NYamy の起動時に読み込まれます (タスクトレイメニューの<span class="menu-item">Reload</span>では反映されません)。
+
 #### 設定ファイルの文字コード {#encoding}
 
 設定ファイルの文字コードは UTF-8 (BOM の有無は不問) を推奨します。`.mayu` 形式については、UTF-16 および CP932 (Shift_JIS) のファイルも読み込むことができます。
@@ -1180,6 +1190,20 @@ key M-C = &ShellExecute("open", "C:/WINDOWS/system32/Control.exe", "sysdm.cpl",,
 key M-H = &ShellExecute("open", "https://www.example.com/",,, ShowNormal)
 ```
 
+##### キーリピートとの関係 {#function_ShellExecute_repeat}
+
+キーを押しっぱなしにしても実行は 1 回だけです。オートリピートによる発火は無視されるので、アプリケーションがいくつも起動することはありません。
+
+このため、[`R-`](#keyRepeat) を明示的に指定した `key R-M-B = &ShellExecute(...)` のような割り当ては一度も実行されません。
+
+##### 引数の評価タイミング {#function_ShellExecute_eval}
+
+`$Clipboard` などの[引数置換](#arg_subst)は、**キーを押した時点**で評価されます。プログラムの起動には時間がかかることがありますが、その間にクリップボードの内容やフォーカスが変わっても、キーを押した時点の値が使われます。
+
+```mayu
+key M-C-O = &ShellExecute("open", $Clipboard,,, ShowNormal)
+```
+
 #### `&Sync` {#function_Sync}
 
 それまでに Windows へ送ったキー入力がアプリケーションに届くまで、NYamyのキー処理を中断します。
@@ -1359,11 +1383,13 @@ key 変換 = &VK(F13)
 
 #### 引数置換 {#arg_subst}
 
-引数として `$` で始まるキーワードを指定することにより `⟨FUNCTION⟩` に以下の内容を渡すことができます。\[\]内はそのキーワードを指定できる引数の型です。値の取り出しは `⟨FUNCTION⟩` の実行時に行われます。
+引数として `$` で始まるキーワードを指定することにより `⟨FUNCTION⟩` に以下の内容を渡すことができます。\[\]内はそのキーワードを指定できる引数の型です。値の取り出しは `⟨FUNCTION⟩` の実行時に行われます。ここでいう実行時とは、その `⟨FUNCTION⟩` が動きはじめる時点のことで、キーを押した時点と考えて構いません。時間のかかる処理を行う `⟨FUNCTION⟩` でも、処理中に値が変わったかどうかは結果に影響しません ([`&ShellExecute`](#function_ShellExecute_eval) の例を参照)。
 
 - `$Clipboard`: \[文字列\] クリップボードの中身
 - `$WindowClassName`: \[文字列\] フォーカスされているウィンドウのクラス名
 - `$WindowTitleName`: \[文字列\] フォーカスされているウィンドウのタイトル名
+
+`$` で始まる書き方は[キーシーケンス](#keyseq)の参照にも使いますが、どちらとして扱われるかは**その引数の型**で決まります。`⟨キーシーケンス⟩` を受け取る引数 ([`&Repeat`](#function_Repeat)、[`&EmacsEditKillLinePred`](#function_EmacsEditKillLine)) ではキーシーケンス名、[文字列](#string)を受け取る引数では上記のキーワードとして解釈されます。したがって `&Repeat($Clipboard, 3)` は `$Clipboard` という名前のキーシーケンスを探しますし、文字列の引数に上記以外の名前を書くとエラーになります。
 
 クリップボード内の文字列を URL としてブラウザで開く例:
 

@@ -8,6 +8,7 @@
 
 #  include "setting.h"
 #  include "function.h"
+#  include "errormessage.h"
 #  include "adhoc_keyseq.h"
 #  include <vector>
 
@@ -81,6 +82,11 @@ public:
 		if (index < m_keySeqs.size()) return m_keySeqs[index];
 		return nullptr;
 	}
+	const KeySeq *resolveKeySeqByName(const wstringi &name) override {
+		if (KeySeq *ks = searchKeySeqByName(name))
+			return ks;
+		throw ErrorMessage() << L"`$" << name << L"': unknown keyseq name.";
+	}
 	Modifier resolveModifier(const ModifierSpec &bm) override {
 		return modifierFromCmd(bm);
 	}
@@ -129,6 +135,11 @@ public:
 	// CmdLoadContext
 	const Keymap *resolveKeymap(const wstringi &name) override;
 	const KeySeq *resolveKeySeq(uint32_t /*index*/) override { return nullptr; }
+	/// ad-hoc sequences are compiled without the Setting's keyseq table
+	const KeySeq *resolveKeySeqByName(const wstringi &name) override {
+		throw ErrorMessage() << L"`$" << name
+		<< L"': keyseq names cannot be used here.";
+	}
 	Modifier resolveModifier(const ModifierSpec &bm) override { return modifierFromCmd(bm); }
 
 	/// Materialize actions into an AdHocKeySeq (not stored in Setting)

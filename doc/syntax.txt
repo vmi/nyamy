@@ -268,6 +268,7 @@
 	<ARGUMENT>
 		: <KEYMAP_NAME>
 		| "$" <KEYSEQ_NAME> | "(" <KEY_SEQUENCE> ")"
+		| <ARGUMENT_SUBST>
 		| <ARGUMENT_LOCK>
 		| <string>
 		| <number>
@@ -279,6 +280,19 @@
 		| <bool>
 
 	<ARGUMENT_LOCK> : /lock\d/	# &Toggle()
+
+	<ARGUMENT_SUBST>		# <string> arguments
+		: "$Clipboard"		# contents of the clipboard
+		| "$WindowClassName"	# class name of the focused window
+		| "$WindowTitleName"	# title name of the focused window
+	# <ARGUMENT_SUBST> and "$" <KEYSEQ_NAME> are spelled the same way, and
+	# which of the two applies is decided by the type of the argument the
+	# function takes - not by the name:
+	#	a keyseq argument (&Repeat, &EmacsEditKillLinePred)
+	#					-> "$" <KEYSEQ_NAME>
+	#	a <string> argument		-> <ARGUMENT_SUBST>
+	# So $Clipboard given to &Repeat names a keyseq, and a keyseq name given
+	# to &ShellExecute is an error.
 
 	<ARGUMENT_VK>			# &VK()
 		: <VK_MODIFIER>* <VK_NAME>
