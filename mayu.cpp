@@ -62,6 +62,7 @@ class Mayu
 
 	womsgstream m_log;				/** log stream (output to log
 						    dialog's edit) */
+	size_t m_logMaxChars;				/// nyamy.ini logMaxSize
 #ifdef LOG_TO_FILE
 	std::wofstream m_logFile;
 #endif // LOG_TO_FILE
@@ -431,7 +432,7 @@ private:
 				// thing on the log path, and the cost grows with how much the
 				// control already holds, so the buffer is kept modest.
 				editInsertTextAtLast(GetDlgItem(This->m_hwndLog, IDC_EDIT_log),
-									 str, kLogEditMaxChars);
+									 str, This->m_logMaxChars);
 				log->releaseString();
 				return 0;
 			}
@@ -1070,6 +1071,12 @@ public:
 			m_isSettingDialogOpened(false),
 			m_sessionState(0),
 			m_engine(m_log) {
+		int logMaxSize;
+		IniFile().read(L"logMaxSize", &logMaxSize,
+					   static_cast<int>(kLogEditMaxChars));
+		m_logMaxChars = (0 < logMaxSize) ?
+			static_cast<size_t>(logMaxSize) : kLogEditMaxChars;
+
 		// addSessionId(): mailslot names live in \Device\Mailslot, which has
 		// no per session split of its own, so without it a second logged on
 		// user's nyamy would find the name taken.  Everything else shared

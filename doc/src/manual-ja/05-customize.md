@@ -720,6 +720,16 @@ cmdLine="${NYAMY_ROOT}\nyamy-scripter.exe -I ${HOME}\nyamy-lib -D MYFLAG .mayu.r
 
 なお `cmdLine` は、scripter のプロトコルを話す別の実装に差し替えるためのものでもあります。通常は変更する必要はありません。
 
+#### ログ欄の保持文字数 (`logMaxSize`) {#logmaxsize}
+
+<span class="menu-item">ログ</span>ダイアログの編集欄が保持するテキスト量は、既定で 20000 文字です。これを超えると古い行から行単位で切り詰められます。`nyamy.ini` の `logMaxSize` で文字数を変更できます。
+
+```ini
+logMaxSize=50000
+```
+
+未指定・0 以下・数値として解釈できない値の場合は既定値 (20000) が使われます。上限はありませんが、値を大きくするほど追記のたびのコストが増える点に注意してください。この設定は NYamy の起動時に読み込まれます (タスクトレイメニューの<span class="menu-item">Reload</span>では反映されません)。
+
 #### 設定ファイルの文字コード {#encoding}
 
 設定ファイルの文字コードは UTF-8 (BOM の有無は不問) を推奨します。`.mayu` 形式については、UTF-16 および CP932 (Shift_JIS) のファイルも読み込むことができます。
