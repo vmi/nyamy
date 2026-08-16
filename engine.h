@@ -258,8 +258,14 @@ private:
 	bool m_isStopping;
 	HANDLE m_queueMutex;
 	MSLLHOOKSTRUCT m_msllHookCurrent;
-	bool m_buttonPressed;
+	/** Mouse buttons the hook has seen pressed, as a bit per E1 scan code.
+	    One flag for every button was not enough: releasing any button cleared
+	    it, so letting go of the right button in the middle of a left drag left
+	    the drag with nothing to end it. */
+	unsigned m_buttonsPressed;
 	bool m_dragging;
+	/// E1 scan code of the button that owns the drag, 0 when there is none
+	USHORT m_dragButton;
 	/** Setting::m_dragThreshold scaled to the monitor the drag started on.
 
 	    Resolved when the button goes down rather than per mouse move: the
@@ -461,6 +467,9 @@ private:
 
 	/// drop pressed-key marks that no longer match the OS key state
 	void resyncKeyStates(bool i_force);
+
+	/// queue the release of the drag pseudo key; call with m_queueMutex held
+	void endDrag();
 
 	/// result of waitWhileUnlocked()
 	enum class WaitResult {

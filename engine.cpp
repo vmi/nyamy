@@ -1153,6 +1153,29 @@ unsigned int Engine::keyboardDetour(KBDLLHOOKSTRUCT *i_kid)
 	}
 }
 
+/// the bit m_buttonsPressed keeps for a button, by its E1 scan code
+static inline unsigned buttonBit(USHORT i_makeCode)
+{
+	return 1u << i_makeCode;
+}
+
+
+// queue the release of the drag pseudo key.  The caller holds m_queueMutex.
+void Engine::endDrag()
+{
+	KEYBOARD_INPUT_DATA kid;
+
+	m_dragging = false;
+	m_dragButton = 0;
+	kid.UnitId = 0;
+	kid.Flags = KEYBOARD_INPUT_DATA::E1 | KEYBOARD_INPUT_DATA::BREAK;
+	kid.Reserved = 0;
+	kid.ExtraInformation = 0;
+	kid.MakeCode = 0;
+	m_inputQueue->push_back(kid);
+}
+
+
 unsigned int WINAPI Engine::mouseDetour(Engine *i_this, WPARAM i_wParam, LPARAM i_lParam)
 {
 	return i_this->mouseDetour(i_wParam, reinterpret_cast<MSLLHOOKSTRUCT*>(i_lParam));
@@ -1227,7 +1250,7 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			LONG dr = 0;
 			dr += (i_mid->pt.x - m_msllHookCurrent.pt.x) * (i_mid->pt.x - m_msllHookCurrent.pt.x);
 			dr += (i_mid->pt.y - m_msllHookCurrent.pt.y) * (i_mid->pt.y - m_msllHookCurrent.pt.y);
-			if (m_buttonPressed && !m_dragging && m_dragThresholdPx &&
+			if (m_buttonsPressed && !m_dragging && m_dragThresholdPx &&
 				(m_dragThresholdPx * m_dragThresholdPx < dr)) {
 				kid.MakeCode = 0;
 				WaitForSingleObject(m_queueMutex, INFINITE);
@@ -1301,20 +1324,22 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 		WaitForSingleObject(m_queueMutex, INFINITE);
 
 		if (kid.Flags & KEYBOARD_INPUT_DATA::BREAK) {
-			m_buttonPressed = false;
-			if (m_dragging) {
-				KEYBOARD_INPUT_DATA kid2;
-
-				m_dragging = false;
-				kid2.UnitId = 0;
-				kid2.Flags = KEYBOARD_INPUT_DATA::E1 | KEYBOARD_INPUT_DATA::BREAK;
-				kid2.Reserved = 0;
-				kid2.ExtraInformation = 0;
-				kid2.MakeCode = 0;
-				m_inputQueue->push_back(kid2);
-			}
+			m_buttonsPressed &= ~buttonBit(kid.MakeCode);
+			// only the button that started the drag ends it
+			if (m_dragging && kid.MakeCode == m_dragButton)
+				endDrag();
 		} else if (i_message != WM_MOUSEWHEEL && i_message != WM_MOUSEHWHEEL) {
-			m_buttonPressed = true;
+			unsigned bit = buttonBit(kid.MakeCode);
+			// This button is already down, so its release never reached this
+			// bookkeeping: the hook was handing events back to the system by
+			// then, or it was not called for that one at all.  Drop the drag
+			// it was carrying rather than let the stale one run on.
+			if ((m_buttonsPressed & bit) && m_dragging &&
+					kid.MakeCode == m_dragButton)
+				endDrag();
+			m_buttonsPressed |= bit;
+			if (!m_dragging)
+				m_dragButton = kid.MakeCode;
 			m_msllHookCurrent = *i_mid;
 			// the config states the threshold in 96 dpi pixels, so that the
 			// same setting means the same apparent distance on every monitor
@@ -1586,8 +1611,9 @@ Engine::Engine(womsgstream &i_log)
 		: m_mutexDepth(0),
 		m_hwndAssocWindow(NULL),
 		m_setting(std::shared_ptr<Setting>{}),
-		m_buttonPressed(false),
+		m_buttonsPressed(0),
 		m_dragging(false),
+		m_dragButton(0),
 		m_keyboardHandler(installKeyboardHook, Engine::keyboardDetour),
 		m_mouseHandler(installMouseHook, Engine::mouseDetour),
 		m_isStopping(false),
