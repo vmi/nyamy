@@ -88,7 +88,7 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 >
 > 見るのは `FocusChanged` ではなく **`HWND:` / `THREADID:` / `CLASS:` / `TITLE:` の 4 行ブロック**。理由は 6 章。
 
-直接証拠は Debug ビルド + DebugView (**Capture Global Win32** を有効化)。`HOOK_RPT` は Debug のみ有効で、`WriteFile to mailslot failed(...), reopening` → `open mailslot successed` の 2 行が出れば再オープンが発火している。**この 2 行が無いまま成功した場合は DLL が再注入されただけで、検証になっていない。**
+直接証拠は Debug ビルド + DebugView (**Capture Global Win32** を有効化。ツールについては 7 章)。`HOOK_RPT` は Debug のみ有効で、`WriteFile to mailslot failed(...), reopening` → `open mailslot successed` の 2 行が出れば再オープンが発火している。**この 2 行が無いまま成功した場合は DLL が再注入されただけで、検証になっていない。**
 
 ---
 
@@ -109,7 +109,53 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 
 ---
 
-## 7. 関連
+## 7. ログ処理の性能を測る
+
+ログの書き手 (とりわけ keyboardHandler スレッド) がどれだけ待たされているかを測る計装が [`log_profile.h`](../log_profile.h) にある。**平均ではなく最大値と分布を見る**ための道具で、平均は問題の起きているケースをちょうど隠す。
+
+### 有効にする
+
+`log_profile.h` の `//#  define NYAMY_LOG_PROFILE` のコメントを外してビルドする。どのプロジェクトファイルでも定義していないので、**戻し忘れてもコミットの diff に出る**。無効時は `Acquire` から計装が丸ごと消える。
+
+### 測る
+
+結果は `OutputDebugString` へ出るので、それを拾うツールが要る。**Sysinternals の DebugView** (`Dbgview.exe`、<https://learn.microsoft.com/sysinternals/downloads/debugview>) を起動しておくこと。Sysinternals Suite にも含まれている。
+
+nyamy.exe 自身の出力なので、フック DLL を見る 5 章と違って *Capture Global Win32* は要らない。nyamy は非昇格で動くので、DebugView も管理者として実行する必要はない。
+
+> **デバッガを接続していると DebugView には出ない。** `OutputDebugString` の出力先はデバッガが優先されるため。Visual Studio から実行して[出力]ウィンドウで読むこともできるが、待ち時間を測るのが目的なのでデバッガは付けない方がよい。
+
+出力の契機は 2 つ。どちらも出力後にカウンタを 0 に戻すので、**シナリオの切り替えは「ログの消去」ボタンで行う**。
+
+| 契機 | タグ |
+|---|---|
+| ログダイアログの [ログの消去] | `log cleared` |
+| nyamy の終了 | `exit` |
+
+観測する組み合わせは 4 通り。**それぞれの間で必ず [ログの消去] を押す**。
+
+1. 通常モード × ログダイアログ非表示
+2. 通常モード × ログダイアログ表示
+3. 詳細モード × ログダイアログ非表示
+4. 詳細モード × ログダイアログ表示
+
+負荷は**キーリピートの押しっぱなし** (適当なキーを 10 秒ほど押し続ける)。詳細モードではこれでほぼ全部が同じブロックになる。scripter からの出力も混ぜたいなら、`.mayu.rb` にエラーを含めて stderr を流す。
+
+### 読み方
+
+- **`wait`** = `Acquire` の構築で待たされた時間。**書き手が「ログを書く」と決めてから 1 文字も書けずにいる時間**であり、これが実害そのもの。見るのは `max`
+- **`hold`** = `acquire()` から `release()` が返るまで。他の書き手と読み手が待つ側の量で、整形コストの目安になる
+
+`max` が `wait` と `hold` で近い値なら、待たせているのは他の書き手 (整形)。`wait` の `max` だけが突出しているなら、待たせているのは読み手 (EDIT コントロールの更新)。
+
+### 注意
+
+- **`n` の桁が違う条件同士を比べない。** ヒストグラムの棒は全体に対する割合なので形は比較できるが、`max` は試行回数が多いほど大きい値を引きやすい。押しっぱなしの秒数を揃えること
+- 計装自体が `Acquire` ごとに `QueryPerformanceCounter` を 3 回呼ぶ。**計装入りのビルドの絶対値を、計装なしのビルドの性能として読まないこと**。見るのは同じ計装入りビルド同士の前後差
+
+---
+
+## 8. 関連
 
 - [event-flow.md](event-flow.md) — フローとスレッド構成
 - [input-injection.md](input-injection.md) — 横取りと再注入

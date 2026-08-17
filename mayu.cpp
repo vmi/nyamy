@@ -683,6 +683,11 @@ private:
 			case WM_APP_dlglogNotify: {
 				switch (i_wParam) {
 				case DlgLogNotify_logCleared:
+					// Clearing the log is what separates one measurement
+					// scenario from the next, so it is where the profile is
+					// written out and started over.  Does nothing unless
+					// NYAMY_LOG_PROFILE is defined; see log_profile.h.
+					LOG_PROFILE_REPORT(L"log cleared");
 					This->showBanner(true);
 					break;
 				case DlgLogNotify_thresholdChanged:
@@ -703,6 +708,7 @@ private:
 				break;
 
 			case WM_DESTROY:
+				LOG_PROFILE_REPORT(L"exit");
 				if (This->m_usingSN) {
 					wtsUnRegisterSessionNotification(i_hwnd);
 					This->m_usingSN = false;

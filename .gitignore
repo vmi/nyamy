@@ -8,6 +8,8 @@
 functions.h
 /Debug
 /Release
+# 計測で before/after のビルドを比べるときの Release/ の退避先
+/Release_*
 /proj/.vs
 /.claude
 /tmp

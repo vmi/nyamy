@@ -156,6 +156,7 @@
     <ClInclude Include="..\inifile.h" />
     <ClInclude Include="..\nyamy_paths.h" />
     <ClInclude Include="..\multithread.h" />
+    <ClInclude Include="..\log_profile.h" />
     <ClInclude Include="..\setting.h" />
     <ClInclude Include="..\cmd_stream.h" />
     <ClInclude Include="..\setting_builder.h" />
