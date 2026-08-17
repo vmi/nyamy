@@ -19,8 +19,10 @@
 #include "keyboard.h"
 #include "symbols.h"
 #include "nyamy_scripter.h"   // parseScancodeMapBlob (exported test helper)
+#include "cli_options.h"
 
 #include <windows.h>
+#include <io.h>
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
@@ -179,9 +181,9 @@ int main()
 	std::string wkMayuPath  = exeDirU8 + "\\__wk_via_mayu__.rb";
 
 	// Generate the loader scripts.  workaround.* is not included from dot.*,
-	// so chain it behind the dot configuration.  The .mayu reference uses a
-	// wrapper .mayu (single compile) because `define`d symbols do not
-	// propagate between two separate `load "*.mayu"` calls.
+	// so chain it behind the dot configuration.  The .mayu reference goes
+	// through a wrapper .mayu, which is the spelling the .rb side mirrors:
+	// one `load` of a file that includes both.
 	writeUtf8File(exeDir + L"\\__via_mayu__.rb", L"load \"dot.mayu\"\n");
 	writeUtf8File(exeDir + L"\\__wk_all__.mayu",
 	              L"include \"dot.mayu\"\ninclude \"workaround.mayu\"\n");
@@ -643,7 +645,7 @@ int main()
 		}
 	}
 
-	// `key ⟨MODIFIER⟩ = ⟨MODIFIER⟩' changed the default modifiers of every line
+	// `key <MODIFIER> = <MODIFIER>' changed the default modifiers of every line
 	// below it.  The statement is gone and must be rejected, not read as an
 	// assignment to a key named "=".
 	{
@@ -1042,7 +1044,732 @@ int main()
 #endif // NYAMY_TEST_HOOKS
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 13;
+	// Regexp: mruby parses /.../ but has no Regexp class, so the binding
+	// supplies one on top of std::wregex.  The script asserts the contract and
+	// raises on any mismatch; buildSetting returns null if it did.
+	{
+		printf("[%d] Regexp / MatchData ... ", idx + 14);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__re_test__.rb",
+			// the real class lives under NYamy; ::Regexp is an alias
+			L"raise \"class name\" unless /a/.class.to_s == \"NYamy::Regexp\"\n"
+			L"raise \"alias\"      unless Regexp.equal?(NYamy::Regexp)\n"
+			L"raise \"md alias\"   unless MatchData.equal?(NYamy::MatchData)\n"
+			// source / pattern / options / inspect / to_s
+			L"raise \"source\"  unless /a\\d+/.source == \"a\\\\d+\"\n"
+			L"raise \"pattern\" unless /ab/.pattern == \"ab\"\n"
+			L"raise \"options\" unless /a/im.options == 5\n"
+			L"raise \"opt x\"   unless /a/x.options == Regexp::EXTENDED\n"
+			L"raise \"opt n\"   unless /a/n.options == 32\n"
+			L"raise \"inspect\" unless /a/xim.inspect == \"/a/mix\"\n"
+			L"raise \"to_s\"    unless /a/i.to_s == \"(?i-mx:a)\"\n"
+			// interpolation, and '/' as division where it is not a literal
+			L"x = \"b\"\n"
+			L"raise \"interp\" unless /a#{x}c/.source == \"abc\"\n"
+			L"y = 4\n"
+			L"raise \"div\"  unless 6/2 == 3\n"
+			L"raise \"div2\" unless y / 2 == 2\n"
+			// matching
+			L"raise \"match?\" unless /b+/.match?(\"abbbc\")\n"
+			L"raise \"=~\"     unless (/b+/ =~ \"abbbc\") == 1\n"
+			L"raise \"===\"    unless /b+/ === \"abbbc\"\n"
+			L"m = /a(b+)(z)?c/.match(\"xxabbbc\")\n"
+			L"raise \"md\"       if m.nil?\n"
+			L"raise \"md[0]\"    unless m[0] == \"abbbc\"\n"
+			L"raise \"md[1]\"    unless m[1] == \"bbb\"\n"
+			L"raise \"md[2]\"    unless m[2].nil?\n"
+			L"raise \"md size\"  unless m.size == 3\n"
+			L"raise \"captures\" unless m.captures == [\"bbb\", nil]\n"
+			L"raise \"pre\"      unless m.pre_match == \"xx\"\n"
+			L"raise \"post\"     unless m.post_match == \"\"\n"
+			L"raise \"begin\"    unless m.begin(0) == 2\n"
+			L"raise \"end\"      unless m.end(1) == 6\n"
+			// $~ / $1..$9 are plain globals in mruby
+			L"raise \"$~\"       unless $~[1] == \"bbb\"\n"
+			L"raise \"$1\"       unless $1 == \"bbb\"\n"
+			L"raise \"no match\" unless /zzz/.match(\"abc\").nil?\n"
+			L"raise \"$~ nil\"   unless $~.nil?\n"
+			L"/l+/ =~ \"hello\"\n"
+			L"raise \"last_match\" unless Regexp.last_match(0) == \"ll\"\n"
+			// String side
+			L"raise \"s =~\"      unless (\"hello\" =~ /l+/) == 2\n"
+			L"raise \"s match\"   unless \"hello\".match(/l+/)[0] == \"ll\"\n"
+			L"raise \"s match?\"  unless \"hello\".match?(/^he/)\n"
+			L"raise \"to_regexp\" unless \"a+\".to_regexp.source == \"a+\"\n"
+			L"raise \"escape\"    unless Regexp.escape(\"a.b\") == \"a\\\\.b\"\n"
+			// 'm' is ECMAScript multiline, not Ruby's dot-matches-newline
+			L"raise \"m anchors\"  unless (/^b$/m =~ \"a\\nb\") == 2\n"
+			L"raise \"no m\"       unless (/^b$/ =~ \"a\\nb\").nil?\n"
+			L"raise \"not dotall\" unless (/a.b/m =~ \"a\\nb\").nil?\n"
+			// 'x' rewrites the pattern; source keeps what was written
+			// a real tab, not the \t escape: /x drops literal whitespace, while
+			// an escape sequence stays, exactly as in Ruby
+			L"raise \"x ws\"      unless /a b\tc/x.pattern == \"abc\"\n"
+			L"raise \"x esc t\"   unless /a\\tb/x.pattern == \"a\\\\tb\"\n"
+			L"raise \"x source\"  unless /a b/x.source == \"a b\"\n"
+			L"raise \"x esc\"     unless /a\\ b/x.pattern == \"a\\\\ b\"\n"
+			L"raise \"x class\"   unless /[a b]/x.pattern == \"[a b]\"\n"
+			L"raise \"x comment\" unless /a # drop me\nb/x.pattern == \"ab\"\n"
+			L"raise \"x esc #\"   unless /a\\#b/x.pattern == \"a\\\\#b\"\n"
+			L"raise \"x cls #\"   unless /a[#]b/x.pattern == \"a[#]b\"\n"
+			L"raise \"no x\"      unless /a b/.pattern == \"a b\"\n"
+			// integer options, and the flag decoder as the one validation point
+			L"raise \"int opts\" unless Regexp.new(\"a\", Regexp::IGNORECASE) == /a/i\n"
+			L"def expect_err(cls)\n"
+			L"  yield\n"
+			L"  false\n"
+			L"rescue => e\n"
+			L"  e.is_a?(cls)\n"
+			L"end\n"
+			L"raise \"bad flag\" unless expect_err(ArgumentError) { Regexp.compile(\"a\", \"zz\") }\n"
+			L"raise \"bad pat\"  unless expect_err(RegexpError) { Regexp.compile(\"(\") }\n"
+			// Onigmo-only syntax the manual lists as unusable really is rejected
+			// rather than quietly meaning something else
+			// Onigmo-only syntax.  Group constructs are rejected outright, but
+			// the letter escapes are read as identity escapes and quietly match
+			// the bare letter - the manual has to warn about exactly this.
+			L"['(?<n>a)', '(?i)a', '(?<=a)b', '\\p{L}'].each do |p|\n"
+			L"  raise \"expected RegexpError: #{p}\" unless expect_err(RegexpError) { Regexp.compile(p) }\n"
+			L"end\n"
+			L"raise \"\\\\A is literal A\" unless (/\\A/ =~ \"xA\") == 1\n"
+			L"raise \"\\\\z is literal z\" unless (/\\z/ =~ \"xz\") == 1\n"
+			L"raise \"\\\\h is literal h\" unless (/\\h/ =~ \"xh\") == 1\n"
+			// the two examples the manual shows in the "Regexp limitations" section
+			L"host = \"desktop-01.example.jp\"\n"
+			L"raise \"doc =~\" unless (host =~ /^([^.]+)\\./) == 0\n"
+			L"raise \"doc $1\" unless $1.upcase == \"DESKTOP-01\"\n"
+			L"doc_re = /\n"
+			L"    EXPLORER\\.EXE :       # comment\n"
+			L"    .* SysListView32 $    # end\n"
+			L"  /x\n"
+			L"raise \"doc x\" unless doc_re.pattern == \"EXPLORER\\\\.EXE:.*SysListView32$\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__re_test__.rb", syms);
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (script raised or no commit)\n");
+			++failures;
+		}
+	}
+
+	// What a Regexp contributes to class: / title: is the compiled pattern,
+	// not its source: under /x the two differ, and it is the compiled one the
+	// engine has to see.  Proven by dumping both spellings and comparing.
+	{
+		printf("[%d] Regexp in class: / title: ... ", idx + 15);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__re_win_a__.rb",
+			L"keymap \"Global\"\n"
+			L"window \"W1\", class: /^Foo:Bar$/, parent: \"Global\"\n"
+			L"window \"W2\", class: /a b/x, title: /t x/x, parent: \"Global\"\n"
+			L"window \"W3\", class: /^Baz$/i, parent: \"Global\"\n");
+		writeUtf8File(exeDir + L"\\__re_win_b__.rb",
+			L"keymap \"Global\"\n"
+			L"window \"W1\", class: '^Foo:Bar$', parent: \"Global\"\n"
+			L"window \"W2\", class: 'ab', title: 'tx', parent: \"Global\"\n"
+			L"window \"W3\", class: '^Baz$', parent: \"Global\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> a =
+			buildSetting(exeDirU8 + "\\__re_win_a__.rb", syms);
+		std::shared_ptr<Setting> b =
+			buildSetting(exeDirU8 + "\\__re_win_b__.rb", syms);
+		if (!a || !b) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else {
+			std::wstring da = dumpSetting(*a);
+			std::wstring db = dumpSetting(*b);
+			if (da == db) {
+				printf("OK\n");
+			} else {
+				printf("\n  settings differ\n");
+				reportFirstDiff(da, db);
+				++failures;
+			}
+		}
+	}
+
+	// The two notices: 'm' is reported once per pattern because it does not
+	// mean what Ruby's /m means, and flags that cannot travel to the engine
+	// are reported where they are used.  'x' travels (it is folded into the
+	// pattern), so it must stay quiet.
+	{
+		printf("[%d] Regexp log output ... ", idx + 16);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__re_log__.rb",
+			L"keymap \"Global\"\n"
+			L"window \"WarnMe\",  class: /^a$/i, parent: \"Global\"\n"
+			L"window \"QuietX\",  class: /a b/x, parent: \"Global\"\n"
+			L"window \"QuietNo\", class: /^plain$/, parent: \"Global\"\n"
+			L"10.times { /^a$/m }\n");
+
+		// Capture stderr, where the scripter writes its log, by swapping the
+		// file descriptor rather than reopening the console afterwards: the
+		// test may well be running without one.
+		std::wstring logPath = exeDir + L"\\__re_log__.txt";
+		fflush(stderr);
+		int savedFd = _dup(_fileno(stderr));
+		FILE *redirected = nullptr;
+		_wfreopen_s(&redirected, logPath.c_str(), L"w", stderr);
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__re_log__.rb", syms);
+
+		fflush(stderr);
+		_dup2(savedFd, _fileno(stderr));
+		_close(savedFd);
+		clearerr(stderr);
+
+		std::vector<std::string> lines;
+		{
+			std::ifstream in(logPath.c_str());
+			std::string line;
+			while (std::getline(in, line)) {
+				if (!line.empty() && line.back() == '\r')
+					line.pop_back();
+				lines.push_back(line);
+			}
+		}
+		auto count = [&](const char *tag, const char *needle) {
+			int n = 0;
+			for (const std::string &l : lines)
+				if (l.compare(0, 2, tag) == 0 &&
+					l.find(needle) != std::string::npos)
+					++n;
+			return n;
+		};
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		check(s != nullptr, "script loaded");
+		check(count("W|", "\"WarnMe\"") == 1, "/i on class: warns");
+		check(count("W|", "\"QuietX\"") == 0, "/x on class: stays quiet");
+		check(count("W|", "\"QuietNo\"") == 0, "no flags stays quiet");
+		check(count("I|", "not dotall") == 1, "/m notice is emitted once");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// In the Ruby DSL a keymap statement declares the keymap; where the
+	// assignments that follow it land is the block's business.  With a block,
+	// what follows the block belongs to the keymap that was in effect before
+	// it; without one, nothing moves at all and the assignments stay at the
+	// top level (Global).  .mayu keeps its own rule - see the test after this.
+	{
+		printf("[%d] keymap block scope ... ", idx + 17);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__scope__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"keymap \"Global\" do\n"
+			L"  key[\"C-A\"] = \"Home\"\n"
+			L"end\n"
+			L"window \"W1\", class: 'w1', parent: \"Global\" do\n"
+			L"  key[\"C-B\"] = \"End\"\n"
+			L"end\n"
+			L"key[\"C-C\"] = \"Delete\"\n"
+			L"keymap \"K2\", parent: \"Global\" do\n"
+			L"  window \"W2\", class: 'w2', parent: \"Global\" do\n"
+			L"    key[\"C-D\"] = \"Left\"\n"
+			L"  end\n"
+			L"  key[\"C-E\"] = \"Right\"\n"
+			L"end\n"
+			L"key[\"C-F\"] = \"Up\"\n"
+			L"window \"W3\", class: 'w3', parent: \"Global\"\n"
+			L"key[\"C-G\"] = \"Down\"\n"
+			// declaring first and filling in later has to keep the parent
+			L"keymap \"K4\", parent: \"K2\"\n"
+			L"keymap \"K4\" do\n"
+			L"  key[\"C-H\"] = \"Left\"\n"
+			L"end\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__scope__.rb", syms);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		// Whether the keymap itself carries the assignment, without looking at
+		// its parents: that is exactly the question the scope answers.
+		auto assigned = [&](const wchar_t *keymapName, const wchar_t *keyName) {
+			if (!s) return false;
+			const Keymap *km = findKeymap(*s, keymapName);
+			if (!km) return false;
+			Keyboard &kb = const_cast<Keyboard &>(s->m_keyboard);
+			Key *key = kb.searchKey(wstringi(keyName));
+			if (!key) return false;
+			Held held;
+			held.ctrl = true;
+			return km->searchAssignment(physicalKey(key, true, held)) != nullptr;
+		};
+
+		check(s != nullptr, "script loaded");
+		check(assigned(L"Global", L"A"), "C-A lands in Global");
+		check(assigned(L"W1", L"B"),     "C-B lands in the window block");
+		check(assigned(L"Global", L"C"), "C-C after the block returns to Global");
+		check(!assigned(L"W1", L"C"),    "C-C does not leak into the window");
+		check(assigned(L"W2", L"D"),     "C-D lands in the inner block");
+		check(assigned(L"K2", L"E"),     "C-E returns to the enclosing block");
+		check(!assigned(L"W2", L"E"),    "C-E does not leak out of the inner block");
+		check(assigned(L"Global", L"F"), "C-F returns to Global from a nested block");
+		check(assigned(L"Global", L"G"), "C-G stays at the top level");
+		check(!assigned(L"W3", L"G"),    "a blockless window takes nothing");
+		check(assigned(L"K4", L"H"),     "C-H lands in the block that fills K4 in");
+		const Keymap *k4 = s ? findKeymap(*s, L"K4") : nullptr;
+		check(k4 && k4->getParentKeymap() &&
+		      std::wstring(k4->getParentKeymap()->getName().c_str()) == L"K2",
+		      "a blockless declaration keeps its parent");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// Where a `load' leaves the keymap context.  A .mayu keymap statement stays
+	// in effect until the next one - inside that file - but the rule stops at
+	// the file: what the script writes after the load belongs to the script's
+	// own top level.  The same goes for a .rb that ends on a blockless keymap.
+	{
+		printf("[%d] keymap context across load ... ", idx + 18);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__scope_lib__.rb",
+			L"window \"L1\", class: 'l1', parent: \"Global\"\n");
+		writeUtf8File(exeDir + L"\\__scope_leg__.mayu",
+			L"include \"109.mayu\"\n"
+			L"keymap Global\n"
+			L"keymap KLeg : Global\n"
+			L"key C-B\t= End\n");
+		writeUtf8File(exeDir + L"\\__scope_load__.rb",
+			L"load \"__scope_leg__.mayu\"\n"
+			L"key[\"C-C\"] = \"Delete\"\n"
+			L"load \"__scope_lib__.rb\"\n"
+			L"key[\"C-A\"] = \"Home\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__scope_load__.rb", syms);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		auto assigned = [&](const wchar_t *keymapName, const wchar_t *keyName) {
+			if (!s) return false;
+			const Keymap *km = findKeymap(*s, keymapName);
+			if (!km) return false;
+			Keyboard &kb = const_cast<Keyboard &>(s->m_keyboard);
+			Key *key = kb.searchKey(wstringi(keyName));
+			if (!key) return false;
+			Held held;
+			held.ctrl = true;
+			return km->searchAssignment(physicalKey(key, true, held)) != nullptr;
+		};
+
+		check(s != nullptr, "script loaded");
+		check(assigned(L"KLeg", L"B"),   ".mayu keeps its own keymap context");
+		check(assigned(L"Global", L"C"), "the .mayu context does not escape");
+		check(!assigned(L"KLeg", L"C"),  "C-C does not land in the .mayu keymap");
+		check(assigned(L"Global", L"A"), "a blockless window in a .rb does not escape");
+		check(!assigned(L"L1", L"A"),    "C-A does not land in the loaded window");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// `define' in one included .mayu is visible to the `if' of the next one.
+	// Each include is compiled on its own, so the symbols have to be carried
+	// across; nesting an include has always worked, and these have to match.
+	{
+		printf("[%d] symbols across sibling includes ... ", idx + 19);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__sib_a__.mayu", L"define SIB-A\n");
+		writeUtf8File(exeDir + L"\\__sib_b__.mayu",
+			L"if ( SIB-A )\n"
+			L"  define SIB-B-SAW-A\n"
+			L"endif\n");
+		writeUtf8File(exeDir + L"\\__sib_main__.rb",
+			L"load \"__sib_a__.mayu\"\n"
+			L"load \"__sib_b__.mayu\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__sib_main__.rb", syms);
+
+		bool saw = s && s->m_symbols.count(wstringi(L"SIB-B-SAW-A")) > 0;
+		if (saw) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (%s)\n",
+			       s ? "the second include did not see the first define"
+			         : "load failed");
+			++failures;
+		}
+	}
+
+	// ENV: a read-only view of the process environment.
+	{
+		printf("[%d] ENV ... ", idx + 20);
+		fflush(stdout);
+
+		SetEnvironmentVariableW(L"NYAMY_TEST_ENV", L"hello");
+		SetEnvironmentVariableW(L"NYAMY_TEST_ENV_MISSING", nullptr);
+
+		writeUtf8File(exeDir + L"\\__env__.rb",
+			L"raise \"[] failed\" unless ENV[\"NYAMY_TEST_ENV\"] == \"hello\"\n"
+			L"raise \"[] on unset\" unless ENV[\"NYAMY_TEST_ENV_MISSING\"].nil?\n"
+			L"raise \"symbol key\" unless ENV[:NYAMY_TEST_ENV] == \"hello\"\n"
+			L"raise \"key? true\"  unless ENV.key?(\"NYAMY_TEST_ENV\")\n"
+			L"raise \"key? false\" if ENV.key?(\"NYAMY_TEST_ENV_MISSING\")\n"
+			L"raise \"fetch\" unless ENV.fetch(\"NYAMY_TEST_ENV\") == \"hello\"\n"
+			L"raise \"fetch default\" unless\n"
+			L"  ENV.fetch(\"NYAMY_TEST_ENV_MISSING\", \"d\") == \"d\"\n"
+			L"raised = false\n"
+			L"begin\n"
+			L"  ENV.fetch(\"NYAMY_TEST_ENV_MISSING\")\n"
+			L"rescue KeyError\n"
+			L"  raised = true\n"
+			L"end\n"
+			L"raise \"fetch should raise KeyError\" unless raised\n"
+			L"raise \"keys\" unless ENV.keys.include?(\"NYAMY_TEST_ENV\")\n"
+			L"raise \"to_h\" unless ENV.to_h[\"NYAMY_TEST_ENV\"] == \"hello\"\n"
+			L"n = 0\n"
+			L"ENV.each { |k, v| n += 1 if k == \"NYAMY_TEST_ENV\" && v == \"hello\" }\n"
+			L"raise \"each\" unless n == 1\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__env__.rb", syms);
+
+		SetEnvironmentVariableW(L"NYAMY_TEST_ENV", nullptr);
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (script raised or no commit)\n");
+			++failures;
+		}
+	}
+
+	// NYAMY_LOAD_PATH adds to $LOAD_PATH.  A relative element is dropped with a
+	// warning instead of failing the load: a stray environment variable should
+	// not be able to stop nyamy from starting.
+	{
+		printf("[%d] NYAMY_LOAD_PATH ... ", idx + 21);
+		fflush(stdout);
+
+		std::wstring lpDir = exeDir + L"\\__nlp__";
+		CreateDirectoryW(lpDir.c_str(), nullptr);
+		writeUtf8File(lpDir + L"\\__nlp_lib__.rb", L"$nlp_loaded = true\n");
+		writeUtf8File(exeDir + L"\\__nlp_main__.rb",
+			L"load \"__nlp_lib__.rb\"\n"
+			L"raise \"NYAMY_LOAD_PATH entry not searched\" unless $nlp_loaded\n");
+
+		SetEnvironmentVariableW(L"NYAMY_LOAD_PATH",
+		                        (L"relative\\path;" + lpDir).c_str());
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__nlp_main__.rb", syms);
+
+		SetEnvironmentVariableW(L"NYAMY_LOAD_PATH", nullptr);
+		if (s) {
+			printf("OK\n");
+		} else {
+			printf("FAIL (script raised or no commit)\n");
+			++failures;
+		}
+	}
+
+	// The command line parser, which main() is the only production caller of.
+	{
+		printf("[%d] command line options ... ", idx + 22);
+		fflush(stdout);
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+
+		{
+			const char *argv[] = { "nyamy-scripter", "-I", "C:\\a;D:/b\\",
+			                       "-DSYM1", "-D", "SYM2", "--",
+			                       "-script.rb", "arg1" };
+			CliOptions o;
+			std::string err;
+			bool ok = parseCliOptions((int)(sizeof(argv) / sizeof(argv[0])),
+			                          argv, &o, &err);
+			check(ok, "full command line parses");
+			check(o.includeDirs.size() == 2, "two -I directories");
+			check(o.includeDirs.size() == 2 && o.includeDirs[0] == "C:\\a" &&
+			      o.includeDirs[1] == "D:\\b",
+			      "-I is split on ';', slashes and trailing separator normalized");
+			check(o.symbols.size() == 2 && o.symbols[0] == "SYM1" &&
+			      o.symbols[1] == "SYM2", "-D glued and separated both work");
+			check(o.scriptArgIndex == 7, "-- makes the next argument the script");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "script.rb" };
+			CliOptions o;
+			std::string err;
+			check(parseCliOptions(2, argv, &o, &err) && o.scriptArgIndex == 1,
+			      "a bare script is the script");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "--help" };
+			CliOptions o;
+			std::string err;
+			check(parseCliOptions(2, argv, &o, &err) && o.showHelp &&
+			      o.scriptArgIndex == 0, "--help needs no script");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "-I", "lib", "s.rb" };
+			CliOptions o;
+			std::string err;
+			check(!parseCliOptions(4, argv, &o, &err), "relative -I is rejected");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "-I", "\\lib", "s.rb" };
+			CliOptions o;
+			std::string err;
+			check(!parseCliOptions(4, argv, &o, &err),
+			      "drive-relative -I is rejected");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "-D" };
+			CliOptions o;
+			std::string err;
+			check(!parseCliOptions(2, argv, &o, &err), "-D without a value fails");
+		}
+		{
+			const char *argv[] = { "nyamy-scripter", "-Z", "s.rb" };
+			CliOptions o;
+			std::string err;
+			check(!parseCliOptions(3, argv, &o, &err), "an unknown option fails");
+		}
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// Every argument type has to survive the trip to a user function: the ctrl
+	// stream used to carry only strings and numbers, and an argument it could
+	// not write vanished while its count stayed - which desynchronized the
+	// reader and killed every request that followed.  Hence the second call.
+	{
+		printf("[%d] ExecUserFunc arguments ... ", idx + 23);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__uf_args__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"deffunc \"T13Args\" do |s, n, re, ks, mod, toks|\n"
+			L"  log.info \"T13 s=#{s} n=#{n} re=#{re.source}\" +\n"
+			L"           \" ks=#{ks.class} mod=#{mod.class} toks=#{toks.inspect}\"\n"
+			L"end\n");
+
+		ExecUserFuncRequest req;
+		req.name = wstringi(L"T13Args");
+		req.args.emplace_back(std::in_place_type<FuncArgString>, L"hello");
+		req.args.emplace_back(std::in_place_type<FuncArgNumber>, -42);
+		req.args.emplace_back(std::in_place_type<FuncArgRegexp>, L"a+b");
+		req.args.emplace_back(std::in_place_type<FuncArgKeySeqIdx>, 0u);
+		ModifierSpec ms;
+		ms.modifiers = 0x12;
+		ms.dontcares = 0x34;
+		req.args.emplace_back(std::in_place_type<FuncArgModifierSpec>, ms);
+		req.args.emplace_back(std::in_place_type<FuncArgTokenSeq>,
+			FuncArgTokenSeq{ wstringi(L"A"), wstringi(L"B") });
+		req.context.scanCode = 0x1e;
+		req.context.windowClass = L"cls";
+		req.context.windowTitle = L"ttl";
+		std::vector<ExecUserFuncRequest> execs = { req, req };
+
+		std::wstring logPath = exeDir + L"\\__uf_args__.txt";
+		fflush(stderr);
+		int savedFd = _dup(_fileno(stderr));
+		FILE *redirected = nullptr;
+		_wfreopen_s(&redirected, logPath.c_str(), L"w", stderr);
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__uf_args__.rb", syms, 1, &execs);
+
+		fflush(stderr);
+		_dup2(savedFd, _fileno(stderr));
+		_close(savedFd);
+		clearerr(stderr);
+
+		int hits = 0, calls = 0;
+		{
+			std::ifstream in(logPath.c_str());
+			std::string line;
+			const char *want =
+				"T13 s=hello n=-42 re=a+b ks=NYamy::KeySeq"
+				" mod=NYamy::Modifier toks=[\"A\", \"B\"]";
+			while (std::getline(in, line)) {
+				if (line.find("T13 ") != std::string::npos) ++calls;
+				if (line.find(want) != std::string::npos) ++hits;
+			}
+		}
+
+		int bad = 0;
+		auto check = [&](bool cond, const char *what) {
+			if (!cond) { printf("\n  %s: FAILED", what); ++bad; }
+		};
+		check(s != nullptr, "script loaded");
+		check(calls == 2, "the handler ran once per request");
+		check(hits == 2,  "every argument type arrived intact, twice");
+
+		if (bad == 0) {
+			printf("OK\n");
+		} else {
+			printf("\n  FAIL (%d check(s))\n", bad);
+			++failures;
+		}
+	}
+
+	// A pattern is dumped as a regexp literal, so the delimiter and anything
+	// that cannot be shown have to be escaped - and nothing else, since the
+	// text is the pattern's own source.
+	{
+		printf("[%d] regexp literal in dumps ... ", idx + 24);
+		fflush(stdout);
+
+		// a/b\/c<TAB>d<e-acute>: a bare delimiter, one that is already escaped,
+		// a control character, and a letter no ASCII locale calls printable.
+		writeUtf8File(exeDir + L"\\__re_dump__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"window \"T13Re\", class: \"a/b\\\\/c\\td\\u00e9\","
+			L" parent: \"Global\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__re_dump__.rb", syms);
+
+		std::wstring dump = s ? dumpSetting(*s) : std::wstring();
+		const std::wstring want = L"/a\\/b\\/c\\td\u00e9/";
+
+		if (s && dump.find(want) != std::wstring::npos) {
+			printf("OK\n");
+		} else if (!s) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else {
+			printf("FAIL (expected literal not in the dump)\n");
+			++failures;
+		}
+	}
+
+	// $NAME in an argument means one of two things depending on the parameter
+	// it lands on, and the parser cannot tell which - it does not know the
+	// signatures.  So it travels as FuncArgDollarName and the generated
+	// loadFromCmd() decides.  Before that it was compiled to a plain string,
+	// which made $Clipboard the literal text "Clipboard" and made a keyseq
+	// argument throw std::bad_variant_access on a thread with no handler.
+	{
+		printf("[%d] $NAME resolves by parameter type ... ", idx + 25);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__dollar__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"keyseq \"$Foo\", \"A\"\n"
+			// a substitution, a literal that merely looks like one, and a
+			// keyseq reference - all three spelled into arguments
+			L"key[\"C-A-S-O\"] = "
+			L"'&ShellExecute(\"open\", $Clipboard,,, ShowNormal)'\n"
+			L"key[\"C-A-S-W\"] = '&ClipboardCopy($WindowClassName)'\n"
+			L"key[\"C-A-S-L\"] = '&ClipboardCopy(\"Clipboard\")'\n"
+			L"key[\"C-A-S-P\"] = '&Repeat($Foo, 3)'\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__dollar__.rb", syms);
+		std::wstring dump = s ? dumpSetting(*s) : std::wstring();
+
+		struct { const wchar_t *want; const char *why; } wants[] = {
+			{ L"&ShellExecute(\"open\", $Clipboard,",	"$Clipboard" },
+			{ L"&ClipboardCopy($WindowClassName)",		"$WindowClassName" },
+			{ L"&ClipboardCopy(\"Clipboard\")",		"quoted literal" },
+			{ L"&Repeat(",					"keyseq argument" },
+		};
+		const char *missing = NULL;
+		for (const auto &w : wants)
+			if (!missing && dump.find(w.want) == std::wstring::npos)
+				missing = w.why;
+
+		if (s && !missing) {
+			printf("OK\n");
+		} else if (!s) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else {
+			printf("FAIL (%s not as expected)\n", missing);
+			++failures;
+		}
+	}
+
+	// An unknown $NAME used to leave StrExprArg::m_expr null, so the first
+	// eval() dereferenced it.  It has to be reported instead, and the rest of
+	// the setting has to survive.
+	{
+		printf("[%d] unknown $NAME is reported ... ", idx + 26);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__dollar_bad__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"key[\"C-A-S-O\"] = "
+			L"'&ShellExecute(\"open\", $Clipbord,,, ShowNormal)'\n"
+			L"key[\"C-A-S-P\"] = '&Repeat($NoSuchKeySeq, 3)'\n"
+			L"key[\"C-A-S-B\"] = \"&DescribeBindings\"\n");
+
+		Symbols syms;
+		std::shared_ptr<Setting> s =
+			buildSetting(exeDirU8 + "\\__dollar_bad__.rb", syms);
+		std::wstring dump = s ? dumpSetting(*s) : std::wstring();
+
+		// the good assignment survives, the two bad ones are dropped
+		if (s && dump.find(L"&DescribeBindings") != std::wstring::npos
+				&& dump.find(L"Clipbord") == std::wstring::npos
+				&& dump.find(L"NoSuchKeySeq") == std::wstring::npos) {
+			printf("OK\n");
+		} else if (!s) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else {
+			printf("FAIL (bad names not dropped, or good one lost)\n");
+			++failures;
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 26;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

@@ -42,6 +42,22 @@ uint16_t CtrlStreamReader::readU16()
 }
 
 
+uint32_t CtrlStreamReader::readU32()
+{
+	uint32_t lo = readU16();
+	uint32_t hi = readU16();
+	return lo | (hi << 16);
+}
+
+
+uint64_t CtrlStreamReader::readU64()
+{
+	uint64_t lo = readU32();
+	uint64_t hi = readU32();
+	return lo | (hi << 32);
+}
+
+
 wstringi CtrlStreamReader::readString()
 {
 	uint16_t len = readU16();
@@ -79,25 +95,60 @@ LogLevel CtrlStreamReader::readSetLogLevel()
 }
 
 
+// One function argument, in the layout CtrlStreamWriter::writeFuncArg() writes
+// (which is the layout of the command stream, tags included).  An unknown tag
+// throws: the length of what follows depends on the tag, so guessing means
+// reading the rest of the frame as an argument and blocking on a string that
+// never arrives.
+NYsFuncArg CtrlStreamReader::readFuncArg(CtrlArgsExecUserFunc *o_data)
+{
+	NYsFuncArg e;
+	uint8_t tag = readU8();		// FuncArgTag values == NYsType values
+	switch (static_cast<FuncArgTag>(tag)) {
+	case FuncArgTag_String:
+	case FuncArgTag_Regexp:
+		e.type = (tag == FuncArgTag_String) ? NYsType_String : NYsType_Regexp;
+		e.str = to_UTF8(std::wstring(readString()));
+		break;
+	case FuncArgTag_Number:
+		e.type = NYsType_Number;
+		e.numval = static_cast<int32_t>(readU32());
+		break;
+	case FuncArgTag_KeySeqIdx:
+		e.type = NYsType_KeySeqIdx;
+		e.numval = static_cast<int64_t>(readU32());
+		break;
+	case FuncArgTag_ModifierSpec:
+		e.type = NYsType_ModifierSpec;
+		e.numval  = static_cast<int64_t>(readU64());
+		e.numval2 = static_cast<int64_t>(readU64());
+		break;
+	case FuncArgTag_TokenSeq: {
+		e.type = NYsType_TokenSeq;
+		uint16_t count = readU16();
+		o_data->tokenSeqs.push_back(std::make_unique<NYsStrs>());
+		NYsStrs *ss = o_data->tokenSeqs.back().get();
+		for (uint16_t i = 0; i < count; ++i)
+			ss->strs.push_back(to_UTF8(std::wstring(readString())));
+		e.strs = ss;
+		break;
+	}
+	default:
+		throw ErrorMessage()
+			<< L"ExecUserFunc: unknown argument tag " << static_cast<int>(tag);
+	}
+	return e;
+}
+
+
 CtrlArgsExecUserFunc CtrlStreamReader::readExecUserFunc()
 {
 	CtrlArgsExecUserFunc data;
 	data.name = readString();
 	uint16_t argCount = readU16();
-	for (uint16_t i = 0; i < argCount; ++i) {
-		NYsFuncArg e;
-		e.type = static_cast<NYsType>(readU8());  // FuncArgTag values == NYsType values
-		if (e.type == NYsType_Number) {
-			int32_t v = 0;
-			for (int j = 0; j < 8; ++j)
-				v |= static_cast<int32_t>(readU8()) << (8 * j);
-			e.numval = v;
-		} else {
-			wstringi ws = readString();
-			e.str = to_UTF8(std::wstring(ws));
-		}
-		data.args.entries.push_back(std::move(e));
-	}
+	data.tokenSeqs.reserve(argCount);
+	for (uint16_t i = 0; i < argCount; ++i)
+		data.args.entries.push_back(readFuncArg(&data));
 	data.context.scanCode    = readU8();
 	data.context.extended    = (readU8() != 0);
 	data.context.windowClass = std::wstring(readString());

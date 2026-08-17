@@ -14,8 +14,10 @@ if symbol_defined?("USEdefault")
   load "default.mayu.rb"
 end
 
-keymap "Global"
-
-# このファイルをホームディレクトリにコピーしてから、
+# このファイルを %LOCALAPPDATA%\NYamy\Config にコピーしてから、
 # 以下に自分の好みのキーバインディングを設定するとよい。
-# このファイル自体を変更しないこと。
+# 必要に応じて任意の keymap/window ブロックを追加する。
+# このファイル自体は変更しないこと。
+keymap "Global" do
+  # 例: key["C-A-S-L"] = "&MayuDialog(Log, SHOW)"
+end

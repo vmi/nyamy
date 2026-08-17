@@ -131,6 +131,14 @@ NYS_API int nys_start(const NYsCallbacks* callbacks, void* exeCtx);
 /// Call before nys_start().
 NYS_API void nys_set_quit_timeout(uint32_t millisec);
 
+/// Define a symbol for every setting load, on top of whatever the Start command
+/// carries.  This is what the -D option is made of, so a symbol given on the
+/// command line means the same thing as one given by nyamy.
+/// Call before nys_start(): the symbols are re-applied at each Start, so they
+/// survive a reload, and the set is settled before on_load_setting runs.
+/// Idempotent.
+NYS_API bool nys_add_default_symbol(const char* name);
+
 /// Version check for FFI compatibility: major(16) | minor(8) | patch(8)
 NYS_API uint32_t nys_version(void);
 
@@ -180,17 +188,34 @@ NYS_API bool nys_def_subst(const NYsStrs* lhs_mod_keys, int rhs_keyseq_idx);
 /// Equivalent to: def option <option_name> = <value>
 NYS_API bool nys_def_option(const char* option_name, const char* value);
 
+/// What a keymap definition does to the keymap currently in effect.
+/// Declaring the keymap and choosing where the assignments that follow it land
+/// are separate decisions: .mayu enters and never comes back, while a Ruby DSL
+/// `keymap`/`window` either only declares (no block) or opens a block.
+typedef enum NYsKeymapScope {
+	NYsKeymapScope_Declare = 0,	///< declare only; the current keymap does not move
+	NYsKeymapScope_Enter   = 1,	///< declare and make current, with no way back
+	NYsKeymapScope_Block   = 2,	///< declare and make current until nys_end_keymap()
+} NYsKeymapScope;
+
 /// Equivalent to: keymap / keymap2 / window directive.
+/// scope:         see NYsKeymapScope
 /// keyword:       "keymap", "keymap2", or "window"
 /// window_class:  regex pattern string (NULL for non-window keymaps)
 /// window_title:  regex pattern string (NULL if not used)
 /// op:            "&&", "||", or NULL (default: "&&")
 /// parent_name:   NULL if no parent
 /// default_keyseq_idx: -1 means none
-NYS_API bool nys_begin_keymap(const char* keyword, const char* name,
+NYS_API bool nys_def_keymap(NYsKeymapScope scope,
+	const char* keyword, const char* name,
 	const char* window_class, const char* window_title,
 	const char* op, const char* parent_name,
 	int default_keyseq_idx);
+
+/// Closes the keymap opened by nys_def_keymap(NYsKeymapScope_Block, ...),
+/// putting back the keymap that was in effect when the block was entered, so
+/// that what follows the block is not silently swallowed by it.
+NYS_API bool nys_end_keymap(void);
 
 /// Equivalent to: key <lhs_mod_keys...> = <keyseq>  (inside a keymap block)
 NYS_API bool nys_assign_key(const NYsStrs* lhs_mod_keys, int rhs_keyseq_idx);

@@ -23,10 +23,17 @@ extern "C" {
 
 // Caller-supplied context carried through nys_start().
 // mrb is set inside mruby_on_load_setting and closed in mruby_on_quit.
+//
+// scriptArgIndex is where <script> sits in argv, which is not a constant once
+// options exist; ARGV is built from the arguments after it.  includeDirs are
+// the -I directories, prepended to $LOAD_PATH at each load.  Both are owned by
+// the caller and must outlive nys_start(), since every reload reads them again.
 struct MRubyContext {
 	int                argc;
 	const char* const* argv;
 	mrb_state*         mrb;   // initially nullptr; set by mruby_on_load_setting
+	int                scriptArgIndex;   // argv index of <script>
+	const char* const* includeDirs;      // NULL-terminated, or NULL for none
 };
 
 

@@ -15,6 +15,39 @@
 #include <process.h>
 
 
+/** Thread whose focus m_focusOfThreads holds for this foreground window.
+
+    The hooks report a focus under the thread that observed it
+    (NotifySetFocus::m_threadId is the reporting thread), and an application is
+    free to own its top level window on one thread and the control that takes
+    the keyboard on another - WinUI 3 does exactly that, and Windows 11's
+    Notepad puts every tab on a thread of its own.  Those threads share an input
+    queue, so GetGUIThreadInfo() answers for any of them; asking the foreground
+    thread therefore names the window that actually has the focus, and the
+    thread owning that window is the one that reported it.
+
+    Keying off the foreground thread instead looks up an entry that no longer
+    describes where the keyboard is going: moving the focus to a window owned by
+    another thread of the same application notifies only that other thread, and
+    leaves the foreground thread's entry behind, pointing at whatever it saw
+    last.  Switching Notepad tabs left the keymaps on the tab that was open
+    before.
+*/
+static DWORD focusThreadOf(HWND i_hwndFore)
+{
+	DWORD threadId = GetWindowThreadProcessId(i_hwndFore, NULL);
+	GUITHREADINFO gti;
+	memset(&gti, 0, sizeof(gti));
+	gti.cbSize = sizeof(gti);
+	// hwndFocus is NULL whenever the queue has no focus window at all - during
+	// an activation change, or while a menu has taken the input - and then the
+	// foreground thread is still the best answer available.
+	if (GetGUIThreadInfo(threadId, &gti) && gti.hwndFocus)
+		threadId = GetWindowThreadProcessId(gti.hwndFocus, NULL);
+	return threadId;
+}
+
+
 // check focus window
 void Engine::checkFocusWindow()
 {
@@ -24,7 +57,7 @@ restart:
 	count ++;
 
 	HWND hwndFore = GetForegroundWindow();
-	DWORD threadId = GetWindowThreadProcessId(hwndFore, NULL);
+	DWORD threadId = focusThreadOf(hwndFore);
 
 	if (hwndFore) {
 		{
@@ -311,6 +344,31 @@ Modifier Engine::getCurrentModifiers(Key *i_key, bool i_isPressed)
 }
 
 
+/** Does this key stand for a mouse button ?
+
+    mouseDetour() maps the buttons to E1 scan codes 1, 2, 3, 6 and 7; the wheel
+    (4, 5, 8, 9) and the drag pseudo key (0) are not buttons and have no
+    release worth delivering.
+*/
+static bool isMouseButtonKey(const Key *i_key)
+{
+	if (i_key->getScanCodesSize() != 1)
+		return false;
+	const ScanCode &sc = i_key->getScanCodes()[0];
+	if (!(sc.m_flags & ScanCode::E1))
+		return false;
+	switch (sc.m_scan) {
+	case 1:		// left
+	case 2:		// right
+	case 3:		// middle
+	case 6:		// X1
+	case 7:		// X2
+		return true;
+	}
+	return false;
+}
+
+
 // generate keyboard event for a key
 void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 {
@@ -324,6 +382,7 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 		}
 
 	bool isAlreadyReleased = false;
+	bool doGenerate = false;
 
 	if (!isEvent) {
 		if (i_doPress && !i_key->m_isPressedOnWin32)
@@ -341,7 +400,20 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 
 		Key *sync = s->m_keyboard.getSyncKey();
 
-		if (!isAlreadyReleased || i_key == sync) {
+		// A mouse button release is sent even when this engine has no record
+		// of the press.  Missing that record is normal: the press may have
+		// reached the application without passing through here at all - log
+		// mode injects mouse events raw, and the hook hands them straight back
+		// to the system while nothing this process injects would be delivered
+		// (see isInjectionBlocked()).  Either state can end between a press and
+		// its release, leaving only the release to us.  Dropping the release
+		// then leaves the application holding the button down, which turns a
+		// click on a title bar into a drag that never ends.  A duplicate
+		// release is ignored by applications; a missing one is not.
+		doGenerate = !isAlreadyReleased || i_key == sync ||
+					 isMouseButtonKey(i_key);
+
+		if (doGenerate) {
 			KEYBOARD_INPUT_DATA kid = { 0, 0, 0, 0, 0 };
 			const ScanCode *sc = i_key->getScanCodes();
 			for (size_t i = 0; i < i_key->getScanCodesSize(); ++ i) {
@@ -368,7 +440,10 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 	mkey.m_modifier.on(Modifier::Type_Up, !i_doPress);
 	mkey.m_modifier.on(Modifier::Type_Down, i_doPress);
 	outputToLog(i_key, mkey, LogLevel::Debug, L"OUT",
-				isAlreadyReleased ? L"(already released) " : NULL);
+				isAlreadyReleased
+				? (doGenerate ? L"(already released, sent anyway) "
+				   : L"(already released) ")
+				: NULL);
 }
 
 
@@ -678,6 +753,29 @@ void Engine::beginGeneratingKeyboardEvents(
 }
 
 
+/** Convert a screen point for MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK.
+
+    The normalized range covers the whole virtual desktop, so the conversion has
+    to start from its origin: that is negative whenever a secondary monitor sits
+    left of or above the primary one, and leaving it out sent the cursor to the
+    wrong place on such an arrangement.  The range is also inclusive at both
+    ends, hence the division by one less than the extent.
+*/
+static void toVirtualDesktopAbsolute(POINT i_pt, LONG *o_dx, LONG *o_dy)
+{
+	int width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+	int height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+	*o_dx = (1 < width)
+			? MulDiv(i_pt.x - GetSystemMetrics(SM_XVIRTUALSCREEN),
+					 65535, width - 1)
+			: 0;
+	*o_dy = (1 < height)
+			? MulDiv(i_pt.y - GetSystemMetrics(SM_YVIRTUALSCREEN),
+					 65535, height - 1)
+			: 0;
+}
+
+
 unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHOOKSTRUCT *i_kidRaw)
 {
 	if (i_kid->Flags & KEYBOARD_INPUT_DATA::E1) {
@@ -779,13 +877,12 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 				}
 			}
 			if (m_dragging) {
-				kid[0].mi.dx = 65535 * m_msllHookCurrent.pt.x / GetSystemMetrics(SM_CXVIRTUALSCREEN);
-				kid[0].mi.dy = 65535 * m_msllHookCurrent.pt.y / GetSystemMetrics(SM_CYVIRTUALSCREEN);
+				toVirtualDesktopAbsolute(m_msllHookCurrent.pt,
+										 &kid[0].mi.dx, &kid[0].mi.dy);
 				kid[0].mi.dwFlags |= MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
 
 				kid[1].type = INPUT_MOUSE;
-				kid[1].mi.dx = 65535 * pt.x / GetSystemMetrics(SM_CXVIRTUALSCREEN);
-				kid[1].mi.dy = 65535 * pt.y / GetSystemMetrics(SM_CYVIRTUALSCREEN);
+				toVirtualDesktopAbsolute(pt, &kid[1].mi.dx, &kid[1].mi.dy);
 				kid[1].mi.time = 0;
 				kid[1].mi.mouseData = 0;
 				kid[1].mi.dwExtraInfo = 0;
@@ -813,6 +910,33 @@ unsigned int Engine::injectInput(const KEYBOARD_INPUT_DATA *i_kid, const KBDLLHO
 		SendInput(1, &kid, sizeof(kid));
 	}
 	return 1;
+}
+
+
+/** Inject an event that bypassed the keymap, keeping the pressed-on-Win32
+    bookkeeping in step.
+
+    Log mode hands mouse events straight to injectInput(), so generateKeyEvent()
+    never sees them and m_isPressedOnWin32 stays behind.  The flag is flipped
+    from the UI thread the moment the investigate dialog gains or loses focus,
+    which can happen between a button press and its release: the press goes out
+    raw, the release arrives through the normal path, and without this it would
+    be dropped as a release of a button this engine never saw pressed.
+*/
+unsigned int Engine::injectInputThrough(const KEYBOARD_INPUT_DATA *i_kid,
+										Key *i_key)
+{
+	if (i_key) {
+		bool doPress = !(i_kid->Flags & KEYBOARD_INPUT_DATA::BREAK);
+		if (doPress) {
+			if (!i_key->m_isPressedOnWin32)
+				++ m_currentKeyPressCountOnWin32;
+		} else if (i_key->m_isPressedOnWin32) {
+			-- m_currentKeyPressCountOnWin32;
+		}
+		i_key->m_isPressedOnWin32 = doPress;
+	}
+	return injectInput(i_kid, NULL);
 }
 
 
@@ -854,8 +978,28 @@ void Engine::resetModifiersIfIdle()
 // returns 0 if the scan code has no reliable VK mapping.
 static USHORT scanCodeToVKey(const ScanCode &i_sc)
 {
-	if (i_sc.m_flags & ScanCode::E1)
+	if (i_sc.m_flags & ScanCode::E1) {
+		// mouse buttons, as numbered by mouseDetour().  The wheel (4, 5, 8, 9)
+		// and the drag pseudo key (0) hold nothing to verify.
+		switch (i_sc.m_scan) {
+		case 1:
+		case 2:
+			// With the buttons swapped, the hook, SendInput() and
+			// GetAsyncKeyState() do not agree on which virtual key stands for
+			// which button.  Guessing wrong would release a button that is
+			// really held, so leave these two unverified in that case.
+			if (GetSystemMetrics(SM_SWAPBUTTON))
+				return 0;
+			return (i_sc.m_scan == 1) ? VK_LBUTTON : VK_RBUTTON;
+		case 3:
+			return VK_MBUTTON;
+		case 6:
+			return VK_XBUTTON1;
+		case 7:
+			return VK_XBUTTON2;
+		}
 		return 0;
+	}
 	bool isE0 = !!(i_sc.m_flags & ScanCode::E0);
 	// fixed table for modifier keys; MAPVK_VSC_TO_VK_EX support for
 	// E0-prefixed scan codes varies between Windows versions
@@ -1009,6 +1153,115 @@ unsigned int Engine::keyboardDetour(KBDLLHOOKSTRUCT *i_kid)
 	}
 }
 
+/// the bit m_buttonsPressed keeps for a button, by its E1 scan code
+static inline unsigned buttonBit(USHORT i_makeCode)
+{
+	return 1u << i_makeCode;
+}
+
+
+/// integrity level of a token, as the RID of its mandatory label
+static bool tokenIntegrityLevel(HANDLE i_token, DWORD *o_level)
+{
+	BYTE buf[sizeof(TOKEN_MANDATORY_LABEL) + SECURITY_MAX_SID_SIZE];
+	DWORD size = 0;
+	if (!GetTokenInformation(i_token, TokenIntegrityLevel, buf, sizeof(buf),
+							 &size))
+		return false;
+	TOKEN_MANDATORY_LABEL *label =
+		reinterpret_cast<TOKEN_MANDATORY_LABEL *>(buf);
+	UCHAR *count = GetSidSubAuthorityCount(label->Label.Sid);
+	if (!count || !*count)
+		return false;
+	*o_level = *GetSidSubAuthority(label->Label.Sid, *count - 1);
+	return true;
+}
+
+
+/// integrity level of this process; queried once
+static DWORD ownIntegrityLevel()
+{
+	static const DWORD level = [] {
+		DWORD l = SECURITY_MANDATORY_MEDIUM_RID;
+		HANDLE token = NULL;
+		if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+			tokenIntegrityLevel(token, &l);
+			CloseHandle(token);
+		}
+		return l;
+	}();
+	return level;
+}
+
+
+/** Can this process inject input into that one ?
+
+    UIPI allows injection only into processes at this one's integrity level or
+    below.  A process whose token cannot even be opened is taken to be out of
+    reach: answering "no" costs a remap that does not happen, answering "yes"
+    wrongly costs the event itself.
+*/
+static bool canInjectInto(DWORD i_pid)
+{
+	HANDLE process =
+		OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, i_pid);
+	if (!process)
+		return false;
+	HANDLE token = NULL;
+	DWORD level = 0;
+	bool ok = !!OpenProcessToken(process, TOKEN_QUERY, &token);
+	if (ok) {
+		ok = tokenIntegrityLevel(token, &level);
+		CloseHandle(token);
+	}
+	CloseHandle(process);
+	return ok && level <= ownIntegrityLevel();
+}
+
+
+/** Would UIPI drop the input this engine injects ?
+
+    SendInput() from this process is discarded while the foreground window
+    belongs to a process at a higher integrity level, and it is discarded
+    whole: the window the click is aimed at makes no difference.  The low
+    level mouse hook is still called for clicks aimed at ordinary windows -
+    only clicks aimed at the elevated window itself bypass it - so an event
+    swallowed here in that state would simply vanish, and the mouse would stay
+    useless everywhere but inside the elevated window until it is closed.
+
+    The answer is cached against the foreground process, so the token query
+    runs once per foreground process rather than once per click.  Only the
+    mouse hook thread reaches this, hence no locking.
+*/
+bool Engine::isInjectionBlocked()
+{
+	DWORD pid = 0;
+	if (HWND foreground = GetForegroundWindow())
+		GetWindowThreadProcessId(foreground, &pid);
+	if (pid != m_uipiPid) {
+		m_uipiPid = pid;
+		m_uipiBlocked = pid && !canInjectInto(pid);
+	}
+	return m_uipiBlocked;
+}
+
+
+// queue the release of the drag pseudo key.  The caller holds m_queueMutex.
+void Engine::endDrag()
+{
+	KEYBOARD_INPUT_DATA kid;
+
+	m_dragging = false;
+	m_dragButton = 0;
+	kid.UnitId = 0;
+	kid.Flags = KEYBOARD_INPUT_DATA::E1 | KEYBOARD_INPUT_DATA::BREAK;
+	kid.Reserved = 0;
+	kid.ExtraInformation = 0;
+	kid.MakeCode = 0;
+	m_inputQueue->push_back(kid);
+}
+
+
 unsigned int WINAPI Engine::mouseDetour(Engine *i_this, WPARAM i_wParam, LPARAM i_lParam)
 {
 	return i_this->mouseDetour(i_wParam, reinterpret_cast<MSLLHOOKSTRUCT*>(i_lParam));
@@ -1083,8 +1336,8 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			LONG dr = 0;
 			dr += (i_mid->pt.x - m_msllHookCurrent.pt.x) * (i_mid->pt.x - m_msllHookCurrent.pt.x);
 			dr += (i_mid->pt.y - m_msllHookCurrent.pt.y) * (i_mid->pt.y - m_msllHookCurrent.pt.y);
-			if (m_buttonPressed && !m_dragging && s->m_dragThreshold &&
-				(s->m_dragThreshold * s->m_dragThreshold < dr)) {
+			if (m_buttonsPressed && !m_dragging && m_dragThresholdPx &&
+				(m_dragThresholdPx * m_dragThresholdPx < dr)) {
 				kid.MakeCode = 0;
 				WaitForSingleObject(m_queueMutex, INFINITE);
 				m_dragging = true;
@@ -1145,24 +1398,48 @@ unsigned int Engine::mouseDetour(WPARAM i_message, MSLLHOOKSTRUCT *i_mid)
 			break;
 		}
 
+		// Nothing slow belongs here.  This runs in the low level mouse hook,
+		// which Windows skips for an event whose hook takes longer than
+		// LowLevelHooksTimeout - and a skipped button release leaves the
+		// engine believing the button is still down.  An earlier version
+		// logged a coordinate comparison at this point, which meant taking the
+		// log lock while the UI thread could be holding it, and produced
+		// exactly that: stuck buttons and modifiers shortly after startup,
+		// when the log is busiest.
+
+		// Hand the event back to the system rather than swallow one this
+		// engine cannot re-inject; see isInjectionBlocked().  The mouse
+		// features are inactive while an elevated window is in the
+		// foreground, which is the limitation the manual already describes,
+		// instead of the mouse going dead.
+		if (isInjectionBlocked())
+			return 0;
+
 		WaitForSingleObject(m_queueMutex, INFINITE);
 
 		if (kid.Flags & KEYBOARD_INPUT_DATA::BREAK) {
-			m_buttonPressed = false;
-			if (m_dragging) {
-				KEYBOARD_INPUT_DATA kid2;
-
-				m_dragging = false;
-				kid2.UnitId = 0;
-				kid2.Flags = KEYBOARD_INPUT_DATA::E1 | KEYBOARD_INPUT_DATA::BREAK;
-				kid2.Reserved = 0;
-				kid2.ExtraInformation = 0;
-				kid2.MakeCode = 0;
-				m_inputQueue->push_back(kid2);
-			}
+			m_buttonsPressed &= ~buttonBit(kid.MakeCode);
+			// only the button that started the drag ends it
+			if (m_dragging && kid.MakeCode == m_dragButton)
+				endDrag();
 		} else if (i_message != WM_MOUSEWHEEL && i_message != WM_MOUSEHWHEEL) {
-			m_buttonPressed = true;
+			unsigned bit = buttonBit(kid.MakeCode);
+			// This button is already down, so its release never reached this
+			// bookkeeping: the hook was handing events back to the system by
+			// then, or it was not called for that one at all.  Drop the drag
+			// it was carrying rather than let the stale one run on.
+			if ((m_buttonsPressed & bit) && m_dragging &&
+					kid.MakeCode == m_dragButton)
+				endDrag();
+			m_buttonsPressed |= bit;
+			if (!m_dragging)
+				m_dragButton = kid.MakeCode;
 			m_msllHookCurrent = *i_mid;
+			// the config states the threshold in 96 dpi pixels, so that the
+			// same setting means the same apparent distance on every monitor
+			m_dragThresholdPx =
+				scaleFromLogical(static_cast<int>(s->m_dragThreshold),
+								 dpiForPoint(i_mid->pt));
 		}
 
 		m_inputQueue->push_back(kid);
@@ -1357,7 +1634,7 @@ void Engine::keyboardHandler()
 			outputInputToLog(&key, c.m_mkey, LogLevel::Info);
 			if (kid.Flags & KEYBOARD_INPUT_DATA::E1) {
 				// through mouse event even if log mode
-				injectInput(&kid, NULL);
+				injectInputThrough(&kid, c.m_mkey.m_key);
 			}
 		} else if (am == Keymap::AM_true) {
 			// true modifier doesn't generate scan code
@@ -1428,8 +1705,11 @@ Engine::Engine(womsgstream &i_log)
 		: m_mutexDepth(0),
 		m_hwndAssocWindow(NULL),
 		m_setting(std::shared_ptr<Setting>{}),
-		m_buttonPressed(false),
+		m_buttonsPressed(0),
 		m_dragging(false),
+		m_dragButton(0),
+		m_uipiPid(0),
+		m_uipiBlocked(false),
 		m_keyboardHandler(installKeyboardHook, Engine::keyboardDetour),
 		m_mouseHandler(installMouseHook, Engine::mouseDetour),
 		m_isStopping(false),
@@ -1454,7 +1734,6 @@ Engine::Engine(womsgstream &i_log)
 		m_currentKeymap(NULL),
 		m_currentFocusOfThread(NULL),
 		m_hwndFocus(NULL),
-		m_afShellExecute(NULL),
 		m_variable(0),
 		m_log(i_log) {
 #pragma warning(suppress: 6387)
@@ -1484,6 +1763,8 @@ Engine::Engine(womsgstream &i_log)
 								 PIPE_TYPE_BYTE, 1,
 								 0, 0, 0, NULL);
 	StrExprArg::setEngine(this);
+	// prime the one-time query so that the mouse hook never runs it
+	ownIntegrityLevel();
 
 	m_msllHookCurrent.pt.x = 0;
 	m_msllHookCurrent.pt.y = 0;
@@ -1491,6 +1772,7 @@ Engine::Engine(womsgstream &i_log)
 	m_msllHookCurrent.flags = 0;
 	m_msllHookCurrent.time = 0;
 	m_msllHookCurrent.dwExtraInfo = 0;
+	m_dragThresholdPx = 0;
 }
 
 
@@ -1780,8 +2062,16 @@ bool Engine::setFocus(HWND i_hwndFocus, DWORD i_threadId,
 	Lock lock(this);
 	if (m_isSynchronizing)
 		return false;
-	if (i_hwndFocus == NULL)
+	// A thread reporting no focus window teaches us nothing about it, so it
+	// stays unregistered - and an unregistered foreground thread is what makes
+	// checkFocusWindow() fall back to the global focus, which is otherwise hard
+	// to account for from the log alone.  notifySetFocus() no longer sends
+	// these, so one arriving means it came from somewhere else.
+	if (i_hwndFocus == NULL) {
+		Acquire a(&m_log, LogLevel::Debug);
+		m_log << L"NoFocusWindow: THREADID: " << i_threadId << std::endl;
 		return true;
+	}
 
 	// remove newly created thread's id from m_detachedThreadIds
 	if (!m_detachedThreadIds.empty()) {

@@ -63,7 +63,9 @@ protected:
 
 std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
                                       const Symbols &i_symbols,
-                                      int i_loadCount)
+                                      int i_loadCount,
+                                      const std::vector<ExecUserFuncRequest>
+                                          *i_execs)
 {
 	// ctrl pipe: test (write) -> scripter (read, via NYS_CTRL)
 	// data pipe: scripter (write, via NYS_CMD) -> test (read)
@@ -81,7 +83,12 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	// be relative; it is resolved against the config search path, never the
 	// current directory.
 	const char *argv[2] = { "nyamy-scripter-tests", i_scriptPathUtf8.c_str() };
-	MRubyContext ctx = { 2, argv, nullptr };
+	MRubyContext ctx = {};
+	ctx.argc           = 2;
+	ctx.argv           = argv;
+	ctx.mrb            = nullptr;
+	ctx.scriptArgIndex = 1;
+	ctx.includeDirs    = nullptr;
 	NYsCallbacks cb = {};
 	cb.on_load_setting = mruby_on_load_setting;
 	cb.on_quit         = mruby_on_quit;
@@ -120,6 +127,11 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	for (int i = 0; i < i_loadCount; ++i)
 		ctrlWriter.writeStart(wstringi(L"test"), wstringi(L""), i_symbols,
 							  kLogLevelNormal);
+	// Behind the Start commands: the ctrl stream is processed in order, so the
+	// script has been loaded and its handlers registered before these run.
+	if (i_execs)
+		for (const auto &e : *i_execs)
+			ctrlWriter.writeExecUserFunc(e.name, e.args, e.context);
 	// Quit goes right behind the Start commands: the ctrl stream is processed in
 	// order, so every load runs first.  Quitting closes dataW, which gives the
 	// consumer EOF even when a load failed and no Commit is coming.

@@ -257,7 +257,7 @@ bool IniFile::remove(const std::wstring &i_name) const
 //
 static bool string2logfont(LOGFONT *o_lf, const std::wstring &i_strlf)
 {
-	// -13,0,0,0,400,0,0,0,128,1,2,1,1,Terminal
+	// -13,0,0,0,400,0,0,0,128,0,0,0,1,MS Gothic
 	wregex_stored lf(L"^(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),"
 			  L"(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),"
 			  L"(-?\\d+),(-?\\d+),(-?\\d+),(.+)$");

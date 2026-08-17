@@ -132,10 +132,10 @@ end
 # control settings
 load "emacsedit.mayu.rb"
 
-window "EditControl",   class: ':(Edit|TEdit|RichEdit(20[AW])?)$', parent: "EmacsEdit"
-window "SysListView32", class: ':SysListView32$', parent: "EmacsMove"
-window "SysTreeView32", class: ':SysTreeView32$', parent: "EmacsMove"
-window "ComboBox",      class: ':ComboBox(:Edit)?$', parent: "EmacsEdit" do
+window "EditControl",   class: /:(Edit|TEdit|RichEdit(20[AW])?)$/, parent: "EmacsEdit"
+window "SysListView32", class: /:SysListView32$/, parent: "EmacsMove"
+window "SysTreeView32", class: /:SysTreeView32$/, parent: "EmacsMove"
+window "ComboBox",      class: /:ComboBox(:Edit)?$/, parent: "EmacsEdit" do
   key["M-N", "M-P"] = "A-Down"
 end
 
@@ -185,9 +185,9 @@ window "MDI", class: ':MDIClient:', parent: "Global" do
 end
 
 # # Mado Tsukai no Yuutsu
-# window "MayuInvestigate", class: 'mayu\.exe:#32770:mayuFocus$', parent: "KeymapDefault"
+# window "MayuInvestigate", class: /mayu\.exe:#32770:mayuFocus$/, parent: "KeymapDefault"
 # 
-# window "MayuLog", class: 'mayu\.exe:#32770:Button', title: 'ログ - 窓使いの憂鬱', parent: "Global" do
+# window "MayuLog", class: /mayu\.exe:#32770:Button/, title: 'ログ - 窓使いの憂鬱', parent: "Global" do
 #   key["C-G"] = "$WindowClose"
 #   key["Esc"] = "$WindowClose"
 # end
@@ -200,7 +200,7 @@ keyseq "$ConsoleWindowClass/scroll",     "&PostMessage(ToItself, 274, 65523, 0)"
 keyseq "$ConsoleWindowClass/search",     "&PostMessage(ToItself, 274, 65524, 0)"
 keyseq "$ConsoleWindowClass/select-all", "&PostMessage(ToItself, 274, 65525, 0)"
 
-window "ConsoleWindowClass", class: '^ConsoleWindowClass$', parent: "Global" do
+window "ConsoleWindowClass", class: /^ConsoleWindowClass$/, parent: "Global" do
   key["C-S-K", "C-A-K"] = "A-Space C"
   key["S-Insert"]       = "$ConsoleWindowClass/paste"
   key["S-Prior"]        = "$WM_VSCROLL/SB_PAGEUP"
@@ -212,14 +212,14 @@ end
 # Explorer (Windows11で機能するか要検証)
 keyseq "$Explorer/show-folder-bar", "&PostMessage(ToMainWindow, 273, 41525, 0)"
 
-window "ExplorerList", class: 'EXPLORER.*:SHELLDLL_DefView:.*SysListView32$', parent: "SysListView32" do
+window "ExplorerList", class: /EXPLORER.*:SHELLDLL_DefView:.*SysListView32$/, parent: "SysListView32" do
   key["S-R"]   = "F2"
   key["C-S-Z"] = "&Sync&WindowMaximize"
   key["C-A-Z"] = "C-&WindowMaximize"
   key["M-E"]   = "$Explorer/show-folder-bar"
 end
 
-window "ExplorerTree", class: 'EXPLORER.*:BaseBar:.*SysTreeView32$', parent: "SysTreeView32" do
+window "ExplorerTree", class: /EXPLORER.*:BaseBar:.*SysTreeView32$/, parent: "SysTreeView32" do
   key["S-R"]   = "F2"
   key["C-S-Z"] = "&Sync&WindowMaximize"
   key["C-A-Z"] = "C-&WindowMaximize"
@@ -242,7 +242,7 @@ keymap "Emacsen", parent: "Global" do
   end
 end
 
-window "Emacs", class: ':Emacs$', parent: "Emacsen"
+window "Emacs", class: /:Emacs$/, parent: "Emacsen"
 
 # Notepad
 keyseq "$Notepad/new",     "&PostMessage(ToParentWindow, 273, 9, 0)"
@@ -258,7 +258,7 @@ keymap2 "NotepadC-X", parent: "GeneralC-X" do
   key["C-C"] = "$WindowClose"
 end
 
-window "Notepad", class: ':Notepad:Edit$', parent: "EmacsEdit" do
+window "Notepad", class: /:Notepad:Edit$/, parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(NotepadC-X)" unless symbol_defined?("ZXCV")
   key["C-S"] = "F3"
   key["M-J"] = "C-G"
@@ -269,31 +269,31 @@ keymap2 "PowerPointC-X", parent: "GeneralC-X" do
   key["C-C"] = "$WindowClose"
 end
 
-window "PowerPoint", class: 'POWERPNT\.EXE:.*:(paneClassDC|REComboBox20W|RichEdit20W)$', parent: "EmacsEdit" do
+window "PowerPoint", class: /POWERPNT\.EXE:.*:(paneClassDC|REComboBox20W|RichEdit20W)$/, parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(PowerPointC-X)" unless symbol_defined?("ZXCV")
 end
 
-window "PowerPoint2", class: 'POWERPNT\.EXE:PP9FrameClass.*', parent: "EmacsEdit" do
+window "PowerPoint2", class: /POWERPNT\.EXE:PP9FrameClass.*/, parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(PowerPointC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft Visual Basic 6.0
-window "VisualBasic", class: 'vb6\.exe:.*:VbaWindow$', parent: "EmacsEdit" do
+window "VisualBasic", class: /vb6\.exe:.*:VbaWindow$/, parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft Word
-window "MicrosoftWord", class: 'WINWORD\.EXE:.*:_WwG$', parent: "EmacsEdit" do
+window "MicrosoftWord", class: /WINWORD\.EXE:.*:_WwG$/, parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 # Microsoft Excel
-window "MicrosoftExcel", class: 'EXCEL\.EXE:XLMAIN:', parent: "EmacsEdit" do
+window "MicrosoftExcel", class: /EXCEL\.EXE:XLMAIN:/, parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(GeneralC-X)" unless symbol_defined?("ZXCV")
 end
 
 # TeraTerm
-window "TeraTerm", class: 'TTermPRO\.exe:VTWin32$', parent: "Global" do
+window "TeraTerm", class: /TTermPRO\.exe:VTWin32$/, parent: "Global" do
   key["C-Slash"]      = "C-S-HyphenMinus"
   key["S-Prior"]      = "C-Prior"
   key["S-Next"]       = "C-Next"
@@ -304,12 +304,12 @@ window "TeraTerm", class: 'TTermPRO\.exe:VTWin32$', parent: "Global" do
 end
 
 # Xyzzy
-window "Xyzzy", class: 'xyzzy\.exe:', parent: "Global" do
+window "Xyzzy", class: /xyzzy\.exe:/, parent: "Global" do
   key["C-S-K", "C-A-K"] = "C-X C-C"
 end
 
 # Windows Mine Sweeper
-window "WindowsMineSweeper", class: 'winmine.exe:マインスイーパ$', parent: "Global" do
+window "WindowsMineSweeper", class: /winmine.exe:マインスイーパ$/, parent: "Global" do
   key["D-Z"]  = "&VK(RButton)"
   key["U-Z"]  = "&Ignore"
   key["D-X"]  = "&VK(MButton)"
@@ -328,16 +328,16 @@ window "WindowsMineSweeper", class: 'winmine.exe:マインスイーパ$', parent
 end
 
 # Acrobat Reader
-window "AcrobatReader", class: 'AcroRd32.exe:.*:MDIClient:', parent: "EmacsMove" do
+window "AcrobatReader", class: /AcroRd32.exe:.*:MDIClient:/, parent: "EmacsMove" do
   key["Space"] = "PageDown"
   key["BS"]    = "PageUp"
 end
 
 # VisualBasic
-window "VBTextBox", class: ':ThunderRT6FormDC:(ThunderRT6TextBox|RichTextWndClass)$', parent: "EmacsEdit"
+window "VBTextBox", class: /:ThunderRT6FormDC:(ThunderRT6TextBox|RichTextWndClass)$/, parent: "EmacsEdit"
 
 # StarOffice/StarSuite/OpenOffice
-window "StarOffice", class: 'soffice\.exe:SALFRAME$', parent: "EmacsEdit"
+window "StarOffice", class: /soffice\.exe:SALFRAME$/, parent: "EmacsEdit"
 
 # Opera
-window "Opera", class: 'Opera\.exe:', parent: "EmacsEdit"
+window "Opera", class: /Opera\.exe:/, parent: "EmacsEdit"

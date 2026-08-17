@@ -11,8 +11,16 @@
 # retried on the next run.
 $NYamyStashPrefix = 'NYamy.old-'
 
-# Per-user Startup shortcut, fixed name so re-running --startup overwrites it.
-$NYamyShortcutPath = Join-Path ([Environment]::GetFolderPath('Startup')) 'NYamy.lnk'
+# The shortcuts NYamy installs, both with a fixed name so re-running the
+# installer overwrites them instead of piling up duplicates.  'Programs' is the
+# per-user Start Menu; the all-users one needs elevation, which this installer
+# never has.
+$NYamyStartupShortcutPath   = Join-Path ([Environment]::GetFolderPath('Startup'))  'NYamy.lnk'
+$NYamyStartMenuShortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'NYamy.lnk'
+
+# Tooltip, and what Start Menu search matches besides the name.  Same wording
+# as the FileDescription in nyamy.exe.
+$NYamyShortcutDescription = 'NYamy keyboard remapper'
 
 # Every process that may hold a file from the install directory.
 $NYamyProcessNames = @('nyamy', 'nyamy-scripter', 'nyamyd32')
@@ -21,14 +29,14 @@ function Write-NYamyPhase([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
 }
 
-function Test-NYamyShortcutTarget([string]$Dir) {
-    # True when the Startup shortcut points into $Dir, i.e. it is ours to
-    # remove.  A shortcut left by another installation stays untouched.
-    if (-not (Test-Path $NYamyShortcutPath)) {
+function Test-NYamyShortcutTarget([string]$ShortcutPath, [string]$Dir) {
+    # True when $ShortcutPath points into $Dir, i.e. it is ours to remove.
+    # A shortcut left by another installation stays untouched.
+    if (-not (Test-Path $ShortcutPath)) {
         return $false
     }
     $shell = New-Object -ComObject WScript.Shell
-    $shortcutTarget = $shell.CreateShortcut($NYamyShortcutPath).TargetPath
+    $shortcutTarget = $shell.CreateShortcut($ShortcutPath).TargetPath
     if ([string]::IsNullOrEmpty($shortcutTarget)) {
         return $false
     }
@@ -37,26 +45,52 @@ function Test-NYamyShortcutTarget([string]$Dir) {
     return $shortcutTargetDir.Equals($resolvedDir, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
-function New-NYamyStartupShortcut([string]$Dir) {
+#
+# The two shortcuts differ only in where they live and what they are called in
+# the log, so creating and removing them is one implementation each.  $Label is
+# 'Startup' or 'Start Menu'.
+#
+
+function New-NYamyShortcut([string]$ShortcutPath, [string]$Dir, [string]$Label) {
+    # Save() fails outright if the containing folder is missing.
+    New-Item -ItemType Directory -Path (Split-Path $ShortcutPath -Parent) -Force | Out-Null
+
     $shell = New-Object -ComObject WScript.Shell
-    $shortcut = $shell.CreateShortcut($NYamyShortcutPath)
+    $shortcut = $shell.CreateShortcut($ShortcutPath)
     $shortcut.TargetPath = Join-Path $Dir 'nyamy.exe'
     $shortcut.WorkingDirectory = $Dir
+    $shortcut.Description = $NYamyShortcutDescription
     $shortcut.Save()
-    Write-Host "Startup shortcut created: $NYamyShortcutPath"
+    Write-Host "$Label shortcut created: $ShortcutPath"
+}
+
+function Remove-NYamyShortcut([string]$ShortcutPath, [string]$Dir, [string]$Label) {
+    if (-not (Test-Path $ShortcutPath)) {
+        Write-Host "No $Label shortcut to remove."
+        return
+    }
+    if (-not (Test-NYamyShortcutTarget $ShortcutPath $Dir)) {
+        Write-Host "$Label shortcut points elsewhere; not removed: $ShortcutPath"
+        return
+    }
+    Remove-Item $ShortcutPath -Force
+    Write-Host "$Label shortcut removed: $ShortcutPath"
+}
+
+function New-NYamyStartupShortcut([string]$Dir) {
+    New-NYamyShortcut $NYamyStartupShortcutPath $Dir 'Startup'
 }
 
 function Remove-NYamyStartupShortcut([string]$Dir) {
-    if (-not (Test-Path $NYamyShortcutPath)) {
-        Write-Host "No Startup shortcut to remove."
-        return
-    }
-    if (-not (Test-NYamyShortcutTarget $Dir)) {
-        Write-Host "Startup shortcut points elsewhere; not removed: $NYamyShortcutPath"
-        return
-    }
-    Remove-Item $NYamyShortcutPath -Force
-    Write-Host "Startup shortcut removed: $NYamyShortcutPath"
+    Remove-NYamyShortcut $NYamyStartupShortcutPath $Dir 'Startup'
+}
+
+function New-NYamyStartMenuShortcut([string]$Dir) {
+    New-NYamyShortcut $NYamyStartMenuShortcutPath $Dir 'Start Menu'
+}
+
+function Remove-NYamyStartMenuShortcut([string]$Dir) {
+    Remove-NYamyShortcut $NYamyStartMenuShortcutPath $Dir 'Start Menu'
 }
 
 function Get-NYamyBlockingProcess([string]$Dir) {
@@ -128,6 +162,8 @@ Export-ModuleMember `
         'Test-NYamyShortcutTarget',
         'New-NYamyStartupShortcut',
         'Remove-NYamyStartupShortcut',
+        'New-NYamyStartMenuShortcut',
+        'Remove-NYamyStartMenuShortcut',
         'Get-NYamyBlockingProcess',
         'Assert-NYamyNotRunning',
         'Get-NYamyStashPath',
@@ -135,6 +171,7 @@ Export-ModuleMember `
     ) `
     -Variable @(
         'NYamyStashPrefix',
-        'NYamyShortcutPath',
+        'NYamyStartupShortcutPath',
+        'NYamyStartMenuShortcutPath',
         'NYamyProcessNames'
     )

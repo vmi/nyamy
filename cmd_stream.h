@@ -33,10 +33,13 @@ enum class CmdId : uint8_t {
 	DefSubst       = 0x14,
 	DefOption      = 0x15,
 	DefSymbol      = 0x16,
-	BeginKeymap    = 0x20,
+	DefKeymap      = 0x20,
 	AssignKey      = 0x21,
 	AssignEvent    = 0x23,
 	AssignMod      = 0x24,
+	// 0x22 is deliberately left free for a future Assign* command.
+	EndKeymap      = 0x25,
+	// 0x26 is free.
 	Reset          = 0xFE,
 	Commit         = 0xFF,
 };
@@ -130,7 +133,18 @@ struct CmdArgsDefSymbol {
 	wstringi symbolName;
 };
 
-struct CmdArgsBeginKeymap {
+/// What a keymap definition does to the keymap currently in effect.  Declaring
+/// the keymap and choosing where the assignments that follow it land are two
+/// separate things, and every producer needs a different pair of them.
+enum class CmdKeymapScope : uint8_t {
+	Declare = 0,	///< declare only; the current keymap does not move
+	Enter   = 1,	///< declare and make current, with no way back (.mayu)
+	Block   = 2,	///< declare, save the current keymap and make current;
+					///< the matching EndKeymap restores it (Ruby DSL block)
+};
+
+struct CmdArgsDefKeymap {
+	CmdKeymapScope scope;
 	wstringi keyword;		///< "keymap", "keymap2", "window"
 	wstringi name;
 	wstringi windowClassName;
@@ -139,7 +153,8 @@ struct CmdArgsBeginKeymap {
 	wstringi parentName;
 	int32_t defaultKeySeqIdx;	///< -1 if none
 
-	CmdArgsBeginKeymap() : defaultKeySeqIdx(-1) {}
+	CmdArgsDefKeymap()
+		: scope(CmdKeymapScope::Declare), defaultKeySeqIdx(-1) {}
 };
 
 struct CmdArgsAssignKey {
@@ -179,6 +194,12 @@ struct CmdArgsAssignMod {
 /// Tag-only struct for the payload-free Commit command
 struct CmdArgsCommit {};
 
+/// Tag-only struct for the payload-free EndKeymap command: it closes the most
+/// recent Block-scoped DefKeymap, putting back the keymap that was in effect
+/// when the block was entered.  Only the Ruby DSL emits the pair; the .mayu
+/// compiler emits Enter and never comes back.
+struct CmdArgsEndKeymap {};
+
 /// Tag-only struct for the payload-free Reset command.
 /// Marks the start of a setting definition block: the consumer discards any
 /// partially built setting and starts a fresh one.
@@ -201,10 +222,11 @@ using CmdArgs = std::variant<
 	CmdArgsDefSubst,
 	CmdArgsDefOption,
 	CmdArgsDefSymbol,
-	CmdArgsBeginKeymap,
+	CmdArgsDefKeymap,
 	CmdArgsAssignKey,
 	CmdArgsAssignEvent,
 	CmdArgsAssignMod,
+	CmdArgsEndKeymap,
 	CmdArgsReset,
 	CmdArgsCommit
 >;

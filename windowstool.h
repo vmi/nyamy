@@ -20,11 +20,13 @@ extern HINSTANCE g_hInst;
 /// load resource string
 extern std::wstring loadString(UINT i_id);
 
-/// load small icon resource (it must be deleted by DestroyIcon())
-extern HICON loadSmallIcon(UINT i_id);
+/** load small icon resource at the size i_dpi calls for (it must be deleted by
+    DestroyIcon()) */
+extern HICON loadSmallIcon(UINT i_id, UINT i_dpi);
 
-///load big icon resource (it must be deleted by DestroyIcon())
-extern HICON loadBigIcon(UINT i_id);
+/** load big icon resource at the size i_dpi calls for (it must be deleted by
+    DestroyIcon()) */
+extern HICON loadBigIcon(UINT i_id, UINT i_dpi);
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,6 +71,58 @@ extern DWORD getDllVersion(const wchar_t *i_dllname);
 
 // workaround of SetForegroundWindow
 extern bool setForegroundWindow(HWND i_hwnd);
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// DPI
+//
+// nyamy declares Per-Monitor v2 in its manifest, so USER32 reports physical
+// pixels rather than coordinates virtualized into a 96 dpi space.  See
+// doc/dpi-aware.md for what that changes and what it does not.
+
+/** Empty when the process runs at the per-monitor-v2 awareness the manifest
+    asks for, a warning to log otherwise.
+
+    The awareness is a property of the build and does not change while running,
+    so there is nothing to report in the normal case.  It can still be forced
+    down from outside - the compatibility tab of the executable, the
+    __COMPAT_LAYER variable, AppCompat registry entries - and a user does that
+    without knowing that coordinates are what breaks. */
+extern std::wstring warnUnexpectedDpiAwareness();
+
+/** DPI of the monitor a point falls on, or 96 if it cannot be determined.
+
+    A failure therefore scales nothing rather than guessing. */
+extern UINT dpiForPoint(POINT i_pt);
+
+/** DPI of the monitor a window sits on, or 96 if it cannot be determined.
+
+    Not the same as GetDpiForWindow(): that answers what DPI the window is
+    being rendered at, which for a DPI unaware target process is 96 whatever
+    monitor it is on.  Coordinates nyamy hands to SetWindowPos are in the
+    desktop's own space, so it is the monitor that decides the scale. */
+extern UINT dpiForWindowMonitor(HWND i_hwnd);
+
+/** DPI of the monitor a rectangle falls on, or 96 if it cannot be determined.
+
+    Picks the monitor holding the largest part of the rectangle, the same rule
+    Windows uses to decide which monitor a window belongs to, so this answers
+    what DPI a window would be at once it has been put there. */
+extern UINT dpiForRect(const RECT *i_rc);
+
+/** Scale a length written for 96 dpi to what i_dpi calls for.
+
+    Anything the code states as a pixel count - a caret width, a metric that
+    predates GetSystemMetricsForDpi, a size out of the ini or the config file -
+    is a 96 dpi length by convention and goes through here before it reaches
+    the screen.  At 96 dpi this is the identity, which is what keeps the
+    primary monitor a usable regression baseline.
+
+    A non-zero length never scales down to nothing: a 1 px nudge stays a nudge
+    rather than becoming a no-op. */
+extern int scaleFromLogical(int i_px, UINT i_dpi);
+
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // dialog

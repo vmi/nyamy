@@ -18,7 +18,13 @@ class DlgLog : public LayoutManager
 {
 	HWND m_hwndEdit;				///
 	HWND m_hwndTaskTray;				/// tasktray window
-	LOGFONT m_lf;					///
+	/** Log font, with lfHeight held at 96 dpi.
+
+	    That is the form the ini stores, so a settings file written before
+	    nyamy became DPI aware still means what it says, and one font setting
+	    describes the same apparent size on every monitor.  It is scaled to the
+	    window's DPI only on the way into GDI; see makeFont(). */
+	LOGFONT m_lf;
 	HFONT m_hfontOriginal;			///
 	HFONT m_hfont;				///
 	womsgstream *m_log;				///
@@ -36,6 +42,11 @@ class DlgLog : public LayoutManager
 	/// the saved placement was maximized; apply it when the dialog is shown
 	bool m_restoreMaximized;
 
+	/** Where the log was being read when a DPI change started; see
+	    onDpiChangeBegin().  m_dpiAnchor is a character index, or -1 for none. */
+	bool m_dpiWasAtBottom;
+	int m_dpiAnchor;
+
 public:
 	///
 	DlgLog(HWND i_hwnd)
@@ -48,7 +59,9 @@ public:
 			m_editStyle(0),
 			m_editExStyle(0),
 			m_isWordWrap(true),
-			m_restoreMaximized(false) {
+			m_restoreMaximized(false),
+			m_dpiWasAtBottom(false),
+			m_dpiAnchor(-1) {
 	}
 
 	/// WM_INITDIALOG
@@ -65,7 +78,7 @@ public:
 
 		// set font
 		ini.read(L"logFont", &m_lf, loadString(IDS_logFont));
-		m_hfont = CreateFontIndirect(&m_lf);
+		m_hfont = makeFont();
 		SetWindowFont(m_hwndEdit, m_hfont, false);
 
 		m_editStyle = static_cast<DWORD>(GetWindowLongPtr(m_hwndEdit, GWL_STYLE))
@@ -148,6 +161,78 @@ public:
 		return TRUE;
 	}
 
+	/** WM_DPICHANGED
+
+	    The base class rescales the layout snapshots; the log font is ours
+	    alone, built from a 96 dpi height, so it has to be rebuilt for the DPI
+	    the dialog has moved to.  The dialog manager rescales the fonts it set
+	    itself, but not one handed to a control through WM_SETFONT. */
+	/** Note where the log is being read, before anything is rescaled.
+
+	    A taller font fits fewer lines in the same control, and the control
+	    keeps its scroll offset in lines, so the view slides on every DPI
+	    change and walks away over a few of them.
+
+	    The anchor is a character index, not a line number.  These messages
+	    count wrapped lines, not logical ones, and both the font change and the
+	    resize re-wrap the text: line 40 before and line 40 after are different
+	    places in the log, and with word wrap on, the top line is usually the
+	    middle of a longer one.  A character index means the same thing however
+	    often the text is re-wrapped in between - which is the reason this is
+	    read here rather than in wmDpiChanged: by then the dialog manager has
+	    already rescaled the font and the view has already moved. */
+	void onDpiChangeBegin() override {
+		m_dpiWasAtBottom = isAtBottom();
+		m_dpiAnchor = -1;
+		int wasFirst = static_cast<int>(
+						   SendMessage(m_hwndEdit, EM_GETFIRSTVISIBLELINE,
+									   0, 0));
+		if (0 <= wasFirst)
+			m_dpiAnchor = static_cast<int>(
+							  SendMessage(m_hwndEdit, EM_LINEINDEX,
+										  static_cast<WPARAM>(wasFirst), 0));
+	}
+
+	/** Put the log's own font back after the base class has laid the dialog out,
+	    and return the view to where onDpiChangeBegin() found it.
+
+	    The dialog manager scales the font of every control, this one included,
+	    by the ratio the window happened to change by.  m_lf is exact - a 96 dpi
+	    height that converts to the new DPI without drift however many monitors
+	    the dialog crosses - so the scaled version is replaced rather than
+	    kept. */
+	BOOL wmDpiChanged(UINT i_dpi, const RECT *i_suggested) override {
+		BOOL result = LayoutManager::wmDpiChanged(i_dpi, i_suggested);
+
+		HFONT hfontNew = makeFontForDpi(i_dpi);
+		if (hfontNew) {
+			SetWindowFont(m_hwndEdit, hfontNew, true);
+			DeleteObject(m_hfont);
+			m_hfont = hfontNew;
+		}
+
+		if (m_dpiWasAtBottom) {
+			// The log follows its own tail, and a taller font fits fewer
+			// lines: anchoring the top line here would push the newest ones
+			// out of sight until the next line arrived.  Scrolling past the
+			// end clamps.
+			SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
+						static_cast<LPARAM>(Edit_GetLineCount(m_hwndEdit)));
+		} else if (0 <= m_dpiAnchor) {
+			int wantLine = static_cast<int>(
+							   SendMessage(m_hwndEdit, EM_LINEFROMCHAR,
+										   static_cast<WPARAM>(m_dpiAnchor), 0));
+			int nowFirst = static_cast<int>(
+							   SendMessage(m_hwndEdit, EM_GETFIRSTVISIBLELINE,
+										   0, 0));
+			if (0 <= wantLine && 0 <= nowFirst && wantLine != nowFirst)
+				SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
+							static_cast<LPARAM>(wantLine - nowFirst));
+		}
+		m_dpiAnchor = -1;
+		return result;
+	}
+
 	/// WM_SHOWWINDOW
 	BOOL wmShowWindow(BOOL i_isShown, int /* i_status */) {
 		if (i_isShown && m_restoreMaximized) {
@@ -175,14 +260,23 @@ public:
 		}
 
 		case IDC_BUTTON_changeFont: {
+			// The dialog works in device pixels, so hand it a scaled copy and
+			// convert the answer back: m_lf stays the 96 dpi original.
+			UINT dpi = GetDpiForWindow(m_hwnd);
+			LOGFONT lf = m_lf;
+			lf.lfHeight = scaleFromLogical(m_lf.lfHeight, dpi);
+
 			CHOOSEFONT cf;
 			memset(&cf, 0, sizeof(cf));
 			cf.lStructSize = sizeof(cf);
 			cf.hwndOwner = m_hwnd;
-			cf.lpLogFont = &m_lf;
+			cf.lpLogFont = &lf;
 			cf.Flags = CF_INITTOLOGFONTSTRUCT | CF_SCREENFONTS;
 			if (ChooseFont(&cf)) {
-				HFONT hfontNew = CreateFontIndirect(&m_lf);
+				m_lf = lf;
+				m_lf.lfHeight = MulDiv(lf.lfHeight, USER_DEFAULT_SCREEN_DPI,
+									   static_cast<int>(dpi));
+				HFONT hfontNew = makeFont();
 				SetWindowFont(m_hwndEdit, hfontNew, true);
 				DeleteObject(m_hfont);
 				m_hfont = hfontNew;
@@ -214,6 +308,40 @@ public:
 	}
 
 private:
+	/** Is the end of the log in view?
+
+	    Asked of the scroll bar rather than worked out from the font metrics and
+	    the formatting rectangle: the control already tracks this, in the same
+	    wrapped lines the scrolling messages count, and reading it moves
+	    nothing. */
+	bool isAtBottom() const {
+		SCROLLINFO si;
+		memset(&si, 0, sizeof(si));
+		si.cbSize = sizeof(si);
+		si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
+		if (!GetScrollInfo(m_hwndEdit, SB_VERT, &si))
+			return false;
+		if (si.nPage == 0)		// everything fits; nothing to scroll past
+			return true;
+		return si.nMax <= si.nPos + static_cast<int>(si.nPage) - 1;
+	}
+
+	/** Build the log font for a given DPI.
+
+	    m_lf.lfHeight is a 96 dpi length; GDI wants device pixels.  The DPI is
+	    a parameter because WM_DPICHANGED has to build the font for the DPI
+	    being moved to, which GetDpiForWindow does not report yet. */
+	HFONT makeFontForDpi(UINT i_dpi) const {
+		LOGFONT lf = m_lf;
+		lf.lfHeight = scaleFromLogical(m_lf.lfHeight, i_dpi);
+		return CreateFontIndirect(&lf);
+	}
+
+	/// Build the log font for the DPI the dialog is on now.
+	HFONT makeFont() const {
+		return makeFontForDpi(GetDpiForWindow(m_hwnd));
+	}
+
 	/// apply the "detail" state, and let the tasktray window forward it
 	void applyThreshold(bool i_isDetail) {
 		LogLevel level = i_isDetail ? kLogLevelDetail : kLogLevelNormal;
@@ -290,14 +418,45 @@ private:
 		wp.length = sizeof(wp);
 		// MONITOR_DEFAULTTONULL: a placement saved on a monitor that is gone
 		// (or on a resolution that shrank) would put the dialog out of reach
-		if (i_ini.read(L"logWindowPlacement", &wp) &&
+		//
+		// The key is not the one nyamy used before it became DPI aware, whose
+		// values were written in the virtualized 96 dpi space.  That one is
+		// still read as a fallback, once: the two spaces only differ for a
+		// window left on a monitor whose scaling is not the system's, and a
+		// rectangle that does come out wrong is pulled back into view by
+		// clampToWorkArea() below.  Carrying the position over the upgrade is
+		// worth that.  savePlacement() drops the old key, so the fallback
+		// stops applying as soon as the dialog has been closed once.
+		bool hasSaved = i_ini.read(L"logWindowPlacementPhysical", &wp);
+		if (!hasSaved)
+			hasSaved = i_ini.read(L"logWindowPlacement", &wp);
+
+		if (hasSaved &&
 				MonitorFromRect(&wp.rcNormalPosition, MONITOR_DEFAULTTONULL)) {
 			m_restoreMaximized = (wp.showCmd == SW_SHOWMAXIMIZED);
 			// the dialog is created hidden and stays that way until the user
 			// opens it; SW_HIDE places the window without showing it
 			wp.showCmd = SW_HIDE;
 			wp.flags = 0;
+			RECT rcWanted = wp.rcNormalPosition;
 			SetWindowPlacement(m_hwnd, &wp);
+
+			// The dialog is created on whichever monitor the template lands
+			// on.  If the saved placement is on one with another DPI, arriving
+			// there raises WM_DPICHANGED and the dialog manager rescales the
+			// window on top of the size just asked for - so the restored
+			// window comes out a factor larger than it was saved, and saving
+			// it again on exit compounds that every run.  The window is on the
+			// target monitor by now, so putting the size back cannot cross a
+			// DPI boundary a second time.
+			RECT rcNow;
+			if (GetWindowRect(m_hwnd, &rcNow) &&
+					(rcWidth(&rcNow) != rcWidth(&rcWanted) ||
+					 rcHeight(&rcNow) != rcHeight(&rcWanted)))
+				SetWindowPos(m_hwnd, NULL, 0, 0,
+							 rcWidth(&rcWanted), rcHeight(&rcWanted),
+							 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
 			clampToWorkArea();
 			return;
 		}
@@ -384,7 +543,12 @@ private:
 		// state would restore to a window the user cannot see
 		wp.showCmd = (wp.showCmd == SW_SHOWMAXIMIZED) ? SW_SHOWMAXIMIZED
 					 : SW_SHOWNORMAL;
-		IniFile().write(L"logWindowPlacement", wp);
+		IniFile ini;
+		ini.write(L"logWindowPlacementPhysical", wp);
+		// The value just written supersedes the one the DPI unaware builds
+		// wrote, which restorePlacement() falls back to.  Drop it rather than
+		// leave a stale rectangle in the file for that fallback to find.
+		ini.remove(L"logWindowPlacement");
 	}
 };
 

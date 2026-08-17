@@ -104,6 +104,14 @@ void CmdProcessor::process(CmdStreamReader &cr)
 		}
 		try { std::visit(*this, *cmd); }
 		catch (ErrorMessage &e) { error(e.getMessage()); }
+		// A malformed command reaches the generated loadFromCmd() as an
+		// argument of the wrong type, and std::get on the variant throws
+		// something that is not an ErrorMessage.  This runs on the scripter's
+		// data thread, where nothing else would catch it, so letting it past
+		// here ends the process over one bad line of configuration.
+		catch (std::exception &e) {
+			error(L"malformed command: " + to_wstring(e.what()));
+		}
 	}
 }
 
@@ -115,6 +123,7 @@ void CmdProcessor::beginSetting()
 {
 	m_pendingKeySeqs.clear();
 	m_pendingSubsts.clear();
+	m_keymapStack.clear();
 	m_setting = std::make_shared<Setting>();
 	m_builder = std::make_unique<SettingBuilder>(*m_setting);
 
@@ -319,7 +328,7 @@ void CmdProcessor::operator()(CmdArgsDefSymbol &data)
 }
 
 
-void CmdProcessor::operator()(CmdArgsBeginKeymap &data)
+void CmdProcessor::operator()(CmdArgsDefKeymap &data)
 {
 	Keymap::Type type = Keymap::Type_keymap;
 	if (!data.windowOp.empty()) {
@@ -328,7 +337,7 @@ void CmdProcessor::operator()(CmdArgsBeginKeymap &data)
 	} else if (data.keyword == L"window" && !data.windowClassName.empty()) {
 		type = Keymap::Type_windowAnd;
 	}
-	m_builder->setCurrentKeymap(m_builder->addKeymap(Keymap(type, data.name, data.windowClassName, data.windowTitleName, nullptr, nullptr)));
+	Keymap *keymap = m_builder->addKeymap(Keymap(type, data.name, data.windowClassName, data.windowTitleName, nullptr, nullptr));
 
 	Keymap *parent = nullptr;
 	if (!data.parentName.empty())
@@ -342,7 +351,35 @@ void CmdProcessor::operator()(CmdArgsBeginKeymap &data)
 		FunctionData *fd = createFunctionData(L"KeymapParent");
 		keySeq = m_builder->addKeySeq(KeySeq(data.name).add(ActionFunction(fd)));
 	}
-	m_builder->currentKeymap()->setIfNotYet(keySeq, parent);
+	keymap->setIfNotYet(keySeq, parent);
+
+	// Declaring the keymap is one thing; deciding where the assignments that
+	// follow it land is another.  Block saves the keymap it displaces so that
+	// the matching EndKeymap can put it back, which is how a `keymap`/`window`
+	// block keeps what is written after it out of its own keymap.
+	switch (data.scope) {
+	case CmdKeymapScope::Declare:
+		break;
+	case CmdKeymapScope::Block:
+		m_keymapStack.push_back(m_builder->currentKeymap());
+		[[fallthrough]];
+	case CmdKeymapScope::Enter:
+		m_builder->setCurrentKeymap(keymap);
+		break;
+	}
+}
+
+
+void CmdProcessor::operator()(CmdArgsEndKeymap)
+{
+	// An unmatched End means the producer is broken.  Say so and carry on with
+	// the current keymap: the rest of the setting is still worth having.
+	if (m_keymapStack.empty()) {
+		error(L"EndKeymap without a matching DefKeymap(Block)");
+		return;
+	}
+	m_builder->setCurrentKeymap(m_keymapStack.back());
+	m_keymapStack.pop_back();
 }
 
 

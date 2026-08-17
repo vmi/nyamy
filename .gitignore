@@ -11,6 +11,8 @@ functions.h
 /proj/.vs
 /.claude
 /tmp
+/issues-draft/*
+!/issues-draft/.git*
 nul
 ?:
 ?

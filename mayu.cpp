@@ -62,6 +62,7 @@ class Mayu
 
 	womsgstream m_log;				/** log stream (output to log
 						    dialog's edit) */
+	size_t m_logMaxChars;				/// nyamy.ini logMaxSize
 #ifdef LOG_TO_FILE
 	std::wofstream m_logFile;
 #endif // LOG_TO_FILE
@@ -223,21 +224,27 @@ private:
 
 			bool isMDI = true;
 			HWND hwnd = getToplevelWindow(n->getHwnd(), &isMDI);
-			RECT rc;
+			// zeroed because the queries below fail for a NULL window - a
+			// notification can carry one - and used to print whatever the
+			// stack happened to hold
+			RECT rc = {};
 			if (isMDI) {
-				getChildWindowRect(hwnd, &rc);
-				m_log << L"MDI Window Position/Size: ("
-				<< rc.left << L", " << rc.top << L") / ("
-				<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
-				<< std::endl;
+				if (getChildWindowRect(hwnd, &rc))
+					m_log << L"MDI Window Position/Size: ("
+					<< rc.left << L", " << rc.top << L") / ("
+					<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
+					<< std::endl;
 				hwnd = getToplevelWindow(n->getHwnd(), NULL);
 			}
 
-			GetWindowRect(hwnd, &rc);
-			m_log << L"Toplevel Window Position/Size: ("
-			<< rc.left << L", " << rc.top << L") / ("
-			<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
-			<< std::endl;
+			if (GetWindowRect(hwnd, &rc))
+				m_log << L"Toplevel Window Position/Size: ("
+				<< rc.left << L", " << rc.top << L") / ("
+				<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
+				<< std::endl;
+			else
+				m_log << L"Toplevel Window Position/Size: (unavailable)"
+				<< std::endl;
 
 			SystemParametersInfo(SPI_GETWORKAREA, 0, (void *)&rc, FALSE);
 			m_log << L"Desktop Window Position/Size: ("
@@ -425,7 +432,7 @@ private:
 				// thing on the log path, and the cost grows with how much the
 				// control already holds, so the buffer is kept modest.
 				editInsertTextAtLast(GetDlgItem(This->m_hwndLog, IDC_EDIT_log),
-									 str, kLogEditMaxChars);
+									 str, This->m_logMaxChars);
 				log->releaseString();
 				return 0;
 			}
@@ -616,7 +623,7 @@ private:
 			case WM_APP_engineNotify: {
 				switch (i_wParam) {
 				case EngineNotify_shellExecute:
-					This->m_engine.shellExecute();
+					This->m_engine.shellExecute(i_lParam);
 					break;
 				case EngineNotify_loadSetting:
 					This->load();
@@ -874,30 +881,19 @@ private:
 	}
 
 	void showBanner(bool i_isCleared) {
-		// Every log line already carries hh:mm:ss.SSS, and a bare [YYYY-MM-DD]
-		// line is emitted whenever the date changes, so the banner only needs
-		// the wall clock time - and no ruled lines to separate it.
-		wchar_t starttimebuf[64];
-		wcsftime(starttimebuf, NUMBER_OF(starttimebuf), L"%H:%M:%S",
-				 localtime(&m_startTime));
-
+		wchar_t modulebuf[1024];
+		CHECK_TRUE( GetModuleFileName(g_hInst, modulebuf,
+									  NUMBER_OF(modulebuf)) );
 		Acquire a(&m_log, LogLevel::Info);
 		m_log << loadString(IDS_mayu) << L" " WIDEN(VERSION);
 #ifndef NDEBUG
 		m_log << L" (DEBUG)";
 #endif
-		m_log << L" (UNICODE)";
-		m_log << std::endl;
+		m_log << L" (" << modulebuf << L")" << std::endl;
 		m_log << L"  built by "
 		<< WIDEN(LOGNAME) << L"@" << toLower(WIDEN(COMPUTERNAME))
-		<< L" (" << WIDEN(__DATE__) <<  L" "
-		<< WIDEN(__TIME__) << L", "
-		<< getCompilerVersionString() << L")" << std::endl;
-		wchar_t modulebuf[1024];
-		CHECK_TRUE( GetModuleFileName(g_hInst, modulebuf,
-									  NUMBER_OF(modulebuf)) );
-		m_log << L"  started at " << starttimebuf << std::endl;
-		m_log << L"  " << modulebuf << std::endl;
+		<< L" at " << WIDEN(__DATE__) <<  L" " << WIDEN(__TIME__) << std::endl;
+		m_log << L"  " << getCompilerVersionString() << L")" << std::endl;
 		m_log << (i_isCleared ? L"log was cleared." : L"log begins.")
 		<< std::endl;
 	}
@@ -1075,6 +1071,12 @@ public:
 			m_isSettingDialogOpened(false),
 			m_sessionState(0),
 			m_engine(m_log) {
+		int logMaxSize;
+		IniFile().read(L"logMaxSize", &logMaxSize,
+					   static_cast<int>(kLogEditMaxChars));
+		m_logMaxChars = (0 < logMaxSize) ?
+			static_cast<size_t>(logMaxSize) : kLogEditMaxChars;
+
 		// addSessionId(): mailslot names live in \Device\Mailslot, which has
 		// no per session split of its own, so without it a second logged on
 		// user's nyamy would find the name taken.  Everything else shared
@@ -1156,9 +1158,12 @@ public:
 		m_engine.setAssociatedWndow(m_hwndTaskTray);
 		m_engine.start();
 
-		// show tasktray icon
-		m_tasktrayIcon[0] = loadSmallIcon(IDI_ICON_mayu_disabled);
-		m_tasktrayIcon[1] = loadSmallIcon(IDI_ICON_mayu);
+		// show tasktray icon.  Sized for the system DPI rather than for our own
+		// hidden window: the icon is drawn by the notification area, not by us,
+		// and the shell asks for a system-DPI sized one.
+		m_tasktrayIcon[0] = loadSmallIcon(IDI_ICON_mayu_disabled,
+										  GetDpiForSystem());
+		m_tasktrayIcon[1] = loadSmallIcon(IDI_ICON_mayu, GetDpiForSystem());
 		std::memset(&m_ni, 0, sizeof(m_ni));
 		m_ni.uID    = ID_TaskTrayIcon;
 		m_ni.hWnd   = m_hwndTaskTray;
@@ -1309,6 +1314,13 @@ public:
 	/// message loop
 	WPARAM messageLoop() {
 		showBanner(false);
+		// Only here, not in showBanner(): that runs again whenever the log is
+		// cleared, and this says nothing new the second time.
+		if (std::wstring warning = warnUnexpectedDpiAwareness();
+				!warning.empty()) {
+			Acquire a(&m_log, LogLevel::Warn);
+			m_log << warning << std::endl;
+		}
 		load();
 
 		startNotifyReader();

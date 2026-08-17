@@ -393,6 +393,22 @@ C API 対応: `nys_define_symbol(name)` / `nys_has_symbol(name)`
   (`.mayu` のファイル順序と同じ意味論)。
 - `flushQueue` が flush 時点のシンボル集合をすべて `DefSymbol` として出力するため、
   `define` したシンボルも最終的な `Setting.m_symbols` に含まれる。
+- コマンドラインの `-D` は `nys_add_default_symbol()` 経由で、Start が運ぶ集合に
+  上乗せされる。Start は集合を丸ごと置き換えるので、Start のたびに再適用している。
+- 初めて集合に入ったシンボルは `symbol: 名前` として info でログに出す
+  (`logSymbolDefined()`)。二度目以降の `define` は無視され、ログにも出ない。
+
+### `.mayu` の `define` との非対称
+
+`load "x.mayu"` は**パスをキューに積むだけ**で、パースもコンパイルも
+`flushQueue()` まで遅延する (keyseq のインデックス空間が Ruby の実行完了まで
+確定しないため)。したがって `.mayu` 内の `define` は `symbol_defined?` からは
+見えない。逆向き (Ruby の `define` → `.mayu` の `if`) は `g_symbols` 経由で見える。
+
+`.mayu` どうしについては、`flushQueue()` が include 1 個をコンパイルするたびに
+`MayuCompiler::symbols()` を `g_symbols` にマージするので、先に読み込んだファイルの
+`define` は後のファイルの `if` から見える (`.mayu` の中で `include` を入れ子にした
+場合と挙動が揃う)。
 
 ---
 
@@ -470,6 +486,20 @@ C API 対応: `nys_begin_keymap(keymap_type, name, window_class, window_title, o
 | `parent: "Name"` | `parent_name` |
 | `default: "&Default"` | `default_keyseq_idx` (自動登録) |
 | `default: "$SeqName"` | `default_keyseq_idx` (名前参照) |
+
+#### ブロックのスコープ
+
+ブロックを渡した場合のみ、`dsl_begin_keymap()` は
+`nys_push_keymap()` → `nys_begin_keymap()` → `instance_eval` → `nys_pop_keymap()`
+の順に呼ぶ。ブロックを抜けると直前のキーマップに戻るので、ブロックの後に書いた
+`key` は書いたとおりの位置に入る。入れ子も同様に動く。
+
+ブロックなしの形式は push / pop を呼ばず、次の `nys_begin_keymap()` まで有効なまま
+になる。`.mayu` と同じ挙動で、既存の設定ファイルはこれに依存している。
+
+ブロック内で例外が起きると pop されないまま巻き戻るが、その場合は
+`on_load_setting` が false を返して設定全体が破棄されるので、中途半端なスコープの
+電文が適用されることはない。
 
 ---
 
@@ -764,6 +794,58 @@ end
 
 ---
 
+## `ENV` — 環境変数 (読み取り専用)
+
+`NYamy::Env` のシングルトンをトップレベル定数 `ENV` として置く
+(`ARGV` と同じく `mrb_define_global_const`)。`mruby-env` gem は使わない
+(gem を足すと mruby のビルド構成に影響するため)。
+
+```ruby
+ENV["HOME"]                          # 未定義なら nil
+ENV.fetch("EDITOR", "notepad.exe")   # 既定値なしで未定義なら KeyError
+ENV.key?("X") / ENV.include?("X") / ENV.has_key?("X")
+ENV.keys / ENV.to_h / ENV.each { |name, value| ... }
+```
+
+- 実装は `GetEnvironmentVariableW` / `GetEnvironmentStringsW`。UTF-8 ⇔ UTF-16 変換は
+  既存の `utf8ToWide` / `wideToUtf8`。
+- 未定義と「定義済みで空文字列」は長さがどちらも 0 なので、`GetLastError()` の
+  `ERROR_ENVVAR_NOT_FOUND` で区別する。
+- 列挙時、名前が空のエントリ (Windows がブロックに置く `=C:=C:\...` 形式のドライブ別
+  カレントディレクトリ) はスキップする。
+- **書き込み (`ENV[]=`) は用意しない**。scripter は設定を読むだけで他プロセスを
+  起動しないため書いても届かず、`nyamy.ini` の `cmdLine` の展開は NYamy 本体側で
+  既に終わっているので、そちらにも影響しない。
+
+`HOME` は `ScripterManager` が子プロセスの環境ブロックに載せる (未定義なら
+`%USERPROFILE%`)。NYamy 自身の環境には入れないので、`&ShellExecute` の起動先には
+伝播しない。
+
+---
+
+## `log` — ログ出力
+
+`NYamy::Log` を `mrb_define_class_under` で定義し、`NYamy::DSL#log` (`dsl_log`) がそのシングルトンを返す。インスタンスは DSL オブジェクトの `@__log__` に遅延生成して保持するので、呼ぶたびに作られることはない。メソッド名は Ruby の Logger の慣例に合わせてある (`trace` ではなく `debug`)。
+
+```ruby
+log.error "…"
+log.warn  "…"
+log.info  "…"
+log.debug "…"
+
+log.error? / log.warn? / log.info? / log.debug?   # 出力されるか (重い生成の回避用)
+
+log.level          # => :info   実効閾値
+log.level = :warn  # スクリプト側の閾値だけを更新する
+```
+
+- 出力の実体は `nysWouldLog()` → `nysLogUtf8()`。閾値の扱いは [c-api.md](c-api.md) の「閾値を 2 つ持つ理由」を参照。
+- **`log.level` の getter と setter は非対称**。getter は実効閾値 (nyamy 側とスクリプト側の厳しいほう) を返し、setter はスクリプト側だけを更新する。`log.level = :debug` の直後に `log.level` が `:info` を返すことがある。読みたいのはたいてい「実際に何が出るか」なので getter は実効閾値でよい、と判断した。この非対称性はユーザー向けマニュアルにも明記してある。
+- レベルは `:error` / `:warn` / `:info` / `:debug` のシンボルまたは同名の文字列を受ける (`logLevelFromRuby`)。ほかの値は `ArgumentError`。getter が返すのは常にシンボル (`logLevelToRuby`)。
+- `log` はトップレベル (DSL の `instance_eval` 下) でも `deffunc` のブロックの中でも同じように使える。前者はロード時、後者はキー押下のたびに評価される。
+
+---
+
 ## 実装済み C API
 
 mruby バインディング実装時に追加された C API:
@@ -773,6 +855,8 @@ mruby バインディング実装時に追加された C API:
 - `nys_exec_keyseq(actions)` — キーシーケンスを実行 (`on_exec_user_func` 内でのみ有効)
 - `nys_sc_resolve(str)` — キー名 / スキャンコード文字列をスキャンコード WORD に解決 (`sc` の実体)
 - `nys_scancode_map_length()` / `nys_scancode_map_entry(idx, from, to)` — レジストリ Scancode Map の列挙 (`ScancodeMap` の実体)
+- `nys_push_keymap()` / `nys_pop_keymap()` — キーマップのスコープを囲む (ブロック付き `keymap` / `window` の実体)
+- `nys_add_default_symbol(name)` — Start が運ぶシンボル集合への上乗せ (`-D` の実体。`nys_start()` の前に呼ぶ)
 
 コールバック typedef:
 
