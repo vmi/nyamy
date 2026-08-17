@@ -607,7 +607,7 @@ void Engine::generateActionEvents(const Current &i_c, const Action *i_a,
 
 		af->m_functionData->exec(this, &param);
 
-		if (param.m_doesNeedEndl) {
+		if (param.m_doesNeedEndl && m_log.wouldLog(LogLevel::Debug)) {
 			Acquire a(&m_log, LogLevel::Debug);
 			m_log << std::endl;
 		}
@@ -959,7 +959,7 @@ void Engine::keyboardResetOnWin32()
 void Engine::resetModifiersIfIdle()
 {
 	if (m_currentKeyPressCount <= 0) {
-		{
+		if (m_log.wouldLog(LogLevel::Debug)) {
 			Acquire a(&m_log, LogLevel::Debug);
 			logIndent(m_logIndent);
 			m_log << L"*   No key is pressed" << std::endl;
@@ -1051,7 +1051,7 @@ void Engine::resyncKeyStates(bool i_force)
 					 ? !(GetAsyncKeyState(vkey) & 0x8000)
 					 : i_force;
 		if (stale) {
-			{
+			if (m_log.wouldLog(LogLevel::Debug)) {
 				Acquire a(&m_log, LogLevel::Debug);
 				logIndent(m_logIndent);
 				m_log << L"*   resync: drop stale key " << *key << std::endl;
@@ -2068,8 +2068,10 @@ bool Engine::setFocus(HWND i_hwndFocus, DWORD i_threadId,
 	// to account for from the log alone.  notifySetFocus() no longer sends
 	// these, so one arriving means it came from somewhere else.
 	if (i_hwndFocus == NULL) {
-		Acquire a(&m_log, LogLevel::Debug);
-		m_log << L"NoFocusWindow: THREADID: " << i_threadId << std::endl;
+		if (m_log.wouldLog(LogLevel::Debug)) {
+			Acquire a(&m_log, LogLevel::Debug);
+			m_log << L"NoFocusWindow: THREADID: " << i_threadId << std::endl;
+		}
 		return true;
 	}
 
@@ -2146,7 +2148,6 @@ bool Engine::setShow(bool i_isMaximized, bool i_isMinimized,
 	Lock lock(this);
 	if (m_isSynchronizing)
 		return false;
-	Acquire b(&m_log, LogLevel::Debug);
 	Modifier::Type max, min;
 	if (i_isMDI == true) {
 		max = Modifier::Type_MdiMaximized;
@@ -2157,12 +2158,18 @@ bool Engine::setShow(bool i_isMaximized, bool i_isMinimized,
 	}
 	m_currentLock.on(max, i_isMaximized);
 	m_currentLock.on(min, i_isMinimized);
-	m_log << L"Set show to " << (i_isMaximized ? L"Maximized" :
-									i_isMinimized ? L"Minimized" : L"Normal");
-	if (i_isMDI == true) {
-		m_log << L" (MDI)";
+	// The lock state above is set whether or not anything is logged; only the
+	// message below is conditional.  Still inside Lock, so the order stays
+	// mutex then log.
+	if (m_log.wouldLog(LogLevel::Debug)) {
+		Acquire b(&m_log, LogLevel::Debug);
+		m_log << L"Set show to " << (i_isMaximized ? L"Maximized" :
+										i_isMinimized ? L"Minimized" : L"Normal");
+		if (i_isMDI == true) {
+			m_log << L" (MDI)";
+		}
+		m_log << std::endl;
 	}
-	m_log << std::endl;
 	return true;
 }
 
