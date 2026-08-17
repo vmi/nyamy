@@ -78,11 +78,15 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 
 **素朴な再起動テストは偽陽性になる。** 通常終了は `uninstallMessageHook()` が `WM_NULL` をブロードキャストして DLL をアンロードさせるため、再注入された DLL が新しいメールスロットを開き、**修正が無くても成功してしまう**。
 
-1. NYamy 起動 → メモ帳起動 → フォーカス通知が出ることを確認 (ログダイアログの**詳細をオン**。フォーカス通知は `Debug` レベル)
-2. **タスク マネージャーから NYamy を強制終了する** (`WM_NULL` ブロードキャストを走らせないため)
-3. **メモ帳に一切触らない** (メッセージを処理しない限り DLL は残る)
+1. NYamy 起動 → メモ帳起動 → **一度クリックして**フォーカス通知が出ることを確認 (ログダイアログの**詳細をオン**。フォーカス通知は `Debug` レベル)
+2. メモ帳を**サスペンドする** (`ntdll!NtSuspendProcess`)
+3. **タスク マネージャーから NYamy を強制終了する** (`WM_NULL` ブロードキャストを走らせないため)
 4. `tasklist /m nyamy64.dll` で notepad.exe が残っていることを確認
-5. NYamy を再起動 → メモ帳をクリック → 通知が出るか
+5. NYamy を再起動 → メモ帳をレジュームし、**メモ帳をクリック** → 通知が出るか
+
+> **サスペンドは省略できない。** グローバルフックの DLL がアンロードされるのは「注入先が次にメッセージを取り出したとき」で、通常の GUI アプリはこれを常時行っている。「触らずに放置する」だけでは手で次の操作をするまでの数秒で先にアンロードされ、**条件が成立しないまま 4 を通過してしまう** (2026-08-17 実測)。サスペンドできない場合は、kill と再起動を 1 本のスクリプトで連続実行して隙間を潰す。
+>
+> 見るのは `FocusChanged` ではなく **`HWND:` / `THREADID:` / `CLASS:` / `TITLE:` の 4 行ブロック**。理由は 6 章。
 
 直接証拠は Debug ビルド + DebugView (**Capture Global Win32** を有効化)。`HOOK_RPT` は Debug のみ有効で、`WriteFile to mailslot failed(...), reopening` → `open mailslot successed` の 2 行が出れば再オープンが発火している。**この 2 行が無いまま成功した場合は DLL が再注入されただけで、検証になっていない。**
 
@@ -90,7 +94,13 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 
 ## 6. ログの読み方 (誤解しやすいもの)
 
+- フォーカス通知が出るのは**アクティブなウィンドウが実際に変わったとき**だけ。フックが `notifySetFocus()` を撃つのは `WM_ACTIVATEAPP` / `WM_NCACTIVATE` / `WM_ACTIVATE` / `WM_MOUSEACTIVATE` / `WM_SETFOCUS` とメニューループの出入り (`hook.cpp`) で、**カーソルを乗せただけでは 1 つも発生しない**。切り替えはクリックか Alt+Tab で行うこと。同じウィンドウ内をクリックし直しても、`GetFocus()` の変化を見ているので 2 回目以降は出ない
+- `FocusChanged` を出す `checkFocusWindow()` は、**入力キューからイベントを 1 つ取り出したときにしか呼ばれない** (`engine.cpp`)。`mouse-event` を使っていない設定ではマウスはキューに入らないので、**ウィンドウを切り替えただけでは出ない。キーを 1 つ押して初めて出る** (Alt+Tab はキー入力を兼ねるので両方出る)。フォーカス通知そのものが届いたかを見たいなら、フックから来て `mayu.cpp` の `notifyHandler()` が出す `HWND:` / `THREADID:` / `CLASS:` / `TITLE:` の 4 行ブロックを見る (こちらはキー入力が要らない)
 - `FocusChanged` は**変化したときだけ**出る。毎回出ないのは正常
+- `FocusChanged` が**一度も**出ないときは、`m_focusOfThreads` の照会が外れてグローバルフォーカスへ落ちている。この経路は `GLOBAL FOCUS` を **1 行出したきり沈黙する** (`m_currentFocusOfThread != &m_globalFocus` が 2 回目以降は偽になるため) ので、黙っていること自体は手がかりにならない。**ログを `GLOBAL FOCUS` / `NO GLOBAL FOCUS` で検索して確かめる**。原因は 2 つあり、**ログ上は見分けが付かない**。(a) 登録側と照会側のスレッド ID の食い違い → [event-flow.md](event-flow.md) 2 章、(b) 強制終了後の再起動で古い DLL が名乗り直さない → [known-limitations.md](known-limitations.md) 2.1 節。**切り分けはクリーン起動で再現するかどうか**で行う
+- 終了時のメッセージ (`ScripterManager: scripter did not exit; terminating` など) は**ログダイアログでは読めない**。ダイアログが終了処理で破棄されるため。`LOG_TO_FILE` はソースを書き換えないと有効にならないので逃げ道も無い。**scripter の終了コードで判定する**: `0` = 自力で正常終了 (メッセージは出ていない)、`1` = nyamy の `TerminateProcess(h, 1)` に殺された (メッセージが出た)、`2` = scripter が自分で自分を殺した (スクリプトが `kScripterQuitTimeoutMillisec` で返らなかった)。PowerShell なら終了前に `Get-Process` して `$s.Handle` に触れておけば、終了後も `$s.ExitCode` を読める
+- **終了までの所要時間で判定してはいけない。** `Stopwatch` を回してからトレイの [終了] を選ぶ形だと、メニューを操作する時間が丸ごと乗る (2026-08-17 に 12.9 秒を計測。実際の終了は一瞬で、ほぼ全部が操作時間だった)
+- ログ欄の切り詰めは上限まで削り戻すのではなく、超えたときに**古い方から約 2/3 を一括で捨てる** (`windowstool.cpp` の `editInsertTextAtLast()`)。保持量は上限の約 1/3 から上限までを振動するので、**同じ量を流しても残る先頭行は毎回変わる**。`logMaxSize` の効きを見るなら、番号の絶対値ではなく設定値を変えたときの差で判断する
 - `NoFocusWindow` はアクティブ化遷移の一瞬 (`WM_ACTIVATEAPP` がフォーカス確定前に届く) で頻出するが正常。危険信号は「**実 hwnd の報告が続かない** `NoFocusWindow`」であって、出現頻度ではない
 - ウィンドウ別キーマップは 1 つだけ選ばれるのではなく、**マッチしたものが連なりとして積まれる**。複数のパターンが同じクラス連鎖にマッチすれば、どちらのキーも生きる
 - 昇格ウィンドウがアクティブな間にマウスの `IN` 行が出ないのは正常 ([input-injection.md](input-injection.md))
