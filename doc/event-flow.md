@@ -207,6 +207,29 @@ flowchart TD
     NH_SF --> C --> D --> E
 ```
 
+### マルチ UI スレッドのアプリ
+
+WinUI 3 のアプリは、**トップレベルウィンドウと入力コントロールが別スレッド**にある。Win11 のメモ帳では `Notepad` と `NotepadTextBox` / `RichEditD2DPT` が別スレッドで、タブごとにも分かれる。`Microsoft.UI.Content.DesktopChildSiteBridge` / `InputSiteWindowClass` が並ぶ典型的な WinUI 3 構成なので、**メモ帳固有ではなく WinUI 3 全般**に当てはまる。
+
+この構造が、フォーカス追跡の前提を 2 つ壊していた (2026-08-15 に修正)。
+
+1. **通知の潰し合い。** `notifySetFocus()` の重複判定に使う `m_hwndFocus` が `static Globals` にあり、プロセスグローバルだった。入力キューが結合された複数の UI スレッドが互いを潰し合い、後から名乗るスレッドの通知が抑止される。→ `m_hwndFocus` と `m_isInMenu` を `thread_local` へ移した
+2. **引き方のずれ。** `checkFocusWindow()` は `GetForegroundWindow()` のスレッド＝**トップレベルのスレッド**で `m_focusOfThreads` を引くが、登録側はフックが `GetCurrentThreadId()` ＝**通知を出したフォーカス側のスレッド**で登録する。→ `focusThreadOf()` を追加し、**常にフォーカスウィンドウを辿ってその所有スレッドで引く**ようにした
+
+2 は 1 を直しただけでは残る。フォーカスがスレッドをまたぐと新しい側だけが名乗るため、**フォアグラウンドのスレッドのエントリが陳腐化する**からで、`find` は成功してしまうのでフォールバックでは発動しない (メモ帳のタブを切り替えると前のタブのキーマップに張り付いていた)。
+
+前提として**入力キューは結合している**ことを確認済み。メモ帳を前面にして `GetGUIThreadInfo(0, ...)` を引くと `hwndActive` はトップレベル、`hwndFocus` は別スレッド所有の `RichEditD2DPT` が返り、PID は同一。なお `GetGUIThreadInfo(tid, ...)` は対象が前面でないと `hwndActive` / `hwndFocus` とも 0 になるので、**この確認は必ず前面にしてから行うこと**。
+
+`notifySetFocus()` は `GetFocus()` が NULL のときは通知しない (NYamy 側が必ず捨てるため)。`t.m_hwndFocus` の更新は続けるので、直後に届く実 hwnd は変化として検出される。
+
+### ウィンドウ調査のターゲット選択
+
+調査のクロスヘアは、カーソル下のトップレベルから子ウィンドウへ降りて対象を選ぶ。このとき**降下先を、トップレベルと同一プロセスが所有するウィンドウに限定している** (`isOwnedBy()`)。
+
+Chromium 系アプリ (Edge、VSCode/Electron、WebView2) は、**サンドボックス化された GPU プロセスが所有する `Intermediate D3D Window`** をトップレベルの子としてぶら下げる。子ウィンドウの降下は矩形の包含で判定するが、VSCode ではこのウィンドウと `Chrome_RenderWidgetHostHWND` の矩形が完全に一致するため、等号込みの判定では**後に列挙された GPU プロセス側が後勝ち**していた。
+
+GPU プロセスにはサンドボックスにより `nyamy64.dll` を注入できないので、そこへ `MayuMessage_notifyName` を送っても誰も応答せず、**エラーも出ないままログが無反応**になる。Edge で「カーソルを上下に動かすと挙動が変わる」のはこれが理由で、`Chrome_RenderWidgetHostHWND` がページ領域しか覆っていないため、その外では GPU ウィンドウが選ばれていた。
+
 ### nyamyd32 のライフサイクル
 
 | フェーズ | 処理 |
