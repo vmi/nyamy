@@ -62,6 +62,9 @@ class Mayu
 
 	womsgstream m_log;				/** log stream (output to log
 						    dialog's edit) */
+	/** Buffer the pending log text is taken into, reused so that the one
+	    handed back to the stream keeps its capacity.  UI thread only. */
+	std::wstring m_logDrainBuf;
 	size_t m_logMaxChars;				/// nyamy.ini logMaxSize
 #ifdef LOG_TO_FILE
 	std::wofstream m_logFile;
@@ -416,6 +419,11 @@ private:
 				}
 					//case WTS_SESSION_REMOTE_CONTROL: m = "WTS_SESSION_REMOTE_CONTROL"; break;
 				}
+				// This one was writing to the log without holding it, which
+				// let it interleave with another thread's message and race on
+				// the pending text.  Info is the level it had in practice:
+				// release() leaves m_msgLevel there.
+				Acquire a(&This->m_log, LogLevel::Info);
 				This->m_log << L"WM_WTSESSION_CHANGE("
 				<< i_wParam << ", " << i_lParam << "): "
 				<< m << std::endl;
@@ -424,16 +432,25 @@ private:
 			case WM_APP_msgStreamNotify: {
 				womsgstream::StreamBuf *log =
 					reinterpret_cast<womsgstream::StreamBuf *>(i_lParam);
-				const std::wstring &str = log->acquireString();
+				// Take the text and drop the lock before touching the edit
+				// control.  Appending there is by far the most expensive thing
+				// on the log path and grows with how much the control already
+				// holds; holding the log's lock across it made every writer -
+				// the keyboard handler thread above all - wait for the whole
+				// of it.
+				//
+				// m_logDrainBuf is a member rather than a local so that the
+				// buffer handed back to the stream keeps its capacity.  It is
+				// safe to reuse it across calls because nothing below pumps
+				// messages: the edit control is on this thread, so its
+				// notifications are direct calls and cannot re-enter here.
+				log->takeString(&This->m_logDrainBuf);
+				const std::wstring &str = This->m_logDrainBuf;
 #ifdef LOG_TO_FILE
 				This->m_logFile << str << std::flush;
 #endif // LOG_TO_FILE
-				// Appending to the edit control is by far the most expensive
-				// thing on the log path, and the cost grows with how much the
-				// control already holds, so the buffer is kept modest.
 				editInsertTextAtLast(GetDlgItem(This->m_hwndLog, IDC_EDIT_log),
 									 str, This->m_logMaxChars);
-				log->releaseString();
 				return 0;
 			}
 

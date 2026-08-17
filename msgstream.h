@@ -25,10 +25,11 @@
 
     <p>Omsgbuf calls <code>PostMessage(hwnd, messageid, 0,
     (LPARAM)omsgbuf)</code> to notify that string is ready to get.
-    When the window (<code>hwnd</code>) get the message, you can get
-    the string containd in the omsgbuf by calling
-    <code>acquireString()</code>.  After calling
-    <code>acquireString()</code>, you must call releaseString().</p>
+    When the window (<code>hwnd</code>) gets the message, it takes the
+    pending text with <code>takeString()</code>, which hands it over and
+    releases the lock in one step.  Whatever the reader does with the text
+    afterwards is therefore outside the lock, and writers do not queue behind
+    it.</p>
 
     <p>Every line that survives the level filter is prefixed with
     <code>hh:mm:ss.SSS|L|</code>, and a bare <code>[YYYY-MM-DD]</code> line is
@@ -140,18 +141,26 @@ public:
 		return !!m_hwnd;
 	}
 
-	/// acquire string and release the string
-	const String &acquireString() {
-		m_mutex.lock();
-		return m_str;
-	}
+	/** Hand the pending text over, and let go of the lock.
 
-	///
-	void releaseString() {
-		m_str.resize(0);
+	    <p>io_str is swapped with the buffer rather than copied out of it, so
+	    the reader's buffer comes back here to be filled again: neither side
+	    reallocates once both have grown to the size they need.</p>
+
+	    <p>What the reader then does with the text - above all appending it to
+	    the edit control, which costs more than the whole of the rest of this
+	    path - happens outside the lock.  That is the point.  While it runs,
+	    writers append to the fresh buffer rather than waiting behind the
+	    control.</p>
+	*/
+	void takeString(String *io_str) {
+		std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		io_str->clear();
+		io_str->swap(m_str);
+		// Cleared while still holding the lock.  A writer that publishes
+		// after this point must post a notification of its own: this one is
+		// already spoken for and its text has left.
 		m_notifyPending = false;
-#pragma warning(suppress: 26110) // m_mutex is locked in acquireString() and releaseString() is called only after acquireString()
-		m_mutex.unlock();
 	}
 
 	/// set the threshold; messages above it are dropped as they are written
@@ -396,14 +405,9 @@ public:
 		return m_streamBuf.wouldLog(i_level);
 	}
 
-	/// acquire string and release the string
-	const String &acquireString() {
-		return m_streamBuf.acquireString();
-	}
-
-	///
-	void releaseString() {
-		m_streamBuf.releaseString();
+	/// hand the pending text over; see basic_msgbuf::takeString()
+	void takeString(String *io_str) {
+		m_streamBuf.takeString(io_str);
 	}
 
 	// sync object
