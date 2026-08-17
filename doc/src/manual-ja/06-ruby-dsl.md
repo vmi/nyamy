@@ -320,6 +320,46 @@ end
 
 `HOME` は Windows が定義していない場合でも、NYamy が `%USERPROFILE%` と同じ値を補って `nyamy-scripter` に渡します ([scripter の起動](#cmdline))。
 
+### ログ出力 (`log`) {#dsl_log}
+
+設定ファイルの中から[ログウインドウ](#menu-l)へメッセージを出力できます。設定が意図どおり読まれているかを確かめたいときや、[`deffunc`](#dsl_deffunc) のブロックの動きを追いたいときに使います。
+
+```mayu
+log.error "読み込みに失敗しました"
+log.warn  "非推奨の書き方です"
+log.info  "設定を読み込みました"
+log.debug "keymap=#{name} parent=#{parent}"
+```
+
+出力は `[scripter]` の印を付けてログウインドウに出ます。レベルは行頭の `E` / `W` / `I` / `D` で区別できます ([ログの書式](#logformat))。
+
+#### 出力される条件 {#dsl_log_level}
+
+`debug` のメッセージは[ログ](#menu-l)ダイアログの「□詳細」がチェックされているときだけ出ます。ほかのレベルは常に出ます。
+
+閾値は NYamy 本体側 (「□詳細」チェックボックス) とスクリプト側の 2 つが別々に保持され、**厳しいほうが効きます**。
+
+```mayu
+log.level          # => :info   実際に出力される閾値
+log.level = :warn  # スクリプト側の閾値だけを変更する
+```
+
+`log.level` は**読み出しと書き込みが非対称**です。読み出すと「実際に何が出るか」(2 つのうち厳しいほう) が返り、書き込むとスクリプト側の閾値だけが変わります。そのため「□詳細」がチェックされていない状態では、`log.level = :debug` と書いた直後に `log.level` が `:info` を返します。指定できるのは `:error` / `:warn` / `:info` / `:debug` で、ほかの値を渡すと `ArgumentError` になります。
+
+2 つを別々に持つのは、スクリプトが `debug` を出しっぱなしにしていても、「□詳細」の ON/OFF で出す/止めるを切り替えられるようにするためです。
+
+メッセージの組み立てが重いときは、先に判定できます。`log.error?` / `log.warn?` / `log.info?` / `log.debug?` があります。
+
+```mayu
+log.debug "keymaps=#{dump_all_keymaps}" if log.debug?
+```
+
+#### 反映のタイミング {#dsl_log_timing}
+
+設定ファイルが読まれるのは NYamy の起動時と[再読み込み(<u>R</u>)](#menu-r)のときだけです。そのため、**「□詳細」をチェックしただけでは、読み込み中に出るはずの `debug` メッセージは出てきません**。チェックしてから再読み込みしてください (この案内はログには出ません)。
+
+[`deffunc`](#dsl_deffunc) のブロックの中で出すメッセージはキーを押すたびに評価されるので、チェックを変えた時点で切り替わります。
+
 ### ユーザー定義関数 (`deffunc`) {#dsl_deffunc}
 
 Ruby のブロックを関数として登録し、キーに割り当てることができます。キー側からは [`&ExecUserFunc`](#function_ExecUserFunc) で呼び出します。

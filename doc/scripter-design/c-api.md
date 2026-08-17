@@ -247,7 +247,70 @@ NYS_API bool nys_scancode_map_entry(int idx, unsigned* from_word, unsigned* to_w
 // 最後のエラーメッセージを返す (UTF-8 NUL 終端)
 // エラーなし / 未発生の場合は NULL を返す
 NYS_API const char* nys_last_error(void);
+
+// --- ログ出力 ---------------------------------------------------------------
+// 出力先は stderr。1 回の呼び出しにつき 1 行で、レベルのタグが付く
+// (nyamy 側がタグを見てフィルタし、タイムスタンプを付ける)。
+// 本文に改行が含まれる場合は行ごとに分割し、各行にタグを付ける。
+
+// ログの重大度 (値は nyamy 側の LogLevel と一致させてある)
+typedef enum {
+	NYS_LOG_ERROR = 0,
+	NYS_LOG_WARN  = 1,
+	NYS_LOG_INFO  = 2,
+	NYS_LOG_DEBUG = 3,
+} NYsLogLevel;
+
+// 1 メッセージを出力する。レベルが閾値を通らない場合は何もしない
+NYS_API void nys_log(NYsLogLevel level, const char* msg);
+
+// 実効閾値 (2 つの閾値のうち厳しいほう) を返す
+NYS_API NYsLogLevel nys_log_level(void);
+
+// スクリプト側の閾値を設定する。nyamy 側より緩い値は出力には影響しないが、
+// 値そのものは保持される
+NYS_API void nys_set_log_level(NYsLogLevel level);
+
+// このレベルのメッセージが出力されるか。重いメッセージの生成を省くために使う
+NYS_API bool nys_would_log(NYsLogLevel level);
 ```
+
+> **閾値を 2 つ持つ理由**
+> nyamy が公開する閾値 (ログダイアログの「詳細」チェックボックス) と、
+> スクリプトが `nys_set_log_level()` で設定する閾値を**別々に保持**し、
+> 出力判定は**両方を通ったときだけ**行う (＝厳しいほうが効く)。
+> 値は「大きいほど詳細」なので、実効閾値は `min(nyamy 側, スクリプト側)`。
+> スクリプト側の初期値は `NYS_LOG_DEBUG` (最も緩い) で、未設定なら nyamy 側の値が
+> そのまま効く。
+> こうしておくと、スクリプトが debug を出しっぱなしにしていても
+> **「詳細」チェックの ON/OFF で出す/止めるを切り替えられる**。
+> どちらか一方を上書きで潰す方式では、この状態が失われる。
+>
+> 実効閾値は**キャッシュしない**。判定は int 2 個の比較 1 回で、`nys_log()` は
+> メッセージ文字列を生成し終えた後に呼ばれるため誤差の範囲。更新点が 2 箇所
+> (`SetLogLevel` 受信 / `nys_set_log_level()`) あるので、キャッシュは再計算漏れの
+> バグ源になるほうが問題になる。重い文字列生成の回避は `nys_would_log()`
+> (Ruby では `log.debug?`) が担当する。
+>
+> 詳細レベルの伝達は ctrl ストリームの `SetLogLevel` (`0x03`、LogLevel 1 バイト) で
+> 行う。「詳細」チェックが切り替わったときに送られる ([protocol.md](protocol.md))。
+> scripter のログの大半はロード時に出るが、ロードは Start 直後の一度きりなので、
+> **「詳細」をチェックしただけでは読み込み時の debug は出てこない** (リロードが要る)。
+> 自動リロードも案内メッセージも出さない方針で、これはユーザー向けマニュアルに
+> 記載してある。
+
+> **C++ 専用ヘルパー (`extern "C"` 外)**
+> 上記 4 関数の `LogLevel` 版が `NYS_API` で export されている。`NYsLogLevel` ではなく
+> nyamy と共通の `LogLevel` (`log_level.h`) を直接取るので、DLL 内部と単体テストは
+> こちらを使う。
+>
+> | 関数 | 役割 |
+> |---|---|
+> | `nysLogUtf8(LogLevel, const char*)` | 1 メッセージを出力。改行は行ごとに分割してタグを付ける |
+> | `nysEffectiveLogLevel()` | 実効閾値 (2 つのうち厳しいほう) |
+> | `nysSetLogLevelFromNyamy(LogLevel)` | nyamy 側の閾値を記録する (Start / `SetLogLevel` の受信時) |
+> | `nysSetLogLevelFromScript(LogLevel)` | スクリプト側の閾値を記録する |
+> | `nysWouldLog(LogLevel)` | このレベルが出力されるか |
 
 > **C++ 専用ヘルパー (`extern "C"` 外)**
 > `parseScancodeMapBlob(const unsigned char* data, size_t len, std::vector<std::pair<uint16_t,uint16_t>>& out)`

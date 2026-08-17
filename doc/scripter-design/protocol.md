@@ -80,10 +80,24 @@ CmdStreamWriter  dataWriter(dataStream);
 ## msg パイプ (ログ)
 
 scripter の stdout と stderr を 1 本のパイプにマージして nyamy がログとして受信する。
+**UTF-8 のテキストで、1 行 1 メッセージ**。
 
-- scripter 側: stderr に `_O_U16TEXT` を設定 → `std::wcerr` 出力が UTF-16 LE になる
-- nyamy 側: `PipeReadWStreambuf` (wchar_t = 2 バイト単位読み取り) で受信
-- stdout に書き込まれたバイト列もこのパイプに流れるが、scripter が `std::cout` 等をログ目的で使う場合は UTF-16 でないと文字化けする
+```
+{Lev}|本文\n
+```
+
+- `{Lev}` は `E` / `W` / `I` / `D` の 1 文字 (`logLevelChar()`)。nyamy 側はこのタグを
+  剥がしてレベルに戻し、`[scripter] ` を付けて自分のログへ流す
+- **タグの無い行は info 扱い**。ユーザースクリプトの素の `puts` や mruby ランタイムの
+  出力がこれにあたる
+- scripter 側は stdout / stderr とも `_O_BINARY`。出力は `logLine()` が
+  `fwrite()` で行う (`std::wcerr` は使わない)
+- 本文に改行が含まれる場合は `nysLogUtf8()` が行ごとに分割し、各行にタグを付ける
+  (mruby のバックトレースが該当)
+- nyamy 側は `PipeReadStreambuf` + `std::getline` で 1 行ずつ読む。末尾の `\r` は落とす
+- **フィルタは両側で効く。** scripter は閾値を通らないメッセージをそもそも書かないが、
+  `SetLogLevel` を受け取る前に書かれた行は既に流れているので、nyamy 側でもレベルで
+  もう一度絞る
 
 ---
 
@@ -93,16 +107,18 @@ scripter の stdout と stderr を 1 本のパイプにマージして nyamy が
 
 | コマンド | ID | 状態 |
 |---------|-----|------|
-| Start | 0x01 | 使用中 (シンボルセット送信、起動時) |
+| Start | 0x01 | 使用中 (設定名/パス・シンボルセット・ログ閾値の送信、起動時) |
 | ExecUserFunc | 0x02 | 使用中 (ユーザー定義関数呼び出し) |
+| SetLogLevel | 0x03 | 使用中 (「詳細」チェックの切り替え時) |
 | Quit | 0xFF | 使用中 |
 
 ### コマンド ID (現状)
 
 ```cpp
 enum class CtrlId : uint8_t {
-    Start        = 0x01,  ///< (Re)compile with symbols; sent on every scripter startup
+    Start        = 0x01,  ///< (Re)compile with the given symbols; sent on every scripter startup
     ExecUserFunc = 0x02,  ///< Engine -> scripter: invoke user-defined function
+    SetLogLevel  = 0x03,  ///< New log threshold (one LogLevel byte); sent when "detail" is toggled
     Quit         = 0xFF,  ///< Terminate scripter
 };
 ```
@@ -111,11 +127,18 @@ enum class CtrlId : uint8_t {
 
 ```
 [0x01]
-[n_syms : U16]
-[sym0   : String]
+[config_name : String]
+[config_path : String]
+[n_syms      : U16]
+[sym0        : String]
 ...
-[symN   : String]
+[symN        : String]
+[log_level   : U8]
 ```
+
+`log_level` は `LogLevel` の値 (`0`=Error / `1`=Warn / `2`=Info / `3`=Debug)。
+scripter はこれを「nyamy 側の閾値」として記録する
+(`nysSetLogLevelFromNyamy()`、[c-api.md](c-api.md))。
 
 ### ExecUserFunc (0x02)
 
@@ -128,6 +151,21 @@ enum class CtrlId : uint8_t {
 [argN      : FuncArg]
 [context   : TriggerInfo]
 ```
+
+### SetLogLevel (0x03)
+
+```
+[0x03]
+[log_level : U8]
+```
+
+ログダイアログの「詳細」チェックが切り替わったときに送られる。scripter 側は
+nyamy 側の閾値だけを更新し、スクリプトが `nys_set_log_level()` で設定した閾値は
+そのまま残る (出力判定は厳しいほうが効く)。
+
+scripter のログの大半はロード時に出るが、ロードは Start 直後の一度きりなので、
+**このコマンドだけでは読み込み時の debug は出てこない**。見るにはリロードが要る。
+自動リロードも案内メッセージも出さない方針。
 
 ### Quit (0xFF)
 
