@@ -86,18 +86,12 @@ scripter の stdout と stderr を 1 本のパイプにマージして nyamy が
 {Lev}|本文\n
 ```
 
-- `{Lev}` は `E` / `W` / `I` / `D` の 1 文字 (`logLevelChar()`)。nyamy 側はこのタグを
-  剥がしてレベルに戻し、`[scripter] ` を付けて自分のログへ流す
-- **タグの無い行は info 扱い**。ユーザースクリプトの素の `puts` や mruby ランタイムの
-  出力がこれにあたる
-- scripter 側は stdout / stderr とも `_O_BINARY`。出力は `logLine()` が
-  `fwrite()` で行う (`std::wcerr` は使わない)
-- 本文に改行が含まれる場合は `nysLogUtf8()` が行ごとに分割し、各行にタグを付ける
-  (mruby のバックトレースが該当)
+- `{Lev}` は `E` / `W` / `I` / `D` の 1 文字 (`logLevelChar()`)。nyamy 側はこのタグを剥がしてレベルに戻し、`[scripter] ` を付けて自分のログへ流す
+- **タグの無い行は info 扱い**。ユーザースクリプトの素の `puts` や mruby ランタイムの出力がこれにあたる
+- scripter 側は stdout / stderr とも `_O_BINARY`。出力は `logLine()` が `fwrite()` で行う (`std::wcerr` は使わない)
+- 本文に改行が含まれる場合は `nysLogUtf8()` が行ごとに分割し、各行にタグを付ける (mruby のバックトレースが該当)
 - nyamy 側は `PipeReadStreambuf` + `std::getline` で 1 行ずつ読む。末尾の `\r` は落とす
-- **フィルタは両側で効く。** scripter は閾値を通らないメッセージをそもそも書かないが、
-  `SetLogLevel` を受け取る前に書かれた行は既に流れているので、nyamy 側でもレベルで
-  もう一度絞る
+- **フィルタは両側で効く。** scripter は閾値を通らないメッセージをそもそも書かないが、`SetLogLevel` を受け取る前に書かれた行は既に流れているので、nyamy 側でもレベルでもう一度絞る
 
 ---
 
@@ -136,9 +130,7 @@ enum class CtrlId : uint8_t {
 [log_level   : U8]
 ```
 
-`log_level` は `LogLevel` の値 (`0`=Error / `1`=Warn / `2`=Info / `3`=Debug)。
-scripter はこれを「nyamy 側の閾値」として記録する
-(`nysSetLogLevelFromNyamy()`、[c-api.md](c-api.md))。
+`log_level` は `LogLevel` の値 (`0`=Error / `1`=Warn / `2`=Info / `3`=Debug)。scripter はこれを「nyamy 側の閾値」として記録する (`nysSetLogLevelFromNyamy()`、[c-api.md](c-api.md))。
 
 ### ExecUserFunc (0x02)
 
@@ -159,13 +151,9 @@ scripter はこれを「nyamy 側の閾値」として記録する
 [log_level : U8]
 ```
 
-ログダイアログの「詳細」チェックが切り替わったときに送られる。scripter 側は
-nyamy 側の閾値だけを更新し、スクリプトが `nys_set_log_level()` で設定した閾値は
-そのまま残る (出力判定は厳しいほうが効く)。
+ログダイアログの「詳細」チェックが切り替わったときに送られる。scripter 側は nyamy 側の閾値だけを更新し、スクリプトが `nys_set_log_level()` で設定した閾値はそのまま残る (出力判定は厳しいほうが効く)。
 
-scripter のログの大半はロード時に出るが、ロードは Start 直後の一度きりなので、
-**このコマンドだけでは読み込み時の debug は出てこない**。見るにはリロードが要る。
-自動リロードも案内メッセージも出さない方針。
+scripter のログの大半はロード時に出るが、ロードは Start 直後の一度きりなので、**このコマンドだけでは読み込み時の debug は出てこない**。見るにはリロードが要る。自動リロードも案内メッセージも出さない方針。
 
 ### Quit (0xFF)
 

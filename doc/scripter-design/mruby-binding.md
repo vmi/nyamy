@@ -825,10 +825,7 @@ ENV.keys / ENV.to_h / ENV.each { |name, value| ... }
 
 ## `log` — ログ出力
 
-`NYamy::Log` を `mrb_define_class_under` で定義し、`NYamy::DSL#log` (`dsl_log`) が
-そのシングルトンを返す。インスタンスは DSL オブジェクトの `@__log__` に遅延生成して
-保持するので、呼ぶたびに作られることはない。メソッド名は Ruby の Logger の慣例に
-合わせてある (`trace` ではなく `debug`)。
+`NYamy::Log` を `mrb_define_class_under` で定義し、`NYamy::DSL#log` (`dsl_log`) がそのシングルトンを返す。インスタンスは DSL オブジェクトの `@__log__` に遅延生成して保持するので、呼ぶたびに作られることはない。メソッド名は Ruby の Logger の慣例に合わせてある (`trace` ではなく `debug`)。
 
 ```ruby
 log.error "…"
@@ -842,18 +839,10 @@ log.level          # => :info   実効閾値
 log.level = :warn  # スクリプト側の閾値だけを更新する
 ```
 
-- 出力の実体は `nysWouldLog()` → `nysLogUtf8()`。閾値の扱いは
-  [c-api.md](c-api.md) の「閾値を 2 つ持つ理由」を参照。
-- **`log.level` の getter と setter は非対称**。getter は実効閾値 (nyamy 側と
-  スクリプト側の厳しいほう) を返し、setter はスクリプト側だけを更新する。
-  `log.level = :debug` の直後に `log.level` が `:info` を返すことがある。
-  読みたいのはたいてい「実際に何が出るか」なので getter は実効閾値でよい、と判断した。
-  この非対称性はユーザー向けマニュアルにも明記してある。
-- レベルは `:error` / `:warn` / `:info` / `:debug` のシンボルまたは同名の文字列を
-  受ける (`logLevelFromRuby`)。ほかの値は `ArgumentError`。getter が返すのは常に
-  シンボル (`logLevelToRuby`)。
-- `log` はトップレベル (DSL の `instance_eval` 下) でも `deffunc` のブロックの中でも
-  同じように使える。前者はロード時、後者はキー押下のたびに評価される。
+- 出力の実体は `nysWouldLog()` → `nysLogUtf8()`。閾値の扱いは [c-api.md](c-api.md) の「閾値を 2 つ持つ理由」を参照。
+- **`log.level` の getter と setter は非対称**。getter は実効閾値 (nyamy 側とスクリプト側の厳しいほう) を返し、setter はスクリプト側だけを更新する。`log.level = :debug` の直後に `log.level` が `:info` を返すことがある。読みたいのはたいてい「実際に何が出るか」なので getter は実効閾値でよい、と判断した。この非対称性はユーザー向けマニュアルにも明記してある。
+- レベルは `:error` / `:warn` / `:info` / `:debug` のシンボルまたは同名の文字列を受ける (`logLevelFromRuby`)。ほかの値は `ArgumentError`。getter が返すのは常にシンボル (`logLevelToRuby`)。
+- `log` はトップレベル (DSL の `instance_eval` 下) でも `deffunc` のブロックの中でも同じように使える。前者はロード時、後者はキー押下のたびに評価される。
 
 ---
 
