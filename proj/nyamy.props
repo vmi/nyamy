@@ -3,7 +3,7 @@
   <ImportGroup Label="PropertySheets">
   </ImportGroup>
   <PropertyGroup Label="UserMacros">
-    <VERSION>0.9.1</VERSION>
+    <VERSION>0.9.2</VERSION>
     <VERSION_NUMERIC_DOTTED>$(VERSION.Split('-')[0])</VERSION_NUMERIC_DOTTED>
     <VERSION_NUMERIC>$(VERSION_NUMERIC_DOTTED.Replace('.',','))</VERSION_NUMERIC>
   </PropertyGroup>
