@@ -18,10 +18,13 @@ enum {
 	WM_APP_dlglogNotify = WM_APP + 115,
 };
 
-/** How much text the log edit control keeps, when nyamy.ini's logMaxSize is
-    absent or invalid.  Appending is O(buffer length): measured 137 us at
-    10000 characters against 325 us at 60000, so this is a direct trade of
-    scrollback against the cost of every single log line. */
+/** How much text the log keeps, in wide characters, when nyamy.ini's
+    logMaxSize is absent or invalid.
+
+    This is the size of the one buffer LogBuffer allocates at startup, and
+    nothing else scales with it: the edit control shows what that buffer
+    holds rather than being the buffer itself, so raising it costs memory and
+    not the price of every appended line. */
 const size_t kLogEditMaxChars = 20000;
 
 enum DlgLogNotify {
@@ -31,10 +34,13 @@ enum DlgLogNotify {
 	DlgLogNotify_thresholdChanged,
 };
 
+class LogBuffer;
+
 /// parameters for "Investigate" dialog box
 class DlgLogData {
 public:
 	womsgstream *m_log;				/// log stream
+	LogBuffer *m_logBuffer;			/// the text the dialog shows
 	HWND m_hwndTaskTray;				/// tasktray window
 };
 

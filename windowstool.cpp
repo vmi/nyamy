@@ -379,14 +379,6 @@ std::wstring warnUnexpectedDpiAwareness()
 // edit control
 
 
-// get edit control's text size
-// @return bytes of text
-size_t editGetTextBytes(HWND i_hwnd)
-{
-	return Edit_GetTextLength(i_hwnd);
-}
-
-
 // delete a line
 void editDeleteLine(HWND i_hwnd, size_t i_n)
 {
@@ -397,49 +389,6 @@ void editDeleteLine(HWND i_hwnd, size_t i_n)
 	int index = Edit_LineIndex(i_hwnd, i_n);
 	Edit_SetSel(i_hwnd, index, index + len);
 	Edit_ReplaceSel(i_hwnd, L"");
-}
-
-
-// insert text at last
-void editInsertTextAtLast(HWND i_hwnd, const std::wstring &i_text,
-						  size_t i_threshold)
-{
-	if (i_text.empty())
-		return;
-
-	size_t len = editGetTextBytes(i_hwnd);
-
-	if (i_threshold < len) {
-		// Drop the oldest two thirds rather than trim back to the threshold:
-		// removing text is O(buffer length), so trimming on every line once
-		// full would make the threshold itself the cost.  The control
-		// therefore holds anywhere between a third of the threshold and the
-		// threshold - it is an upper bound, not the amount kept.
-		// The cut is moved to a line boundary: cutting at a raw character
-		// offset leaves a truncated line at the top of the log.
-		int cut = Edit_LineFromChar(i_hwnd, static_cast<int>(len / 3 * 2));
-		int index = Edit_LineIndex(i_hwnd, cut);
-		if (index <= 0)
-			index = static_cast<int>(len / 3 * 2);
-		Edit_SetSel(i_hwnd, 0, index);
-		Edit_ReplaceSel(i_hwnd, L"");
-		len = editGetTextBytes(i_hwnd);
-	}
-
-	Edit_SetSel(i_hwnd, len, len);
-
-	// \n -> \r\n
-	std::vector<wchar_t> buf(i_text.size() * 2 + 1);
-	wchar_t *d = buf.data();
-	const wchar_t *str = i_text.c_str();
-	for (const wchar_t *s = str; s < str + i_text.size(); ++ s) {
-		if (*s == L'\n')
-			*d++ = L'\r';
-		*d++ = *s;
-	}
-	*d = L'\0';
-
-	Edit_ReplaceSel(i_hwnd, buf.data());
 }
 
 

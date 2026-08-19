@@ -21,6 +21,7 @@
 #include "msgstream.h"
 #include "multithread.h"
 #include "inifile.h"
+#include "log_buffer.h"
 #include "nyamy_paths.h"
 #include "setting.h"
 #include "scripter_manager.h"
@@ -65,7 +66,7 @@ class Mayu
 	/** Buffer the pending log text is taken into, reused so that the one
 	    handed back to the stream keeps its capacity.  UI thread only. */
 	std::wstring m_logDrainBuf;
-	size_t m_logMaxChars;				/// nyamy.ini logMaxSize
+	LogBuffer m_logBuffer;			/// the text the log holds
 #ifdef LOG_TO_FILE
 	std::wofstream m_logFile;
 #endif // LOG_TO_FILE
@@ -449,8 +450,10 @@ private:
 #ifdef LOG_TO_FILE
 				This->m_logFile << str << std::flush;
 #endif // LOG_TO_FILE
-				editInsertTextAtLast(GetDlgItem(This->m_hwndLog, IDC_EDIT_log),
-									 str, This->m_logMaxChars);
+				// Keep the text.  The log dialog shows it on a timer of its
+				// own, and only while it is on screen, so nothing here
+				// touches a window.
+				This->m_logBuffer.add(str);
 				return 0;
 			}
 
@@ -705,6 +708,7 @@ private:
 					// written out and started over.  Does nothing unless
 					// NYAMY_LOG_PROFILE is defined; see log_profile.h.
 					LOG_PROFILE_REPORT(L"log cleared");
+					This->m_logBuffer.clear();
 					This->showBanner(true);
 					break;
 				case DlgLogNotify_thresholdChanged:
@@ -1079,6 +1083,16 @@ exit:
 		return err;
 	}
 
+	/** How much text the log keeps.  Read here rather than in the constructor
+	    body because m_logBuffer takes its one and only allocation at
+	    construction. */
+	static size_t readLogMaxChars() {
+		int chars;
+		IniFile().read(L"logMaxSize", &chars,
+					   static_cast<int>(kLogEditMaxChars));
+		return (0 < chars) ? static_cast<size_t>(chars) : kLogEditMaxChars;
+	}
+
 public:
 	///
 	Mayu(HANDLE i_mutex)
@@ -1093,12 +1107,8 @@ public:
 			m_log(WM_APP_msgStreamNotify),
 			m_isSettingDialogOpened(false),
 			m_sessionState(0),
+			m_logBuffer(readLogMaxChars()),
 			m_engine(m_log) {
-		int logMaxSize;
-		IniFile().read(L"logMaxSize", &logMaxSize,
-					   static_cast<int>(kLogEditMaxChars));
-		m_logMaxChars = (0 < logMaxSize) ?
-			static_cast<size_t>(logMaxSize) : kLogEditMaxChars;
 
 		// addSessionId(): mailslot names live in \Device\Mailslot, which has
 		// no per session split of its own, so without it a second logged on
@@ -1138,6 +1148,7 @@ public:
 
 		DlgLogData dld = {
 			.m_log = &m_log,
+			.m_logBuffer = &m_logBuffer,
 			.m_hwndTaskTray = m_hwndTaskTray,
 		};
 		m_hwndLog =

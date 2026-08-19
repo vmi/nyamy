@@ -6,12 +6,34 @@
 
 ## 1. 自動テスト
 
+2 本ある。**どちらに書くかは「Windows と nyamy 本体に依存するか」で決める。**
+
+| プロジェクト | 対象 | 依存 |
+|---|---|---|
+| `nyamy-tests` | 単体テスト。Windows にも本体にも依存しない部品 | 無し |
+| `nyamy-scripter-tests` | 結合テスト。scripter → CmdStream → Setting のパイプライン | mruby + 本体一式 |
+
+### 1.1 単体テスト (`nyamy-tests`)
+
+```
+MSBuild proj/nyamy-tests.vcxproj -p:Configuration=Debug -p:Platform=x64
+Debug/nyamy-tests.exe
+```
+
+ライブラリ参照が無く数秒で終わる。**その軽さが線引きそのもの**で、ここに入れられるかどうかが「その部品の依存が切れているか」の判定になる。現在の対象は `LogBuffer` (テキストの保持) と `LogView` (編集欄に何を伝えるかの計算) で、どちらも窓を持たないので窓なしで検証できる。
+
+テストを足すときは `tests/core/` に `test_*.cpp` を作り、`core_test.h` に `run*Tests()` を宣言して `core_test_main.cpp` から呼ぶ。フレームワークは `CORE_CHECK` だけ。**フィクスチャや前準備が要る時点で、それは向こう側のテスト**。
+
+### 1.2 結合テスト (`nyamy-scripter-tests`)
+
 ```
 MSBuild proj/nyamy-scripter-tests.vcxproj -p:Configuration=Debug -p:Platform=x64
 Debug/nyamy-scripter-tests.exe
 ```
 
 `.mayu` / `.mayu.rb` はビルド時に出力先へコピーされる。
+
+> このプロジェクトは名前に反して**本体側のソースをほぼ全部コンパイルしている** (`engine.cpp` / `dlglog.cpp` / `function.cpp` など)。本体に新しい `.cpp` を足したら、**`nyamy.vcxproj` だけでなくこちらにも足すこと。** 呼ばれている関数がすべてヘッダ内 inline のうちはリンクが通ってしまうので、忘れても当面は気付けない。
 
 > **設定ファイルを編集したら必ずリビルドしてからテストを実行すること。** テストは `Debug\` にコピーされた設定を読む (`NYAMY_ROOT` = exe のディレクトリ)。リポジトリ側だけ編集して `.exe` を直接実行すると古い設定で走り、「テストが差分を検出しない」という誤った結論になる。
 
@@ -100,7 +122,9 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 - `FocusChanged` が**一度も**出ないときは、`m_focusOfThreads` の照会が外れてグローバルフォーカスへ落ちている。この経路は `GLOBAL FOCUS` を **1 行出したきり沈黙する** (`m_currentFocusOfThread != &m_globalFocus` が 2 回目以降は偽になるため) ので、黙っていること自体は手がかりにならない。**ログを `GLOBAL FOCUS` / `NO GLOBAL FOCUS` で検索して確かめる**。原因は 2 つあり、**ログ上は見分けが付かない**。(a) 登録側と照会側のスレッド ID の食い違い → [event-flow.md](event-flow.md) 2 章、(b) 強制終了後の再起動で古い DLL が名乗り直さない → [known-limitations.md](known-limitations.md) 2.1 節。**切り分けはクリーン起動で再現するかどうか**で行う
 - 終了時のメッセージ (`ScripterManager: scripter did not exit; terminating` など) は**ログダイアログでは読めない**。ダイアログが終了処理で破棄されるため。`LOG_TO_FILE` はソースを書き換えないと有効にならないので逃げ道も無い。**scripter の終了コードで判定する**: `0` = 自力で正常終了 (メッセージは出ていない)、`1` = nyamy の `TerminateProcess(h, 1)` に殺された (メッセージが出た)、`2` = scripter が自分で自分を殺した (スクリプトが `kScripterQuitTimeoutMillisec` で返らなかった)。PowerShell なら終了前に `Get-Process` して `$s.Handle` に触れておけば、終了後も `$s.ExitCode` を読める
 - **終了までの所要時間で判定してはいけない。** `Stopwatch` を回してからトレイの [終了] を選ぶ形だと、メニューを操作する時間が丸ごと乗る (2026-08-17 に 12.9 秒を計測。実際の終了は一瞬で、ほぼ全部が操作時間だった)
-- ログ欄の切り詰めは上限まで削り戻すのではなく、超えたときに**古い方から約 2/3 を一括で捨てる** (`windowstool.cpp` の `editInsertTextAtLast()`)。保持量は上限の約 1/3 から上限までを振動するので、**同じ量を流しても残る先頭行は毎回変わる**。`logMaxSize` の効きを見るなら、番号の絶対値ではなく設定値を変えたときの差で判断する
+- 編集欄は**表示器であって保管場所ではない**。テキストは `LogBuffer` が持ち、編集欄は 100ms のタイマーで追いつく。したがって **1 行流した直後にダイアログを見ても、まだ出ていないことがある** (最大 100ms)。出ないと判断する前にもう一度見ること
+- ログダイアログが**非表示の間、編集欄は更新されない**。行は溜まり続けるので内容は失われないが、「表示した瞬間にまとめて出る」のは正常
+- 切り詰めは `logMaxSize` (既定 20000 文字) を超えた分を**古い方から行単位で**捨てる。以前の「約 2/3 を一括で捨てる」動作は無くなったので、**残る先頭行は設定値どおりに決まる**。保管場所は起動時に一度だけ確保される固定長の文字リングなので、上限を上げても増えるのはメモリだけで 1 行あたりのコストは変わらない
 - `NoFocusWindow` はアクティブ化遷移の一瞬 (`WM_ACTIVATEAPP` がフォーカス確定前に届く) で頻出するが正常。危険信号は「**実 hwnd の報告が続かない** `NoFocusWindow`」であって、出現頻度ではない
 - ウィンドウ別キーマップは 1 つだけ選ばれるのではなく、**マッチしたものが連なりとして積まれる**。複数のパターンが同じクラス連鎖にマッチすれば、どちらのキーも生きる
 - 昇格ウィンドウがアクティブな間にマウスの `IN` 行が出ないのは正常 ([input-injection.md](input-injection.md))

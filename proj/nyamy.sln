@@ -30,6 +30,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nyamy-scripter-dll", "nyamy
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nyamy-scripter-tests", "nyamy-scripter-tests.vcxproj", "{A1B2C3D4-E5F6-4789-ABCD-1234567890AB}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nyamy-tests", "nyamy-tests.vcxproj", "{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -146,6 +148,18 @@ Global
 		{A1B2C3D4-E5F6-4789-ABCD-1234567890AB}.Release|Win32.Build.0 = Release|x64
 		{A1B2C3D4-E5F6-4789-ABCD-1234567890AB}.Release|x64.ActiveCfg = Release|x64
 		{A1B2C3D4-E5F6-4789-ABCD-1234567890AB}.Release|x64.Build.0 = Release|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Debug|Win32.ActiveCfg = Debug|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Debug|Win32.Build.0 = Debug|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Debug|x64.ActiveCfg = Debug|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Debug|x64.Build.0 = Debug|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Release|Mixed Platforms.Build.0 = Release|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Release|Win32.ActiveCfg = Release|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Release|Win32.Build.0 = Release|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Release|x64.ActiveCfg = Release|x64
+		{7C4E1A55-3D62-4B18-9E0C-5A7F2D913C64}.Release|x64.Build.0 = Release|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|Mixed Platforms.Build.0 = Debug|x64
 		{89B73A41-31DE-4480-A574-2C8806F66E8B}.Debug|Win32.ActiveCfg = Debug|x64

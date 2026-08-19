@@ -9,6 +9,8 @@
 #include "windowstool.h"
 #include "msgstream.h"
 #include "layoutmanager.h"
+#include "log_buffer.h"
+#include "log_view.h"
 #include "dlglog.h"
 #include <windowsx.h>
 
@@ -29,6 +31,16 @@ class DlgLog : public LayoutManager
 	HFONT m_hfont;				///
 	womsgstream *m_log;				///
 
+	/** The lines being shown.  The edit control is a view onto this: it is
+	    brought into step on a timer rather than for every message, so that
+	    appending - and above all deleting from the front, which re-wraps
+	    everything after it - happens once per tick however many lines
+	    arrived.  Owned by the tasktray window, which is what fills it. */
+	LogBuffer *m_logBuffer;
+
+	/// works out what the control has to be told; see log_view.h
+	LogView m_view;
+
 	/** Style of the log edit control with the horizontal-scroll bits masked
 	    off.  Word wrap is switched by recreating the control with or without
 	    them: an edit control ignores a later change to ES_AUTOHSCROLL.
@@ -47,6 +59,13 @@ class DlgLog : public LayoutManager
 	bool m_dpiWasAtBottom;
 	int m_dpiAnchor;
 
+	enum {
+		ID_RefreshTimer = 1,			///< brings the control into step
+		/** Long enough that a burst of log lines becomes one update, short
+		    enough that the log still reads as live. */
+		kRefreshIntervalMillisec = 100,
+	};
+
 public:
 	///
 	DlgLog(HWND i_hwnd)
@@ -56,6 +75,7 @@ public:
 			m_hfontOriginal(GetWindowFont(m_hwnd)),
 			m_hfont(NULL),
 			m_log(NULL),
+			m_logBuffer(NULL),
 			m_editStyle(0),
 			m_editExStyle(0),
 			m_isWordWrap(true),
@@ -68,6 +88,7 @@ public:
 	BOOL wmInitDialog(HWND /* i_focus */, LPARAM i_lParam) {
 		DlgLogData *dld = reinterpret_cast<DlgLogData *>(i_lParam);
 		m_log = dld->m_log;
+		m_logBuffer = dld->m_logBuffer;
 		m_hwndTaskTray = dld->m_hwndTaskTray;
 
 		IniFile ini;
@@ -134,6 +155,8 @@ public:
 
 	/// WM_DESTROY
 	BOOL wmDestroy() {
+		KillTimer(m_hwnd, ID_RefreshTimer);
+
 		// Backstop for a geometry change that never reached WM_EXITSIZEMOVE,
 		// e.g. a resize by the window manager or a snap.
 		savePlacement();
@@ -233,13 +256,32 @@ public:
 		return result;
 	}
 
-	/// WM_SHOWWINDOW
+	/** WM_SHOWWINDOW
+
+	    The control is only brought into step while the dialog is on screen.
+	    Nothing is lost by that - LogBuffer is filled either way - and it means
+	    a log nobody is looking at costs nothing to display. */
 	BOOL wmShowWindow(BOOL i_isShown, int /* i_status */) {
 		if (i_isShown && m_restoreMaximized) {
 			m_restoreMaximized = false;
 			ShowWindow(m_hwnd, SW_SHOWMAXIMIZED);
 		}
+		if (i_isShown) {
+			// catch up on everything that arrived while it was hidden
+			refresh();
+			SetTimer(m_hwnd, ID_RefreshTimer, kRefreshIntervalMillisec, NULL);
+		} else {
+			KillTimer(m_hwnd, ID_RefreshTimer);
+		}
 		return FALSE;
+	}
+
+	/// WM_TIMER
+	BOOL wmTimer(UINT_PTR i_id) {
+		if (i_id != ID_RefreshTimer)
+			return FALSE;
+		refresh();
+		return TRUE;
 	}
 
 	/// WM_COMMAND
@@ -252,10 +294,11 @@ public:
 		}
 
 		case IDC_BUTTON_clearLog: {
-			Edit_SetSel(m_hwndEdit, 0, Edit_GetTextLength(m_hwndEdit));
-			Edit_ReplaceSel(m_hwndEdit, L"");
+			// The tasktray window owns the lines, so it clears them; this is
+			// sent first so that the rebuild below has nothing left to show.
 			SendMessage(m_hwndTaskTray, WM_APP_dlglogNotify,
 						DlgLogNotify_logCleared, 0);
+			rebuild();
 			return TRUE;
 		}
 
@@ -308,6 +351,133 @@ public:
 	}
 
 private:
+	/** Bring the edit control into step with the log.
+
+	    What to do is worked out by LogView, which holds no window; this puts
+	    the answer into the control. */
+	void refresh() {
+		if (!m_logBuffer || !IsWindowVisible(m_hwnd))
+			return;
+		LogViewUpdate update;
+		m_view.update(*m_logBuffer, &update);
+		applyUpdate(update);
+	}
+
+	/** Put what LogView decided into the control.
+
+	    Deletions happen before appends so that the control never has to hold
+	    both at once, and the whole tick is at most one delete and one append
+	    however many lines arrived.
+
+	    <p><b>EM_REPLACESEL scrolls the caret into view</b>, so both the delete
+	    at the front and the append at the end move the view by themselves -
+	    the append lands at the end of the text and therefore always ends at
+	    the bottom.  A reader who has scrolled back is put back afterwards,
+	    once the text has settled; correcting between the two would only be
+	    undone by the append.  Painting is held off in the meantime so that the
+	    trip to the bottom and back is never on screen.</p> */
+	void applyUpdate(const LogViewUpdate &i_update) {
+		if (i_update.m_isRebuild) {
+			SetWindowText(m_hwndEdit, i_update.m_append.c_str());
+			int end = Edit_GetTextLength(m_hwndEdit);
+			Edit_SetSel(m_hwndEdit, end, end);
+			Edit_ScrollCaret(m_hwndEdit);
+			return;
+		}
+		if (i_update.isEmpty())
+			return;
+
+		const int drop = static_cast<int>(i_update.m_dropChars);
+		const bool wasAtBottom = isAtBottom();
+
+		// Where the reader is, as a character index rather than a line
+		// number: the delete renumbers every line and the append re-wraps the
+		// last one, but a character means the same place through both.  The
+		// selection is kept for the same reason - the append would otherwise
+		// drop one made to copy from.
+		int anchor = -1;
+		DWORD selStart = 0;
+		DWORD selEnd = 0;
+		if (!wasAtBottom) {
+			int first = static_cast<int>(
+							SendMessage(m_hwndEdit,
+										EM_GETFIRSTVISIBLELINE, 0, 0));
+			if (0 <= first)
+				anchor = static_cast<int>(
+							 SendMessage(m_hwndEdit, EM_LINEINDEX,
+										 static_cast<WPARAM>(first), 0));
+			SendMessage(m_hwndEdit, EM_GETSEL,
+						reinterpret_cast<WPARAM>(&selStart),
+						reinterpret_cast<LPARAM>(&selEnd));
+			SetWindowRedraw(m_hwndEdit, FALSE);
+		}
+
+		if (0 < drop) {
+			Edit_SetSel(m_hwndEdit, 0, drop);
+			Edit_ReplaceSel(m_hwndEdit, L"");
+		}
+
+		if (!i_update.m_append.empty()) {
+			int end = Edit_GetTextLength(m_hwndEdit);
+			Edit_SetSel(m_hwndEdit, end, end);
+			Edit_ReplaceSel(m_hwndEdit, i_update.m_append.c_str());
+		}
+
+		if (wasAtBottom) {
+			SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
+						static_cast<LPARAM>(Edit_GetLineCount(m_hwndEdit)));
+			return;
+		}
+
+		// Everything the reader held was measured before the delete, so it
+		// moves up by what went.  Clamping at 0 is what happens when the line
+		// they were on has itself been evicted: the view settles at the top
+		// rather than chasing a line that is no longer there.
+		Edit_SetSel(m_hwndEdit,
+					clampToZero(static_cast<int>(selStart) - drop),
+					clampToZero(static_cast<int>(selEnd) - drop));
+		if (0 <= anchor) {
+			int wantLine = static_cast<int>(
+							   SendMessage(m_hwndEdit, EM_LINEFROMCHAR,
+										   static_cast<WPARAM>(
+											   clampToZero(anchor - drop)), 0));
+			int nowFirst = static_cast<int>(
+							   SendMessage(m_hwndEdit,
+										   EM_GETFIRSTVISIBLELINE, 0, 0));
+			if (0 <= wantLine && 0 <= nowFirst && wantLine != nowFirst)
+				SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
+							static_cast<LPARAM>(wantLine - nowFirst));
+		}
+
+		// The text under the view is the same as it was, but the scroll bar
+		// has to take in the lines that came and went, so the repaint cannot
+		// be skipped.  Without erasing: the control draws over its own
+		// background and erasing first would show as a flash.
+		SetWindowRedraw(m_hwndEdit, TRUE);
+		InvalidateRect(m_hwndEdit, NULL, FALSE);
+	}
+
+	/// negative positions come out of the subtractions above; the control wants none
+	static int clampToZero(int i_value) {
+		return (i_value < 0) ? 0 : i_value;
+	}
+
+	/** Put the whole of the log into the control, replacing what is there.
+
+	    Used when the control has been recreated for a word wrap change, and
+	    after the log has been cleared.  The cost is one pass over the buffer,
+	    which is why the ordinary path does not use it. */
+	void rebuild() {
+		m_view.reset();
+		if (!m_logBuffer) {
+			SetWindowText(m_hwndEdit, L"");
+			return;
+		}
+		LogViewUpdate update;
+		m_view.update(*m_logBuffer, &update);	// reset() forces a rebuild
+		applyUpdate(update);
+	}
+
 	/** Is the end of the log in view?
 
 	    Asked of the scroll bar rather than worked out from the font metrics and
@@ -358,16 +528,6 @@ private:
 	    moving it would be noticeable.
 	*/
 	void recreateEdit() {
-		std::wstring text;
-		int length = GetWindowTextLength(m_hwndEdit);
-		if (0 < length) {
-			text.resize(static_cast<size_t>(length));
-			// &text[0] is contiguous and writable; the terminator goes into
-			// the slot resize() reserved for it
-			length = GetWindowText(m_hwndEdit, &text[0], length + 1);
-			text.resize(static_cast<size_t>(length < 0 ? 0 : length));
-		}
-
 		RECT rc;
 		GetWindowRect(m_hwndEdit, &rc);
 		MapWindowPoints(NULL, m_hwnd, reinterpret_cast<POINT *>(&rc), 2);
@@ -395,12 +555,10 @@ private:
 
 		SetWindowFont(m_hwndEdit, m_hfont, false);
 		Edit_LimitText(m_hwndEdit, 0);
-		if (!text.empty()) {
-			SetWindowText(m_hwndEdit, text.c_str());
-			int end = Edit_GetTextLength(m_hwndEdit);
-			Edit_SetSel(m_hwndEdit, end, end);
-			Edit_ScrollCaret(m_hwndEdit);
-		}
+		// The text is put back from LogBuffer rather than carried across from
+		// the old control: the lines live there now, so reading them out of
+		// the control first would only be a longer way round.
+		rebuild();
 
 		// restore the original slot in the z-order, hence in the tab order
 		SetWindowPos(m_hwndEdit, prev ? prev : HWND_TOP, 0, 0, 0, 0,
@@ -577,6 +735,8 @@ INT_PTR CALLBACK dlgLog_dlgProc(HWND i_hwnd, UINT i_message,
 		case WM_SHOWWINDOW:
 			return wc->wmShowWindow(static_cast<BOOL>(i_wParam),
 									static_cast<int>(i_lParam));
+		case WM_TIMER:
+			return wc->wmTimer(static_cast<UINT_PTR>(i_wParam));
 		case WM_DESTROY:
 			return wc->wmDestroy();
 		case WM_NCDESTROY:
