@@ -4,11 +4,14 @@
 
 #include "misc.h"
 
+#include "hook.h"
 #include "mayurc.h"
 #include "target.h"
 #include "windowstool.h"
 
 #include <dwmapi.h>
+#include <tlhelp32.h>
+#include <map>
 #pragma comment(lib, "dwmapi.lib")
 
 
@@ -209,6 +212,8 @@ class Target
 	HWND m_preHwnd;				///
 	HICON m_hCursor;				///
 	Highlight m_highlight;			///
+	/// what hasHookDll() answered, by process id
+	std::map<DWORD, bool> m_hasHookDllCache;
 
 	///
 	Target(HWND i_hwnd)
@@ -256,6 +261,7 @@ class Target
 		RECT m_rc;					///
 		DWORD m_processId;			/// owner of the toplevel window
 		HWND m_exclude;				/// the highlight overlay, or NULL
+		Target *m_target;			/// holder of the hook DLL lookup cache
 	};
 
 	/// a cloaked window is still visible to IsWindowVisible() but is not drawn
@@ -267,22 +273,79 @@ class Target
 			   cloaked != 0;
 	}
 
-	///
-	static bool isOwnedBy(HWND i_hwnd, DWORD i_processId) {
-		DWORD processId = 0;
-		GetWindowThreadProcessId(i_hwnd, &processId);
-		return processId == i_processId;
+	/** Does the process have the hook DLL in it?
+
+	    Toolhelp rather than psapi: it opens the process itself, so there are no
+	    access rights to get right here, and TH32CS_SNAPMODULE32 reaches the
+	    32-bit modules of a WOW64 process from this 64-bit one.  A snapshot that
+	    cannot be taken at all - a sandboxed or an elevated process refuses it -
+	    is answered no, which is the conservative side: the descent then stops
+	    where it used to. */
+	static bool hasHookDll(DWORD i_processId) {
+		HANDLE snapshot = CreateToolhelp32Snapshot(
+							  TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
+							  i_processId);
+		if (snapshot == INVALID_HANDLE_VALUE)
+			return false;
+		bool found = false;
+		MODULEENTRY32W me = { .dwSize = sizeof(MODULEENTRY32W) };
+		if (Module32FirstW(snapshot, &me))
+			do {
+				if (_wcsicmp(me.szModule, HOOK_DLL_NAME_64) == 0 ||
+						_wcsicmp(me.szModule, HOOK_DLL_NAME_32) == 0) {
+					found = true;
+					break;
+				}
+			} while (Module32NextW(snapshot, &me));
+		CHECK_TRUE( CloseHandle(snapshot) );
+		return found;
 	}
 
-	/// Chromium based applications (Edge, VSCode, WebView2) parent an
-	/// "Intermediate D3D Window" owned by their sandboxed GPU process into the
-	/// application window, covering the whole client area.  The hook DLL cannot
-	/// be loaded into that process, so a target notification posted there is
-	/// never answered and the log stays silent.  Descend only into windows the
-	/// toplevel window's own process owns.
+	/** Is the window worth descending into?
+
+	    Anything the toplevel window's own process owns is, and that costs
+	    nothing to decide.  A window owned by another process is worth it only
+	    if that process has the hook DLL, because the target is asked what it is
+	    by posting MayuMessage_notifyName to it and only the DLL answers.  Both
+	    kinds of foreign child window turn up in the same applications:
+
+	    - WebView2 hosts (Microsoft 365 Copilot, and anything else embedding it)
+	      parent a `Chrome_WidgetWin_1' owned by msedgewebview2.exe into the host
+	      window.  That window is injected and is the one that takes the focus,
+	      so it is what `window' matches against and what &WindowIdentify
+	      reports.  Stopping at the process boundary named the host's outer
+	      window instead, and the two disagreed.
+	    - Chromium based applications (Edge, VSCode, WebView2) also parent an
+	      "Intermediate D3D Window" owned by their sandboxed GPU process into the
+	      application window, covering the whole client area.  The sandbox keeps
+	      the DLL out of that process, so a notification posted there is never
+	      answered and the log stays silent with no error anywhere.
+
+	    The answers are cached because the descent runs per mouse move for as
+	    long as the crosshair is held over one window, and a module snapshot is
+	    not free.  Cached per process rather than as a single last answer: the
+	    two foreign windows above are siblings in the same application, so one
+	    slot would be overwritten on every pass.  The cache is dropped at the
+	    start of each drag, so an application restarted in the meantime is looked
+	    at again. */
+	bool canDescendInto(HWND i_hwnd, DWORD i_toplevelProcessId) {
+		DWORD processId = 0;
+		GetWindowThreadProcessId(i_hwnd, &processId);
+		if (processId == i_toplevelProcessId)
+			return true;
+		auto cached = m_hasHookDllCache.find(processId);
+		if (cached != m_hasHookDllCache.end())
+			return cached->second;
+		bool has = hasHookDll(processId);
+		m_hasHookDllCache[processId] = has;
+		return has;
+	}
+
+	///
 	static BOOL CALLBACK childWindowFromPoint(HWND i_hwnd, LPARAM i_lParam) {
 		PointWindow &pw = *(PointWindow *)i_lParam;
-		if (IsWindowVisible(i_hwnd) && isOwnedBy(i_hwnd, pw.m_processId)) {
+		if (IsWindowVisible(i_hwnd) &&
+				pw.m_target->canDescendInto(i_hwnd, pw.m_processId)) {
 			RECT rc;
 			CHECK_TRUE( GetWindowRect(i_hwnd, &rc) );
 			if (PtInRect(&rc, pw.m_p))
@@ -325,6 +388,7 @@ class Target
 			pw.m_hwnd = NULL;
 			pw.m_processId = 0;
 			pw.m_exclude = m_highlight.hwnd();
+			pw.m_target = this;
 			CHECK_TRUE( GetWindowRect(GetDesktopWindow(), &pw.m_rc) );
 			EnumWindows(windowFromPoint, (LPARAM)&pw);
 			// without a toplevel window there is nothing to descend into.
@@ -358,6 +422,7 @@ class Target
 
 	/// WM_LBUTTONDOWN
 	int wmLButtonDown(WORD /* i_keys */, int /* i_x */, int /* i_y */) {
+		m_hasHookDllCache.clear();
 		SetCapture(m_hwnd);
 		SetCursor(m_hCursor);
 		CHECK_TRUE( InvalidateRect(m_hwnd, NULL, TRUE) );
