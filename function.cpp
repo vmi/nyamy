@@ -798,11 +798,13 @@ int Engine::EmacsEditKillLine::pred()
 // send a default key to Windows
 void Engine::funcDefault(FunctionParam *i_param)
 {
-	{
+	if (m_log.wouldLog(LogLevel::Debug)) {
 		Acquire a(&m_log, LogLevel::Debug);
 		m_log << std::endl;
-		i_param->m_doesNeedEndl = false;
 	}
+	// Outside the guard: this says the caller has no trailing newline left to
+	// write, which is true whether or not the line was kept.
+	i_param->m_doesNeedEndl = false;
 	if (i_param->m_isPressed)
 		generateModifierEvents(i_param->m_c.m_mkey.m_modifier);
 	generateKeyEvent(i_param->m_c.m_mkey.m_key, i_param->m_isPressed, true);
@@ -818,7 +820,7 @@ void Engine::funcKeymapParent(FunctionParam *i_param)
 		return;
 	}
 
-	{
+	if (m_log.wouldLog(LogLevel::Debug)) {
 		Acquire a(&m_log, LogLevel::Debug);
 		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
 	}
@@ -860,7 +862,7 @@ void Engine::funcOtherWindowClass(FunctionParam *i_param)
 	}
 
 	c.m_keymap = *c.m_i;
-	{
+	if (m_log.wouldLog(LogLevel::Debug)) {
 		Acquire a(&m_log, LogLevel::Debug);
 		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
 	}
@@ -884,7 +886,7 @@ void Engine::funcPrefix(FunctionParam *i_param, const Keymap *i_keymap,
 	m_doesEditNextModifier = false;
 	m_doesIgnoreModifierForPrefix = !!i_doesIgnoreModifiers;
 
-	{
+	if (m_log.wouldLog(LogLevel::Debug)) {
 		Acquire a(&m_log, LogLevel::Debug);
 		m_log << L"(" << i_keymap->getName() << L", "
 		<< (i_doesIgnoreModifiers ? L"true" : L"false") << L")";
@@ -896,11 +898,11 @@ void Engine::funcKeymap(FunctionParam *i_param, const Keymap *i_keymap)
 {
 	Current c(i_param->m_c);
 	c.m_keymap = i_keymap;
-	{
+	if (m_log.wouldLog(LogLevel::Debug)) {
 		Acquire a(&m_log, LogLevel::Debug);
 		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
-		i_param->m_doesNeedEndl = false;
 	}
+	i_param->m_doesNeedEndl = false;
 	generateKeyboardEvents(c);
 }
 

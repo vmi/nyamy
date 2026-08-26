@@ -21,6 +21,7 @@
 #include "msgstream.h"
 #include "multithread.h"
 #include "inifile.h"
+#include "log_buffer.h"
 #include "nyamy_paths.h"
 #include "setting.h"
 #include "scripter_manager.h"
@@ -62,7 +63,10 @@ class Mayu
 
 	womsgstream m_log;				/** log stream (output to log
 						    dialog's edit) */
-	size_t m_logMaxChars;				/// nyamy.ini logMaxSize
+	/** Buffer the pending log text is taken into, reused so that the one
+	    handed back to the stream keeps its capacity.  UI thread only. */
+	std::wstring m_logDrainBuf;
+	LogBuffer m_logBuffer;			/// the text the log holds
 #ifdef LOG_TO_FILE
 	std::wofstream m_logFile;
 #endif // LOG_TO_FILE
@@ -416,6 +420,11 @@ private:
 				}
 					//case WTS_SESSION_REMOTE_CONTROL: m = "WTS_SESSION_REMOTE_CONTROL"; break;
 				}
+				// This one was writing to the log without holding it, which
+				// let it interleave with another thread's message and race on
+				// the pending text.  Info is the level it had in practice:
+				// release() leaves m_msgLevel there.
+				Acquire a(&This->m_log, LogLevel::Info);
 				This->m_log << L"WM_WTSESSION_CHANGE("
 				<< i_wParam << ", " << i_lParam << "): "
 				<< m << std::endl;
@@ -424,16 +433,27 @@ private:
 			case WM_APP_msgStreamNotify: {
 				womsgstream::StreamBuf *log =
 					reinterpret_cast<womsgstream::StreamBuf *>(i_lParam);
-				const std::wstring &str = log->acquireString();
+				// Take the text and drop the lock before touching the edit
+				// control.  Appending there is by far the most expensive thing
+				// on the log path and grows with how much the control already
+				// holds; holding the log's lock across it made every writer -
+				// the keyboard handler thread above all - wait for the whole
+				// of it.
+				//
+				// m_logDrainBuf is a member rather than a local so that the
+				// buffer handed back to the stream keeps its capacity.  It is
+				// safe to reuse it across calls because nothing below pumps
+				// messages: the edit control is on this thread, so its
+				// notifications are direct calls and cannot re-enter here.
+				log->takeString(&This->m_logDrainBuf);
+				const std::wstring &str = This->m_logDrainBuf;
 #ifdef LOG_TO_FILE
 				This->m_logFile << str << std::flush;
 #endif // LOG_TO_FILE
-				// Appending to the edit control is by far the most expensive
-				// thing on the log path, and the cost grows with how much the
-				// control already holds, so the buffer is kept modest.
-				editInsertTextAtLast(GetDlgItem(This->m_hwndLog, IDC_EDIT_log),
-									 str, This->m_logMaxChars);
-				log->releaseString();
+				// Keep the text.  The log dialog shows it on a timer of its
+				// own, and only while it is on screen, so nothing here
+				// touches a window.
+				This->m_logBuffer.add(str);
 				return 0;
 			}
 
@@ -683,6 +703,12 @@ private:
 			case WM_APP_dlglogNotify: {
 				switch (i_wParam) {
 				case DlgLogNotify_logCleared:
+					// Clearing the log is what separates one measurement
+					// scenario from the next, so it is where the profile is
+					// written out and started over.  Does nothing unless
+					// NYAMY_LOG_PROFILE is defined; see log_profile.h.
+					LOG_PROFILE_REPORT(L"log cleared");
+					This->m_logBuffer.clear();
 					This->showBanner(true);
 					break;
 				case DlgLogNotify_thresholdChanged:
@@ -703,6 +729,7 @@ private:
 				break;
 
 			case WM_DESTROY:
+				LOG_PROFILE_REPORT(L"exit");
 				if (This->m_usingSN) {
 					wtsUnRegisterSessionNotification(i_hwnd);
 					This->m_usingSN = false;
@@ -1056,6 +1083,16 @@ exit:
 		return err;
 	}
 
+	/** How much text the log keeps.  Read here rather than in the constructor
+	    body because m_logBuffer takes its one and only allocation at
+	    construction. */
+	static size_t readLogMaxChars() {
+		int chars;
+		IniFile().read(L"logMaxSize", &chars,
+					   static_cast<int>(kLogEditMaxChars));
+		return (0 < chars) ? static_cast<size_t>(chars) : kLogEditMaxChars;
+	}
+
 public:
 	///
 	Mayu(HANDLE i_mutex)
@@ -1070,12 +1107,8 @@ public:
 			m_log(WM_APP_msgStreamNotify),
 			m_isSettingDialogOpened(false),
 			m_sessionState(0),
+			m_logBuffer(readLogMaxChars()),
 			m_engine(m_log) {
-		int logMaxSize;
-		IniFile().read(L"logMaxSize", &logMaxSize,
-					   static_cast<int>(kLogEditMaxChars));
-		m_logMaxChars = (0 < logMaxSize) ?
-			static_cast<size_t>(logMaxSize) : kLogEditMaxChars;
 
 		// addSessionId(): mailslot names live in \Device\Mailslot, which has
 		// no per session split of its own, so without it a second logged on
@@ -1115,6 +1148,7 @@ public:
 
 		DlgLogData dld = {
 			.m_log = &m_log,
+			.m_logBuffer = &m_logBuffer,
 			.m_hwndTaskTray = m_hwndTaskTray,
 		};
 		m_hwndLog =

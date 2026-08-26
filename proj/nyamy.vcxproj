@@ -116,6 +116,8 @@
     <ClCompile Include="..\keyboard.cpp" />
     <ClCompile Include="..\keymap.cpp" />
     <ClCompile Include="..\layoutmanager.cpp" />
+    <ClCompile Include="..\log_buffer.cpp" />
+    <ClCompile Include="..\log_view.cpp" />
     <ClCompile Include="..\inifile.cpp" />
     <ClCompile Include="..\nyamy_paths.cpp" />
     <ClCompile Include="..\mayu.cpp" />
@@ -156,6 +158,9 @@
     <ClInclude Include="..\inifile.h" />
     <ClInclude Include="..\nyamy_paths.h" />
     <ClInclude Include="..\multithread.h" />
+    <ClInclude Include="..\log_profile.h" />
+    <ClInclude Include="..\log_buffer.h" />
+    <ClInclude Include="..\log_view.h" />
     <ClInclude Include="..\setting.h" />
     <ClInclude Include="..\cmd_stream.h" />
     <ClInclude Include="..\setting_builder.h" />

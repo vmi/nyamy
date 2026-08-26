@@ -169,15 +169,8 @@ inline bool isRectInRect(const RECT *i_rcin, const RECT *i_rcout)
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // edit control
 
-/// returns bytes of text
-extern size_t editGetTextBytes(HWND i_hwnd);
-
 /// delete a line
 extern void editDeleteLine(HWND i_hwnd, size_t i_n);
-
-/// insert text at last
-extern void editInsertTextAtLast(HWND i_hwnd, const std::wstring &i_text,
-									 size_t i_threshold);
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
