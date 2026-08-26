@@ -25,7 +25,7 @@ enum {
     nothing else scales with it: the edit control shows what that buffer
     holds rather than being the buffer itself, so raising it costs memory and
     not the price of every appended line. */
-const size_t kLogEditMaxChars = 20000;
+const size_t kLogEditMaxChars = 100000;
 
 enum DlgLogNotify {
 	DlgLogNotify_logCleared,			///
