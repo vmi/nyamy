@@ -17,6 +17,14 @@ L"\\\\.\\mailslot\\GANAware\\mayu\\{330F7914-EB5B-49be-ACCE-D2B8DF585B32}" WIDEN
 ///
 #  define WM_MAYU_MESSAGE_NAME L"GANAware\\mayu\\WM_MAYU_MESSAGE"
 
+/// File names of the hook DLL, one per architecture of the process it is
+/// injected into.  The injection itself goes through SetWindowsHookEx() and
+/// never names the file; these are for asking whether a given process has the
+/// DLL, and therefore whether it can answer a MayuMessage at all.
+#  define HOOK_DLL_NAME_64 L"nyamy64.dll"
+///
+#  define HOOK_DLL_NAME_32 L"nyamy32.dll"
+
 ///
 enum MayuMessage {
 	MayuMessage_notifyName,
