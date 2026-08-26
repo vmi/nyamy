@@ -39,6 +39,15 @@
 ///
 #define ID_MENUITEM_reloadBegin _APS_NEXT_COMMAND_VALUE
 
+/// window class of the tasktray window.  A second instance looks the running
+/// one up by it, so both ends have to agree on the name.
+static const wchar_t TASKTRAY_CLASS_NAME[] = L"mayuTasktray";
+
+/// posted to the tasktray window of the instance already running when a second
+/// instance gives up and exits.  i_wParam is nonzero when that second instance
+/// was launched from Startup.
+static const UINT WM_APP_duplicateInstance = WM_APP + 122;
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Mayu
@@ -196,7 +205,7 @@ private:
 			.hCursor = NULL,
 			.hbrBackground = NULL,
 			.lpszMenuName = NULL,
-			.lpszClassName = L"mayuTasktray",
+			.lpszClassName = TASKTRAY_CLASS_NAME,
 		};
 		return RegisterClass(&wc);
 	}
@@ -430,6 +439,17 @@ private:
 				<< m << std::endl;
 				return TRUE;
 			}
+
+			case WM_APP_duplicateInstance: {
+				// A second instance found us and left.  Say so, or the only
+				// trace of a NYamy that never appeared is its absence.
+				Acquire a(&This->m_log, LogLevel::Info);
+				This->m_log << L"another NYamy was started"
+				<< (i_wParam ? L" from Startup" : L"")
+				<< L" and exited: this instance keeps running." << std::endl;
+				return 0;
+			}
+
 			case WM_APP_msgStreamNotify: {
 				womsgstream::StreamBuf *log =
 					reinterpret_cast<womsgstream::StreamBuf *>(i_lParam);
@@ -1134,7 +1154,7 @@ public:
 
 		// create windows, dialogs
 		wstringi title = loadString(IDS_mayu);
-		m_hwndTaskTray = CreateWindow(L"mayuTasktray", title.c_str(),
+		m_hwndTaskTray = CreateWindow(TASKTRAY_CLASS_NAME, title.c_str(),
 									  WS_OVERLAPPEDWINDOW,
 									  CW_USEDEFAULT, CW_USEDEFAULT,
 									  CW_USEDEFAULT, CW_USEDEFAULT,
@@ -1432,6 +1452,14 @@ int WINAPI wWinMain(_In_ HINSTANCE i_hInstance, _In_opt_ HINSTANCE /* i_hPrevIns
 	};
 	CHECK_TRUE( InitCommonControlsEx(&icc) );
 
+	// A Startup launch races with a manual one: on a slow login the shortcut
+	// can fire long after the user gave up waiting and started NYamy by hand.
+	// Losing that race is not an error worth a modal box nobody asked for.
+	bool isFromStartup = false;
+	for (int i = 1; i < __argc; ++ i)
+		if (_wcsicmp(__wargv[i], L"--startup") == 0)
+			isFromStartup = true;
+
 	// is another mayu running ?
 	// CreateMutex() hands back a valid handle for a mutex that already
 	// exists, so an existing instance shows in GetLastError(), never in the
@@ -1442,10 +1470,11 @@ int WINAPI wWinMain(_In_ HINSTANCE i_hInstance, _In_opt_ HINSTANCE /* i_hPrevIns
 							   MUTEX_MAYU_EXCLUSIVE_RUNNING);
 	DWORD mutexError = GetLastError();	// before anything overwrites it
 	if (mutex == nullptr || mutexError == ERROR_ALREADY_EXISTS) {
+		bool isAlreadyRunning = (mutexError == ERROR_ALREADY_EXISTS ||
+								 mutexError == ERROR_ACCESS_DENIED);
 		std::wstring title = loadString(IDS_mayu);
 		std::wstring text;
-		if (mutexError == ERROR_ALREADY_EXISTS ||
-				mutexError == ERROR_ACCESS_DENIED) {
+		if (isAlreadyRunning) {
 			// another mayu already running
 			text = loadString(IDS_mayuAlreadyExists);
 		}
@@ -1455,16 +1484,27 @@ int WINAPI wWinMain(_In_ HINSTANCE i_hInstance, _In_opt_ HINSTANCE /* i_hPrevIns
 			std::swprintf(buf, NUMBER_OF(buf), loadString(IDS_unexpectedError).c_str(), mutexError);
 			text = buf;
 		}
-		if (g_hookData) {
+		// g_hookData is not ours to read here - it is mapped by initialize(),
+		// which an instance that stops at this point never reaches - so the
+		// running instance has to be found the way anyone else would find it
+		HWND hwndTaskTray = FindWindow(TASKTRAY_CLASS_NAME, NULL);
+		if (hwndTaskTray) {
 			UINT WM_TaskbarRestart = RegisterWindowMessage(L"TaskbarCreated");
-			PostMessage(g_hookData->getHwndTaskTray(),
-						WM_TaskbarRestart, 0, 0);
+			PostMessage(hwndTaskTray, WM_TaskbarRestart, 0, 0);
+			if (isAlreadyRunning)
+				PostMessage(hwndTaskTray, WM_APP_duplicateInstance,
+							isFromStartup, 0);
 		}
-		MessageBox((HWND)NULL, text.c_str(), title.c_str(), MB_OK | MB_ICONSTOP);
 		// we do not own it: closing only drops our reference, the running
 		// instance keeps the mutex alive
 		if (mutex)
 			CloseHandle(mutex);
+		// nothing went wrong - NYamy is running, which is all Startup wanted.
+		// Anything other than a running instance still deserves the dialog:
+		// swallowing it would leave no sign that NYamy failed to start.
+		if (isFromStartup && isAlreadyRunning)
+			return 0;
+		MessageBox((HWND)NULL, text.c_str(), title.c_str(), MB_OK | MB_ICONSTOP);
 		return 1;
 	}
 
