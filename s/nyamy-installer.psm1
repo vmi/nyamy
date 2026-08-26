@@ -51,15 +51,19 @@ function Test-NYamyShortcutTarget([string]$ShortcutPath, [string]$Dir) {
 # 'Startup' or 'Start Menu'.
 #
 
-function New-NYamyShortcut([string]$ShortcutPath, [string]$Dir, [string]$Label) {
+function New-NYamyShortcut([string]$ShortcutPath, [string]$Dir, [string]$Label,
+                           [string]$Arguments = '') {
     # Save() fails outright if the containing folder is missing.
     New-Item -ItemType Directory -Path (Split-Path $ShortcutPath -Parent) -Force | Out-Null
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($ShortcutPath)
     $shortcut.TargetPath = Join-Path $Dir 'nyamy.exe'
+    $shortcut.Arguments = $Arguments
     $shortcut.WorkingDirectory = $Dir
     $shortcut.Description = $NYamyShortcutDescription
+    # IconLocation is deliberately left alone: empty means "whatever the target
+    # uses", and nyamy.exe carries its own icon.
     $shortcut.Save()
     Write-Host "$Label shortcut created: $ShortcutPath"
 }
@@ -78,7 +82,11 @@ function Remove-NYamyShortcut([string]$ShortcutPath, [string]$Dir, [string]$Labe
 }
 
 function New-NYamyStartupShortcut([string]$Dir) {
-    New-NYamyShortcut $NYamyStartupShortcutPath $Dir 'Startup'
+    # --startup tells nyamy.exe that losing the race against a manually started
+    # instance is normal, so it exits without a dialog instead of greeting the
+    # user with an error at every slow login.  The Start Menu shortcut gets no
+    # such argument: a second launch by hand should say something.
+    New-NYamyShortcut $NYamyStartupShortcutPath $Dir 'Startup' '--startup'
 }
 
 function Remove-NYamyStartupShortcut([string]$Dir) {
