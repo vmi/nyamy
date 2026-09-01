@@ -424,6 +424,30 @@ private:
 	/// activate a Setting.  Engine thread only, called at an event boundary.
 	void applySetting(std::shared_ptr<Setting> i_setting);
 
+	/** Fill a FocusOfThread's keymap list from i_setting when it is empty.
+
+	    Every consumer of m_keymaps assumes at least one entry: the generators
+	    read front() off it and &OtherWindowClass walks it with ++.  A thread
+	    that reported its focus before the first Setting existed is registered
+	    with an empty list (setFocus), and setFocus does not come back to it
+	    while the window has not changed.  applySetting() refills all of them,
+	    so an empty list here means the entry was missed; heal it rather than
+	    leave that thread without a keymap.
+
+	    Returns true when the list was empty and has been filled. */
+	bool ensureKeymaps(FocusOfThread *io_fot,
+					   const std::shared_ptr<Setting> &i_setting);
+
+	/** Can an ad-hoc key sequence be generated right now ?
+
+	    Unlike a key event there is no pass-through to fall back on: with no
+	    current keymap the generators would dereference NULL and read front()
+	    off an empty list.  *o_reason gets a note worth logging, or stays NULL
+	    for the cases ordinary enough to keep quiet about. */
+	bool canRunAdHocKeySeq(const AdHocKeySeq &i_item,
+						   const std::shared_ptr<Setting> &i_setting,
+						   const wchar_t **o_reason) const;
+
 	/// check focus window
 	void checkFocusWindow();
 	/// is modifier pressed ?
