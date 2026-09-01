@@ -115,6 +115,11 @@ restart:
 					<< m_currentFocusOfThread->m_className << std::endl;
 					m_log << L"  TITLE:   \""
 					<< m_currentFocusOfThread->m_titleName << L"\"" << std::endl;
+					// 0 means the setting has not taken effect on this thread,
+					// which the log used to leave unsaid: nothing here named
+					// the state, only the internal error the next key raised
+					m_log << L"  KEYMAPS:  "
+					<< m_currentFocusOfThread->m_keymaps.size() << std::endl;
 					m_log << std::endl;
 					return;
 				}
@@ -1550,6 +1555,14 @@ void Engine::keyboardHandler()
 		// KEYBOARD_INPUT_DATA processing
 		KEYBOARD_INPUT_DATA &kid = std::get<KEYBOARD_INPUT_DATA>(event);
 
+		// Passing keys on untouched is the right thing to do with no setting
+		// to apply, so this is Info rather than a warning - but the log used
+		// to say nothing at all, leaving "my keys are not being remapped" with
+		// no answer during the seconds the scripter takes to start.  Being
+		// disabled is a deliberate state and stays quiet.
+		reportSticky(&m_noticeSettingNotReady, !s, LogLevel::Info,
+					 L"no setting yet; keys are not remapped", false);
+
 		if (!s ||						// m_setting has not been loaded
 				!m_isEnabled) {	// disabled
 			if (m_isLogMode) {
@@ -1567,16 +1580,18 @@ void Engine::keyboardHandler()
 			continue;
 		}
 
+		// Once per state, not once per key event.  These conditions hold until
+		// the focus or the setting changes, and a line per event fills the log
+		// ring - throwing away the lines that say how the state was reached.
+		reportSticky(&m_noticeNoFocusOfThread, !m_currentFocusOfThread,
+					 LogLevel::Error,
+					 L"internal error: m_currentFocusOfThread == NULL");
+		reportSticky(&m_noticeNoKeymap, !m_currentKeymap, LogLevel::Error,
+					 L"internal error: m_currentKeymap == NULL");
+
 		if (!m_currentFocusOfThread ||
 				!m_currentKeymap) {
 			injectInput(&kid, NULL);
-			Acquire a(&m_log, LogLevel::Error);
-			if (!m_currentFocusOfThread)
-				m_log << L"internal error: m_currentFocusOfThread == NULL"
-				<< std::endl;
-			if (!m_currentKeymap)
-				m_log << L"internal error: m_currentKeymap == NULL"
-				<< std::endl;
 			updateLastPressedKey(NULL);
 			continue;
 		}
@@ -1917,9 +1932,12 @@ void Engine::applySetting(std::shared_ptr<Setting> newSetting) {
 	// while the window has not changed, so the setting never took effect on
 	// those threads for the rest of the session - the keys they saw were not
 	// remapped, and an internal error was reported for every one of them.
+	size_t refilled = 0;
 	for (FocusOfThreads::iterator i = m_focusOfThreads.begin();
 			i != m_focusOfThreads.end(); i ++) {
 		FocusOfThread *fot = &(*i).second;
+		if (fot->m_keymaps.empty())
+			++ refilled;
 		raw->m_keymaps.searchWindow(&fot->m_keymaps,
 									fot->m_className, fot->m_titleName);
 	}
@@ -1943,8 +1961,25 @@ void Engine::applySetting(std::shared_ptr<Setting> newSetting) {
 	}
 	m_hwndFocus = NULL;
 
-	Acquire a(&m_log, LogLevel::Info);
-	m_log << L"successfully loaded (scripter)." << std::endl;
+	// "loaded" was ambiguous: the scripter reports the end of its own work on
+	// the same log, so a setting that was compiled but never reached the
+	// engine looked exactly like one that had.  This line is the engine's.
+	{
+		Acquire a(&m_log, LogLevel::Info);
+		m_log << L"setting activated: " << raw->m_keymaps.size()
+		<< L" keymaps, " << raw->m_keySeqs.size() << L" keyseqs, "
+		<< raw->m_keyboard.countKeys() << L" keys" << std::endl;
+	}
+	if (m_log.wouldLog(LogLevel::Debug)) {
+		Acquire a(&m_log, LogLevel::Debug);
+		m_log << L"  global keymaps: " << m_globalFocus.m_keymaps.size()
+		<< L", focus threads: " << m_focusOfThreads.size()
+		<< L" (" << refilled << L" had no keymap)" << std::endl;
+	}
+	// Cleared without a word: the line above already says the setting is in
+	// force, and there was nothing wrong to recover from.
+	reportSticky(&m_noticeSettingNotReady, false, LogLevel::Info,
+				 L"no setting yet; keys are not remapped", false);
 }
 
 
@@ -1986,6 +2021,29 @@ bool Engine::canRunAdHocKeySeq(const AdHocKeySeq &i_item,
 		return false;
 	}
 	return true;
+}
+
+
+// report a sticky condition as it starts and as it clears
+void Engine::reportSticky(StickyNotice *io_notice, bool i_isActive,
+						  LogLevel i_level, const wchar_t *i_message,
+						  bool i_doesReportRecovery) {
+	if (i_isActive) {
+		if (!io_notice->shouldReport())
+			return;
+		Acquire a(&m_log, i_level);
+		m_log << i_message << std::endl;
+		return;
+	}
+
+	size_t suppressed = 0;
+	if (!io_notice->clear(&suppressed) || !i_doesReportRecovery)
+		return;
+	Acquire a(&m_log, i_level);
+	m_log << L"recovered: " << i_message;
+	if (0 < suppressed)
+		m_log << L" (suppressed " << suppressed << L" more)";
+	m_log << std::endl;
 }
 
 

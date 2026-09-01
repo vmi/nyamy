@@ -128,6 +128,10 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 - 編集欄を**スクロールして遡っている間は表示位置が保たれる**。末尾への追従が起きるのは、末尾が見えている状態で流したときだけ
 - `NoFocusWindow` はアクティブ化遷移の一瞬 (`WM_ACTIVATEAPP` がフォーカス確定前に届く) で頻出するが正常。危険信号は「**実 hwnd の報告が続かない** `NoFocusWindow`」であって、出現頻度ではない
 - ウィンドウ別キーマップは 1 つだけ選ばれるのではなく、**マッチしたものが連なりとして積まれる**。複数のパターンが同じクラス連鎖にマッチすれば、どちらのキーも生きる
+- **設定が engine に反映されたかどうかは `setting activated:` の行で見る。** scripter 側の完了メッセージ (`[scripter]` が付く) や `loader: setting committed` はコンパイルの終わりを言っているだけで、engine が実際に切り替えたかどうかは言っていない。件数も出るので、**`keys` が極端に少なければキーボード定義の `load` を忘れた設定**だと分かる (3 章)
+- **`FocusChanged` の `KEYMAPS:` が 0 のときは、そのスレッドに設定が反映されていない。** キーマップが 1 つも無いのでそのウィンドウではリマップが効かず、`internal error: m_currentKeymap == NULL` が出る。[known-limitations.md](known-limitations.md) 2.1 節 (古い DLL が名乗り直さない) とは**別物で、ログ上も区別が付く**: あちらは `GLOBAL FOCUS` へ落ちるだけでリマップ自体は効き、内部エラーは出ない
+- **内部エラーは状態ごとに 1 回しか出ない。** `m_currentFocusOfThread == NULL` / `m_currentKeymap == NULL` は最初の 1 回だけ出て、復帰時に `recovered: ... (suppressed N more)` が出る。**同じ行が並んでいないことは「1 回しか起きていない」ことを意味しない**ので、`recovered:` の側の件数を見ること
+- **`no setting yet; keys are not remapped` は異常ではない。** scripter が最初の設定を渡すまでの数秒はキーをそのまま通すのが正しい動作で、この行はその状態を 1 回だけ知らせるもの (Info)。**復帰行は出ない**。設定が入ったことは直後の `setting activated:` が言う。この行のあとに `setting activated:` が続かないときだけが異常
 - 昇格ウィンドウがアクティブな間にマウスの `IN` 行が出ないのは正常 ([input-injection.md](input-injection.md))
 - **`FN ` の行は 2 箇所が別々に書いている。** 前半 (`FN ` と関数名) は `engine.cpp` の `generateActionEvents()`、**末尾の括弧は関数自身** (`function.cpp`)。キーマップを辿る関数はここに**解決先のキーマップ名**を出すので、`FN  &KeymapParent(EmacsEdit)` は「親を辿った結果 `EmacsEdit` に行き着いた」の意味であって、`&KeymapParent` の引数ではない (この関数は引数を取らない)。`&Keymap(X)` と `&Prefix(X, ...)` は関数名の側も引数を出すため **`FN  &Keymap(X) (X)` と括弧が 2 回**並ぶ。`&Prefix` は改行を出さないので**次の出力が同じ行に続く**。いずれも異常ではない
 

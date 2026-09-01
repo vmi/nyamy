@@ -502,6 +502,15 @@ public:
 		return KeyIterator(&m_hashedKeys[0], HASHED_KEYS_SIZE);
 	}
 
+	/// how many keys are defined ?  The keys are spread over a hash, so this
+	/// walks them; call it once per setting, not per key event
+	size_t countKeys() const {
+		size_t n = 0;
+		for (size_t i = 0; i < HASHED_KEYS_SIZE; ++ i)
+			n += m_hashedKeys[i].size();
+		return n;
+	}
+
 	/// get aliases (for enumeration)
 	const Aliases &getAliases() const { return m_aliases; }
 

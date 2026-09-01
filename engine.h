@@ -73,6 +73,49 @@ private:
 
 	using ThreadIds = std::list<DWORD /*ThreadId*/>;	///
 
+	/** A condition that holds for a while and would otherwise be reported once
+	    per key event.  The log is a fixed size ring, so a per-event message
+	    throws away the lines that explain how the condition started - which is
+	    exactly what is wanted when it is investigated.  Report the first
+	    occurrence, count the rest, and report the total when it clears. */
+	class StickyNotice
+	{
+	public:
+		///
+		StickyNotice() : m_isActive(false), m_suppressed(0) { }
+
+		/// true when the caller should write the message now
+		bool shouldReport() {
+			if (m_isActive) {
+				++ m_suppressed;
+				return false;
+			}
+			m_isActive = true;
+			m_suppressed = 0;
+			return true;
+		}
+
+		/// End the condition.  Returns false when it was not active; otherwise
+		/// *o_suppressed gets how many occurrences went unreported.
+		bool clear(size_t *o_suppressed) {
+			if (!m_isActive)
+				return false;
+			*o_suppressed = m_suppressed;
+			m_isActive = false;
+			m_suppressed = 0;
+			return true;
+		}
+
+		///
+		bool isActive() const {
+			return m_isActive;
+		}
+
+	private:
+		bool m_isActive;				/// has it been reported ?
+		size_t m_suppressed;			/// occurrences since then
+	};
+
 	/// current status in generateKeyboardEvents
 	class Current
 	{
@@ -92,6 +135,11 @@ private:
 	};
 
 	friend class FunctionParam;
+	/** Unit tests drive applySetting() and the helpers around it directly:
+	    the paths they cover start from a foreground window, which a test
+	    cannot choose.  A friend declaration does not change what is generated
+	    for the shipped build. */
+	friend class EngineTestAccess;
 
 	/// part of keySeq
 	enum Part {
@@ -352,6 +400,11 @@ private:
 	ThreadIds m_attachedThreadIds;	///
 	ThreadIds m_detachedThreadIds;	///
 
+	// conditions the key handler would otherwise report once per event
+	StickyNotice m_noticeSettingNotReady;	/// no Setting yet
+	StickyNotice m_noticeNoFocusOfThread;	/// m_currentFocusOfThread == NULL
+	StickyNotice m_noticeNoKeymap;		/// m_currentKeymap == NULL
+
 	// for functions
 	KeymapPtrList m_keymapPrefixHistory;		/// for &amp;KeymapPrevPrefix
 	EmacsEditKillLine m_emacsEditKillLine;	/// for &amp;EmacsEditKillLine
@@ -434,7 +487,8 @@ private:
 	    so an empty list here means the entry was missed; heal it rather than
 	    leave that thread without a keymap.
 
-	    Returns true when the list was empty and has been filled. */
+	    Returns true when the list was empty and has been filled.  Free of
+	    Win32 state, unlike its caller, so it can be exercised in a test. */
 	bool ensureKeymaps(FocusOfThread *io_fot,
 					   const std::shared_ptr<Setting> &i_setting);
 
@@ -443,10 +497,22 @@ private:
 	    Unlike a key event there is no pass-through to fall back on: with no
 	    current keymap the generators would dereference NULL and read front()
 	    off an empty list.  *o_reason gets a note worth logging, or stays NULL
-	    for the cases ordinary enough to keep quiet about. */
+	    for the cases ordinary enough to keep quiet about.
+
+	    Split out of keyboardHandler() so that it can be exercised without the
+	    engine thread and without a foreground window. */
 	bool canRunAdHocKeySeq(const AdHocKeySeq &i_item,
 						   const std::shared_ptr<Setting> &i_setting,
 						   const wchar_t **o_reason) const;
+
+	/** Report a StickyNotice as it starts and as it clears; see StickyNotice.
+
+	    i_doesReportRecovery is false for a condition whose end is not news:
+	    saying "recovered" of a state that was never wrong reads as though it
+	    had been, and the line that ends it says so already. */
+	void reportSticky(StickyNotice *io_notice, bool i_isActive,
+					  LogLevel i_level, const wchar_t *i_message,
+					  bool i_doesReportRecovery = true);
 
 	/// check focus window
 	void checkFocusWindow();
