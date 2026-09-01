@@ -120,6 +120,87 @@ WH_GETMESSAGE / WH_CALLWNDPROC フックは **グローバルフック** (thread
 
 どちらの DLL も同じ hook.cpp を共有しており、フォーカス変化を **メールスロット** で nyamy.exe へ送る。
 
+### フォーカス・スレッド・メッセージキューの関係
+
+以降の仕組みは、この 3 つの関係を押さえていないと「なぜスレッドを追いかけるのか」が読み取れない。**先にここを読むこと。**
+
+#### Win32 側の前提
+
+- キーボードフォーカスは**プロセス単位でもウィンドウ単位でもなく、メッセージキュー単位**で 1 つ。既定ではスレッドごとに 1 本のキューを持つので、実質「スレッドごとに 1 つ」になる
+- したがって **`GetFocus()` は呼び出したスレッドのキューのフォーカスウィンドウしか返さない。** 他スレッドのフォーカスは見えない
+- 複数スレッドのキューは結合されうる (API としては `AttachThreadInput()`)。結合されると、その**グループ全体で 1 つのフォーカス**を共有する。WinUI 3 のアプリは**結合された状態にあることを実測で確認済み**で、トップレベルと入力コントロールが別スレッドでありながら 1 つのフォーカスを持つ。どの API で結合されているかまでは追っていない (後述の「マルチ UI スレッドのアプリ」)
+- 外から覗く手段は `GetGUIThreadInfo()`。スレッド ID を渡すとそのスレッド (結合されていればそのグループ) の `hwndFocus` / `hwndActive` が得られる
+
+#### 追跡が何に使われるか
+
+**キーの出力先を決めるためではない。** 用途は 3 つある。
+
+| 用途 | 使うもの | 実体 |
+|---|---|---|
+| **入力の分類** | フォーカスウィンドウの**クラス名とタイトル** | どの `window` キーマップを当てるかの照合。追跡の主目的で、大半はこれ |
+| **ウィンドウ操作の宛先** | フォーカスウィンドウの **HWND** | `&WindowMaximize` / `&WindowMove` / `&WindowRaise` / `&WindowIdentify` など。`m_hwndFocus` が `FunctionParam::m_hwnd` になる (engine.cpp) |
+| **対象スレッド上での実行** | 対象の **HWND とスレッド** | `&SetImeString` / `&SetImeStatus` / `&Recenter` / `&Sync`。後述 |
+
+#### 出力側は宛先を持たない
+
+**リマップ結果の注入は `SendInput()` で、宛先を指定できない。** システム全体の入力キューへ入り、その瞬間フォーカスを持っているところへ届く (`injectInput()`, engine.cpp)。nyamy は届け先を選んでいないし、選べない。
+
+この非対称性が全体の形を決めている。**入る側 (分類) はスレッドを知る必要があり、出る側 (注入) は知りようがない。** 生成中のキーシーケンスの途中でフォーカスが移れば、残りは移った先へ入る。`&Sync` / `&Wait` はその順序を取るための道具であって、宛先を固定する手段ではない。
+
+#### threadId は「突き合わせの鍵」
+
+報告側と照会側は別々の経路でスレッドに辿り着き、**スレッド ID で出会う**。
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart LR
+    subgraph app["対象アプリのプロセス"]
+        T1["UI スレッド A<br>トップレベル窓"]
+        T2["UI スレッド B<br>入力コントロール"]
+        DLL["nyamy64.dll / nyamy32.dll<br>notifySetFocus()"]
+    end
+    subgraph ny["nyamy.exe"]
+        FOT[("m_focusOfThreads<br>threadId → hwnd / class / title")]
+        CFW["checkFocusWindow()"]
+        KM["キーマップ選択"]
+    end
+
+    T1 -.->|"GetFocus() は自スレッドのキューのみ"| DLL
+    T2 -.->|"GetFocus() は自スレッドのキューのみ"| DLL
+    DLL -->|"threadId 付きで通知<br>(メールスロット)"| FOT
+    CFW -->|"GetForegroundWindow()<br>→ GetGUIThreadInfo()<br>→ hwndFocus の所有スレッド"| FOT
+    FOT --> KM
+```
+
+- **報告側** (`notifySetFocus()`, hook.cpp): 対象プロセスに注入された DLL が、フォーカス変化のメッセージを見て `GetFocus()` を呼ぶ。取れるのは自スレッドのフォーカスだけなので、報告は必然的に「スレッド X のフォーカスは窓 H、クラスは C」という形になる
+- **保管** (`setFocus()`, engine.cpp): nyamy は **threadId をキー**に `m_focusOfThreads` へ積む
+- **照会側** (`checkFocusWindow()` → `focusThreadOf()`, engine.cpp): キーイベントごとに `GetForegroundWindow()` から始め、`GetGUIThreadInfo()` で `hwndFocus` を得て、**その所有スレッド**の ID で引く
+
+つまり threadId は**送信先ではなく結合キー**。両側がスレッドでしか物を言えないため、そこで突き合わせている。この鍵が外れると「登録はあるのに引けない」「別スレッドのエントリを引く」という形で壊れ、症状はウィンドウ別キーマップが効かないことになる。後述の「マルチ UI スレッドのアプリ」はまさにこの鍵が外れていた話。
+
+#### なぜ nyamy 自身で調べないのか
+
+照会側は毎回 `GetForegroundWindow()` を引いているのだから、クラス名も自分で取れそうに見える。実際、コンソールウィンドウについては `checkFocusWindow()` が自前で `GetClassName()` / `GetWindowText()` を引く経路を持っている。それでも通知に頼るのは、**アプリの中でしか分からない状態があるため**。
+
+- **メニューループ中は `MENU` として報告される** (`t.m_isInMenu` → `getClassNameTitleName()`, hook.cpp)。メニューに入った/出たは `WM_ENTERMENULOOP` / `WM_EXITMENULOOP` を見ないと分からず、外からは取れない
+- タイトルの制御文字のエスケープなど、照合対象の正規化が DLL 側で行われている (自前で引くコンソール経路も同じエスケープを再現している)
+- 後述のスレッド固有処理のために、いずれにせよ DLL は対象プロセスに要る
+
+#### 対象スレッド上でしか実行できない処理
+
+IME 操作はスレッド固有のコンテキストを触るので、**nyamy のプロセスからは実行できない**。`&SetImeString` の流れ (`funcSetImeString()`, function.cpp):
+
+1. nyamy が `PostMessage(m_hwndFocus, WM_MAYU_MESSAGE, MayuMessage_funcSetImeString, 長さ)` — **対象スレッドのメッセージキューへ**投げる
+2. nyamy が名前付きパイプ (`m_hookPipe`) へ本文を書く
+3. 対象プロセスの DLL が、そのスレッドの `getMessageProc()` でメッセージを拾い、パイプから読んで IME を操作する
+
+`&Recenter` / `&SetImeStatus` も同じ経路。`&Sync` も同型で、nyamy が同期用スキャンコードを注入し、**それが対象スレッドのキューを通過したのを DLL が見て** `Notify::Type_sync` を返す (hook.cpp の `getMessageProc()`)。「対象アプリが注入済みの入力を実際に取り込み終えた」ことを知るための、スレッド単位のランデブーである (5 章)。
+
+ここだけは HWND とスレッドが**本当の宛先**として働く。
+
 ### 通知チャネル
 
 `notify()` (hook.cpp) が全通知の送出口で、経路は 2 つある。
@@ -211,7 +292,7 @@ flowchart TD
 
 WinUI 3 のアプリは、**トップレベルウィンドウと入力コントロールが別スレッド**にある。Win11 のメモ帳では `Notepad` と `NotepadTextBox` / `RichEditD2DPT` が別スレッドで、タブごとにも分かれる。`Microsoft.UI.Content.DesktopChildSiteBridge` / `InputSiteWindowClass` が並ぶ典型的な WinUI 3 構成なので、**メモ帳固有ではなく WinUI 3 全般**に当てはまる。
 
-この構造が、フォーカス追跡の前提を 2 つ壊していた (2026-08-15 に修正)。
+この構造が、フォーカス追跡の前提を 2 つ壊していた (2026-08-15 に修正)。いずれも「フォーカス・スレッド・メッセージキューの関係」で述べた**突き合わせの鍵が外れる**話である。
 
 1. **通知の潰し合い。** `notifySetFocus()` の重複判定に使う `m_hwndFocus` が `static Globals` にあり、プロセスグローバルだった。入力キューが結合された複数の UI スレッドが互いを潰し合い、後から名乗るスレッドの通知が抑止される。→ `m_hwndFocus` と `m_isInMenu` を `thread_local` へ移した
 2. **引き方のずれ。** `checkFocusWindow()` は `GetForegroundWindow()` のスレッド＝**トップレベルのスレッド**で `m_focusOfThreads` を引くが、登録側はフックが `GetCurrentThreadId()` ＝**通知を出したフォーカス側のスレッド**で登録する。→ `focusThreadOf()` を追加し、**常にフォーカスウィンドウを辿ってその所有スレッドで引く**ようにした
@@ -312,11 +393,20 @@ flowchart TD
     C["m_setting をアトミック更新<br>memory_order_release"]
     D["g_hookData->m_correctKanaLockHandling を更新"]
     E["全 FocusOfThread のキーマップを再検索<br>settings->m_keymaps.searchWindow()"]
-    F["m_currentFocusOfThread を globalFocus にリセット<br>m_currentKeymap を globalFocus.front() に設定"]
-    G([完了])
+    F{"globalFocus に<br>マッチするキーマップは<br>あるか"}
+    G["m_currentFocusOfThread を globalFocus にリセット<br>m_currentKeymap を globalFocus.front() に設定"]
+    H["内部エラーを出力<br>m_currentFocusOfThread / m_currentKeymap を NULL に"]
+    I["反映ログを出力<br>setting activated: N keymaps, ..."]
+    J([完了])
 
-    A --> B --> C --> D --> E --> F --> G
+    A --> B --> C --> D --> E --> F
+    F -- あり --> G --> I --> J
+    F -- なし --> H --> I --> J
 ```
+
+E は**無条件**で全件を回す。`m_currentFocusOfThread` が非 NULL のときだけ回していた時期があり、その状態は engine スレッドが最初のイベントを取り出すまで NULL のままなので、**初回ロードで再検索が丸ごと飛ぶことがあった**。Setting が無い間に来たフォーカス通知は `setFocus()` がキーマップ空のまま登録し、`setFocus()` はウィンドウが変わらない限り再訪しないため、そのスレッドは以後キーマップを持たないままになる。`checkFocusWindow()` がそれを拾うと `m_currentKeymap` が NULL になり、キーは素通し、打鍵ごとに内部エラーが出る。
+
+F の分岐は防御的なもの。Global キーマップは `Type_windowOr` × 空正規表現で必ずマッチするので、ローダーが作る Setting でここが「なし」になることはない。空リストへの `front()` が未定義動作で、しかも返る値が NULL ではないため `keyboardHandler()` のガードを素通りしてしまうので、`checkFocusWindow()` の `NO GLOBAL FOCUS` 分岐と同じ状態へ落としてある。
 
 ---
 

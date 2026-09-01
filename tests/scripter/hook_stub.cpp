@@ -8,7 +8,12 @@
 #include "misc.h"
 #include "hook.h"
 
-DllExport HookData *g_hookData = nullptr;
+// In nyamy this points into the shared section of the hook DLL.  A real
+// instance rather than a null pointer, because applySetting() writes
+// m_correctKanaLockHandling into it: nothing reads it back here.
+static HookData s_hookData = {};
+
+DllExport HookData *g_hookData = &s_hookData;
 
 DllExport int installKeyboardHook(INPUT_DETOUR /*i_keyboardDetour*/,
                                   Engine * /*i_engine*/, bool /*i_install*/)

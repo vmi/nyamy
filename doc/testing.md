@@ -6,11 +6,12 @@
 
 ## 1. 自動テスト
 
-2 本ある。**どちらに書くかは「Windows と nyamy 本体に依存するか」で決める。**
+3 本ある。**どれに書くかは「何に依存するか」で決める。**
 
 | プロジェクト | 対象 | 依存 |
 |---|---|---|
 | `nyamy-tests` | 単体テスト。Windows にも本体にも依存しない部品 | 無し |
+| `nyamy-engine-tests` | 単体テスト。Engine の設定反映まわり | 本体一式 (フックはスタブ) |
 | `nyamy-scripter-tests` | 結合テスト。scripter → CmdStream → Setting のパイプライン | mruby + 本体一式 |
 
 ### 1.1 単体テスト (`nyamy-tests`)
@@ -24,7 +25,24 @@ Debug/nyamy-tests.exe
 
 テストを足すときは `tests/core/` に `test_*.cpp` を作り、`core_test.h` に `run*Tests()` を宣言して `core_test_main.cpp` から呼ぶ。フレームワークは `CORE_CHECK` だけ。**フィクスチャや前準備が要る時点で、それは向こう側のテスト**。
 
-### 1.2 結合テスト (`nyamy-scripter-tests`)
+### 1.2 単体テスト (`nyamy-engine-tests`)
+
+```
+MSBuild proj/nyamy-engine-tests.vcxproj -p:Configuration=Debug -p:Platform=x64
+Debug/nyamy-engine-tests.exe
+```
+
+対象は `Engine::applySetting()` と、その周辺 (`ensureKeymaps()` / `canRunAdHocKeySeq()` / `StickyNotice`)。ソース一覧は `nyamy-scripter-tests` から mruby と scripter を抜いたもので、`tests/scripter/hook_stub.cpp` を共有している。**OS フックは一切導入しない。**
+
+テストを足すときは `tests/engine/` に `test_*.cpp` を作り、`engine_test.h` に `run*Tests()` を宣言して `engine_test_main.cpp` から呼ぶ。
+
+**入口は `EngineTestAccess` (`engine_test.h`) で、`Engine` が `friend` に指定している。** `checkFocusWindow()` は `GetForegroundWindow()` から始まって 8 個の Win32 照会を辿るのでテストから制御できず、そこを避けて `applySetting()` などを直接叩くための窓口。`friend` はコード生成に影響しないので、出荷されるバイナリは変わらない。**振る舞いを差し替えるテスト専用マクロは使わない** (テストしたものと出荷するものが別になるため)。
+
+ログの検証は `womsgstream` を attach せずに使い、`takeString()` で本文を取る。attach していなければ `PostMessage` は行われず、書かれたテキストがそのまま溜まる。詳細レベルの行を見たいときは `setThreshold(LogLevel::Debug)` を呼ぶ。
+
+> `Engine` は `StrExprArg::setEngine()` でグローバルに自分を登録するので、**プロセス内に同時に 1 個まで**。テストごとにスコープを切って作り直すこと。
+
+### 1.3 結合テスト (`nyamy-scripter-tests`)
 
 ```
 MSBuild proj/nyamy-scripter-tests.vcxproj -p:Configuration=Debug -p:Platform=x64
@@ -33,7 +51,7 @@ Debug/nyamy-scripter-tests.exe
 
 `.mayu` / `.mayu.rb` はビルド時に出力先へコピーされる。
 
-> このプロジェクトは名前に反して**本体側のソースをほぼ全部コンパイルしている** (`engine.cpp` / `dlglog.cpp` / `function.cpp` など)。本体に新しい `.cpp` を足したら、**`nyamy.vcxproj` だけでなくこちらにも足すこと。** 呼ばれている関数がすべてヘッダ内 inline のうちはリンクが通ってしまうので、忘れても当面は気付けない。
+> このプロジェクトは名前に反して**本体側のソースをほぼ全部コンパイルしている** (`engine.cpp` / `dlglog.cpp` / `function.cpp` など)。本体に新しい `.cpp` を足したら、**`nyamy.vcxproj` だけでなく、こちらと `nyamy-engine-tests.vcxproj` にも足すこと。** 呼ばれている関数がすべてヘッダ内 inline のうちはリンクが通ってしまうので、忘れても当面は気付けない。
 
 > **設定ファイルを編集したら必ずリビルドしてからテストを実行すること。** テストは `Debug\` にコピーされた設定を読む (`NYAMY_ROOT` = exe のディレクトリ)。リポジトリ側だけ編集して `.exe` を直接実行すると古い設定で走り、「テストが差分を検出しない」という誤った結論になる。
 
