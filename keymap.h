@@ -371,6 +371,9 @@ public:
 	using const_iterator = KeymapList::const_iterator;
 	const_iterator begin() const { return m_keymapList.begin(); }
 	const_iterator end() const { return m_keymapList.end(); }
+
+	/// how many keymaps are defined ?
+	size_t size() const { return m_keymapList.size(); }
 };
 
 
@@ -395,6 +398,9 @@ public:
 	using const_iterator = KeySeqList::const_iterator;
 	const_iterator begin() const { return m_keySeqList.begin(); }
 	const_iterator end() const { return m_keySeqList.end(); }
+
+	/// how many key sequences are defined ?
+	size_t size() const { return m_keySeqList.size(); }
 };
 
 

@@ -11,13 +11,15 @@ MSBuild: `C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\
 ```
 MSBuild proj/nyamy.sln -p:Configuration=Release                                  # 本体一式 → Release/
 MSBuild proj/nyamy-tests.vcxproj -p:Configuration=Debug -p:Platform=x64          # 単体テスト (tests/core) → Debug/nyamy-tests.exe
+MSBuild proj/nyamy-engine-tests.vcxproj -p:Configuration=Debug -p:Platform=x64   # 単体テスト (tests/engine) → Debug/nyamy-engine-tests.exe
 MSBuild proj/nyamy-scripter-tests.vcxproj -p:Configuration=Debug -p:Platform=x64 # 結合テスト (tests/scripter) → Debug/nyamy-scripter-tests.exe
 ```
 
 - **個別 vcxproj ではなく sln 経由でビルドする** (プロジェクトごとに x64 / Win32 が混在)。OutDir は全プロジェクト共有なので `TargetName` の重複は implib の LNK1104 を招く。
 - 前提となる生成物: mruby (`git submodule update --init` → `tools/build_mruby.ps1 Release Debug`)、`functions.h` (`tools/ps1exec.cmd tools/makefunc.ps1 engine.h functions.h`。gitignore 対象で、engine.h の関数定義を変えたら再生成)。
 - `VERSION` は `proj/nyamy.props` の 1 行が唯一のソースで、全 TU にマクロ定義済み。**新規コードでこの識別子を使わない**。Release は C4703 (未初期化ポインタ) がエラー。
-- `nyamy-scripter-tests` は名前に反して**本体のソースをほぼ全部コンパイルする**。本体に `.cpp` を足したら `nyamy.vcxproj` とこちらの両方へ。テストは `Debug/` へコピーされた設定を読むので、`.mayu` / `.mayu.rb` を編集したら要リビルド。
+- `nyamy-scripter-tests` は名前に反して**本体のソースをほぼ全部コンパイルする**。`nyamy-engine-tests` もそこから mruby と scripter を除いた一式をコンパイルする。本体に `.cpp` を足したら `nyamy.vcxproj` を含む 3 つすべてへ。テストは `Debug/` へコピーされた設定を読むので、`.mayu` / `.mayu.rb` を編集したら要リビルド。
+- `Engine` は `tests/engine/engine_test.h` の `EngineTestAccess` を `friend` にしている。**テストのために振る舞いを差し替えるマクロは入れない** (出荷物とテスト対象が別物になる)。詳細は `doc/testing.md` 1.2 節。
 - `.vcxproj` / `.props` は直接編集してよい。
 
 ## アーキテクチャ
@@ -48,7 +50,7 @@ MSBuild proj/nyamy-scripter-tests.vcxproj -p:Configuration=Debug -p:Platform=x64
 
 - `*.cpp` / `*.h`: コメントは**英語・ASCII のみ**、インデントは**タブ** (幅 4)、UTF-8 / CRLF
 - `*.md` は**ハードラップしない** (1 段落 1 行)
-- コミットメッセージは日本語で、**問題点と修正内容の概要だけ**を5-10行を目標に記述する。実装の詳細や実測表、検証手順などは書かない
+- コミットメッセージは日本語で、**問題点と修正内容の概要だけ**を5-10行を目標に記述する。実装の詳細(関数/メソッド名や変数名など)や実測表、検証手順は書かないこと
 - `README.md` の「主な変更点」は旧 Yamy との差異のみ
 
 ## 作業上の注意

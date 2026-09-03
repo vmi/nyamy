@@ -73,6 +73,13 @@ private:
 	/// stream that comes from .mayu (which only ever emits Enter).
 	std::vector<Keymap *>                              m_keymapStack;
 
+	/// Errors and warnings reported since the current block was opened.  Both
+	/// are logged as they happen, but a stream of them scrolls past: the
+	/// summary at Commit is what says whether the setting that just went to
+	/// the engine was built cleanly.
+	size_t m_errorCount = 0;
+	size_t m_warningCount = 0;
+
 	std::shared_ptr<Setting>        m_setting;   ///< Setting being built (Reset .. Commit)
 	std::shared_ptr<Setting>        m_committed; ///< last committed Setting (used by ExecKeySeq)
 	std::unique_ptr<SettingBuilder> m_builder;   ///< valid between Reset and Commit

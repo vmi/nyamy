@@ -53,8 +53,11 @@ void CmdProcessor::onExecKeySeq(ExecKeySeqCallback cb) { m_execKeySeqCallback = 
 
 void CmdProcessor::error(const std::wstring &msg)
 {
+	++ m_errorCount;
 	if (m_log) {
-		Acquire a(m_soLog);
+		// levelless Acquire() writes at Info, so these used to be dropped
+		// along with everything else once the threshold was raised
+		Acquire a(m_soLog, LogLevel::Error);
 		*m_log << L"loader error: " << msg << std::endl;
 	}
 }
@@ -62,8 +65,9 @@ void CmdProcessor::error(const std::wstring &msg)
 
 void CmdProcessor::warning(const std::wstring &msg)
 {
+	++ m_warningCount;
 	if (m_log) {
-		Acquire a(m_soLog);
+		Acquire a(m_soLog, LogLevel::Warn);
 		*m_log << L"loader warning: " << msg << std::endl;
 	}
 }
@@ -124,6 +128,8 @@ void CmdProcessor::beginSetting()
 	m_pendingKeySeqs.clear();
 	m_pendingSubsts.clear();
 	m_keymapStack.clear();
+	m_errorCount = 0;
+	m_warningCount = 0;
 	m_setting = std::make_shared<Setting>();
 	m_builder = std::make_unique<SettingBuilder>(*m_setting);
 
@@ -457,5 +463,14 @@ void CmdProcessor::operator()(CmdArgsCommit)
 
 	m_builder.reset();
 	m_committed = std::move(m_setting);
+
+	// Says whether what is about to reach the engine was built cleanly.  The
+	// individual lines above may be far up the log by now, or gone from it.
+	if (m_log) {
+		Acquire a(m_soLog, (0 < m_errorCount) ? LogLevel::Warn : LogLevel::Info);
+		*m_log << L"loader: setting committed (" << m_errorCount
+		<< L" errors, " << m_warningCount << L" warnings)" << std::endl;
+	}
+
 	if (m_commitCallback) m_commitCallback(m_committed);
 }
