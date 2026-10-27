@@ -553,6 +553,24 @@ Keymap *Keymaps::add(const Keymap &i_keymap)
 }
 
 
+// replace keymap
+Keymap *Keymaps::replace(Keymap *io_keymap, const Keymap &i_keymap)
+{
+	// The front is what searchWindow() finds first, and what is found first
+	// wins; a later definition has to beat the ones made before it.  splice()
+	// relinks the node without moving the element, so pointers held by child
+	// keymaps survive.
+	for (KeymapList::iterator
+			i = m_keymapList.begin(); i != m_keymapList.end(); ++ i)
+		if (&*i == io_keymap) {
+			*i = i_keymap;
+			m_keymapList.splice(m_keymapList.begin(), m_keymapList, i);
+			return io_keymap;
+		}
+	return NULL;
+}
+
+
 // adjust modifier
 void Keymaps::adjustModifier(Keyboard &i_keyboard)
 {

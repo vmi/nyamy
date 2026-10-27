@@ -298,7 +298,7 @@ window	PowerPoint /POWERPNT\.EXE:.*:(paneClassDC|REComboBox20W|RichEdit20W)$/\
 			: EmacsEdit
  if ( !ZXCV ) key C-X	= &Prefix(PowerPointC-X)
 
-window	PowerPoint2 /POWERPNT\.EXE:PP9FrameClass.*/ : EmacsEdit
+window	PowerPoint2 /POWERPNT\.EXE:(PP[0-9]+|PPT)FrameClass:/ : EmacsEdit
  if ( !ZXCV ) key C-X	= &Prefix(PowerPointC-X)
 
 ## Microsoft Visual Basic 6.0 .................................................

@@ -310,6 +310,18 @@ public:
 	const wstringi &getName() const {
 		return m_name;
 	}
+	///
+	Type getType() const {
+		return m_type;
+	}
+	/// window class name regexp; ".*" when none was given
+	const std::wstring &getWindowClass() const {
+		return m_windowClass.str();
+	}
+	/// window title name regexp; ".*" when none was given
+	const std::wstring &getWindowTitle() const {
+		return m_windowTitle.str();
+	}
 
 	/// does same window
 	bool doesSameWindow(const wstringi i_className,
@@ -362,6 +374,10 @@ public:
 
 	/// add keymap
 	Keymap *add(const Keymap &i_keymap);
+
+	/** replace the contents of a keymap already in the list and move it to
+		the front, as if it had just been added.  Pointers to it stay valid. */
+	Keymap *replace(Keymap *io_keymap, const Keymap &i_keymap);
 
 	/// adjust modifier
 	void adjustModifier(Keyboard &i_keyboard);

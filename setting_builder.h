@@ -57,6 +57,7 @@ public:
 	// Keymaps
 	Keymap *addKeymap(const Keymap &km) { return m_setting.m_keymaps.add(km); }
 	Keymap *searchKeymapByName(const wstringi &name) { return m_setting.m_keymaps.searchByName(name); }
+	Keymap *replaceKeymap(Keymap *km, const Keymap &def) { return m_setting.m_keymaps.replace(km, def); }
 	void adjustModifiers() { m_setting.m_keymaps.adjustModifier(m_setting.m_keyboard); }
 
 	// KeySeqs

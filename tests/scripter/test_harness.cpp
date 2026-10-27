@@ -40,12 +40,18 @@ struct NullSyncObject : public SyncObject {
 };
 
 // Wide streambuf that writes its content to stderr as UTF-8 on flush,
-// matching the scripter's log line format.
+// matching the scripter's log line format.  A copy goes to the capture string
+// when one is given.
 class Utf8StderrBuf : public std::wstringbuf {
+public:
+	explicit Utf8StderrBuf(std::wstring *o_capture) : m_capture(o_capture) {}
+
 protected:
 	int sync() override {
 		std::wstring s = str();
 		if (!s.empty()) {
+			if (m_capture)
+				*m_capture += s;
 			int n = WideCharToMultiByte(CP_UTF8, 0, s.c_str(), (int)s.size(),
 			                            nullptr, 0, nullptr, nullptr);
 			std::string u8(n, '\0');
@@ -56,6 +62,9 @@ protected:
 		}
 		return 0;
 	}
+
+private:
+	std::wstring *m_capture;
 };
 
 } // namespace
@@ -65,7 +74,8 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
                                       const Symbols &i_symbols,
                                       int i_loadCount,
                                       const std::vector<ExecUserFuncRequest>
-                                          *i_execs)
+                                          *i_execs,
+                                      std::wstring *o_loaderLog)
 {
 	// ctrl pipe: test (write) -> scripter (read, via NYS_CTRL)
 	// data pipe: scripter (write, via NYS_CMD) -> test (read)
@@ -101,7 +111,9 @@ std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
 	CmdStreamReader reader(dataIn);
 
 	NullSyncObject soLog;
-	Utf8StderrBuf logBuf;
+	if (o_loaderLog)
+		o_loaderLog->clear();
+	Utf8StderrBuf logBuf(o_loaderLog);
 	std::wostream logStream(&logBuf);
 	CmdProcessor proc(&soLog, &logStream);
 	std::promise<std::shared_ptr<Setting>> committed;
