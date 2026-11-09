@@ -273,7 +273,7 @@ window "PowerPoint", class: /POWERPNT\.EXE:.*:(paneClassDC|REComboBox20W|RichEdi
   key["C-X"] = "&Prefix(PowerPointC-X)" unless symbol_defined?("ZXCV")
 end
 
-window "PowerPoint2", class: /POWERPNT\.EXE:PP9FrameClass.*/, parent: "EmacsEdit" do
+window "PowerPoint2", class: /POWERPNT\.EXE:(PP[0-9]+|PPT)FrameClass:/, parent: "EmacsEdit" do
   key["C-X"] = "&Prefix(PowerPointC-X)" unless symbol_defined?("ZXCV")
 end
 

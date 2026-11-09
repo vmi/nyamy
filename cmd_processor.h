@@ -53,6 +53,9 @@ private:
 	void error(const std::wstring &msg);
 	void warning(const std::wstring &msg);
 	void beginSetting();
+	void warnIgnoredRedefinition(const Keymap &existing,
+								 const Keymap &ignored,
+								 const CmdArgsDefKeymap &data);
 	void applyDefSubst(const CmdArgsDefSubst &data);
 	bool nlsScanCode(const std::wstring &item, USHORT *o_code);
 	void parseNlsKeys(const wstringi &value);
@@ -72,6 +75,12 @@ private:
 	/// block form of `keymap`/`window` opens one, so this stays empty for a
 	/// stream that comes from .mayu (which only ever emits Enter).
 	std::vector<Keymap *>                              m_keymapStack;
+
+	/// Keymaps that exist only because a DefKeymap named them as its parent
+	/// before they were defined.  Their definition, when it comes, fills them in
+	/// instead of being ignored as a redefinition; any left at Commit were
+	/// never defined.  Kept in creation order so the warnings come out stable.
+	std::vector<Keymap *>                              m_undefinedKeymaps;
 
 	/// Errors and warnings reported since the current block was opened.  Both
 	/// are logged as they happen, but a stream of them scrolls past: the

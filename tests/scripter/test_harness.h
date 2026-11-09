@@ -35,10 +35,13 @@ struct ExecUserFuncRequest {
 /// i_execs are sent behind the Start commands, so the script has been loaded
 /// and its `deffunc' handlers registered by the time they run.  Whatever the
 /// handlers write goes to the scripter's log (stderr), not to the Setting.
+/// o_loaderLog, when given, also receives what the loader (CmdProcessor)
+/// logged; it still goes to stderr as well.
 std::shared_ptr<Setting> buildSetting(const std::string &i_scriptPathUtf8,
                                       const Symbols &i_symbols,
                                       int i_loadCount = 1,
                                       const std::vector<ExecUserFuncRequest>
-                                          *i_execs = nullptr);
+                                          *i_execs = nullptr,
+                                      std::wstring *o_loaderLog = nullptr);
 
 #endif // !_TEST_HARNESS_H

@@ -1769,7 +1769,118 @@ int main()
 		}
 	}
 
-	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 26;
+	// Defining a keymap again under the same name reopens it: the window and
+	// the parent given the second time are ignored.  That stays, but used to
+	// happen without a word, so a `window` meant as a new one in a user's
+	// configuration silently matched nothing.
+	{
+		printf("[%d] keymap redefinition is reported ... ", idx + 27);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__redef__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"keymap \"Other\", parent: \"Global\"\n"
+			L"window \"W\", class: /first\\.exe/, parent: \"Global\"\n"
+			L"window \"W\", class: /second\\.exe/\n"
+			L"window \"W\", parent: \"Other\"\n"
+			// spelling out what it already is, or nothing at all, is fine
+			L"window \"W\", class: /first\\.exe/, parent: \"Global\"\n"
+			L"window \"W\" do\n"
+			L"  key[\"C-A-S-B\"] = \"&DescribeBindings\"\n"
+			L"end\n");
+
+		Symbols syms;
+		std::wstring log;
+		std::shared_ptr<Setting> s = buildSetting(
+			exeDirU8 + "\\__redef__.rb", syms, 1, nullptr, &log);
+
+		auto count = [&](const wchar_t *text) {
+			int n = 0;
+			for (size_t p = log.find(text); p != std::wstring::npos;
+				 p = log.find(text, p + 1))
+				++n;
+			return n;
+		};
+		Keymaps::KeymapPtrList first, second;
+		if (s) {
+			s->m_keymaps.searchWindow(&first, L"C:\\first.exe:Cls", L"");
+			s->m_keymaps.searchWindow(&second, L"C:\\second.exe:Cls", L"");
+		}
+		Keymap *w = s ? s->m_keymaps.searchByName(L"W") : nullptr;
+
+		if (!s) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else if (count(L"`W': already defined") != 2 ||
+				   count(L"window /second\\.exe/ given here is ignored "
+						 L"(keeps window /first\\.exe/)") != 1 ||
+				   count(L"parent `Other' given here is ignored "
+						 L"(keeps `Global')") != 1) {
+			printf("FAIL (warnings not as expected)\n");
+			++failures;
+		} else if (first.empty() || first.front() != w ||
+				   (!second.empty() && second.front() == w) ||
+				   w->getParentKeymap() != s->m_keymaps.searchByName(L"Global")) {
+			printf("FAIL (the first definition did not stay in force)\n");
+			++failures;
+		} else {
+			printf("OK\n");
+		}
+	}
+
+	// A keymap named as a parent before its own definition used to be created
+	// empty on the spot, and the definition that followed was then taken for a
+	// redefinition and dropped: the window never matched anything.
+	{
+		printf("[%d] parent defined after its child ... ", idx + 28);
+		fflush(stdout);
+
+		writeUtf8File(exeDir + L"\\__fwd_parent__.rb",
+			L"load \"109.mayu.rb\"\n"
+			L"window \"A\", class: /a\\.exe/, parent: \"B\"\n"
+			L"window \"Mid\", class: /b\\.exe/, parent: \"Global\"\n"
+			L"window \"B\", class: /b\\.exe/, parent: \"Global\" do\n"
+			L"  key[\"C-A-S-B\"] = \"&DescribeBindings\"\n"
+			L"end\n"
+			L"window \"C\", class: /c\\.exe/, parent: \"Nowhere\"\n");
+
+		Symbols syms;
+		std::wstring log;
+		std::shared_ptr<Setting> s = buildSetting(
+			exeDirU8 + "\\__fwd_parent__.rb", syms, 1, nullptr, &log);
+
+		Keymaps::KeymapPtrList found;
+		Keymap *a = nullptr, *b = nullptr;
+		if (s) {
+			s->m_keymaps.searchWindow(&found, L"C:\\b.exe:Cls", L"");
+			a = s->m_keymaps.searchByName(L"A");
+			b = s->m_keymaps.searchByName(L"B");
+		}
+
+		if (!s) {
+			printf("FAIL (load failed)\n");
+			++failures;
+		} else if (log.find(L"already defined") != std::wstring::npos) {
+			printf("FAIL (the definition was taken for a redefinition)\n");
+			++failures;
+		} else if (!a || !b || a->getParentKeymap() != b ||
+				   b->getParentKeymap() != s->m_keymaps.searchByName(L"Global")) {
+			printf("FAIL (parent links broken)\n");
+			++failures;
+		} else if (found.empty() || found.front() != b) {
+			// defined last, so it has to win over "Mid"
+			printf("FAIL (B does not match, or does not take precedence)\n");
+			++failures;
+		} else if (log.find(L"`Nowhere': used as a parent but never defined.")
+				   == std::wstring::npos) {
+			printf("FAIL (undefined parent not reported)\n");
+			++failures;
+		} else {
+			printf("OK\n");
+		}
+	}
+
+	int total = (int)(sizeof(combos) / sizeof(combos[0])) + 28;
 	printf("\n%s (%d/%d passed)\n",
 	       failures == 0 ? "ALL PASSED" : "FAILURES",
 	       total - failures, total);

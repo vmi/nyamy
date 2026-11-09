@@ -8,6 +8,7 @@
 #include "errormessage.h"
 #include "function.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 
@@ -38,6 +39,34 @@ const ModNameEntry g_modNameMap[] = {
 	{ L"mod8",    Modifier::Type_Mod8 },
 	{ L"mod9",    Modifier::Type_Mod9 },
 };
+
+/// the window condition of a keymap, as the warnings quote it
+std::wstring describeWindow(const Keymap &km)
+{
+	switch (km.getType()) {
+	case Keymap::Type_windowAnd:
+		if (km.getWindowTitle() == L".*")
+			return L"window /" + km.getWindowClass() + L"/";
+		return L"window /" + km.getWindowClass() + L"/ && /" +
+			km.getWindowTitle() + L"/";
+	case Keymap::Type_windowOr:
+		return L"window /" + km.getWindowClass() + L"/ || /" +
+			km.getWindowTitle() + L"/";
+	default:
+		return L"no window";
+	}
+}
+
+/// whether two keymaps match the same windows
+bool isSameWindow(const Keymap &a, const Keymap &b)
+{
+	if (a.getType() != b.getType())
+		return false;
+	if (a.getType() == Keymap::Type_keymap)
+		return true;
+	return a.getWindowClass() == b.getWindowClass() &&
+		a.getWindowTitle() == b.getWindowTitle();
+}
 
 } // namespace
 
@@ -128,6 +157,7 @@ void CmdProcessor::beginSetting()
 	m_pendingKeySeqs.clear();
 	m_pendingSubsts.clear();
 	m_keymapStack.clear();
+	m_undefinedKeymaps.clear();
 	m_errorCount = 0;
 	m_warningCount = 0;
 	m_setting = std::make_shared<Setting>();
@@ -334,6 +364,32 @@ void CmdProcessor::operator()(CmdArgsDefSymbol &data)
 }
 
 
+// Only what the definition spells out is compared: reopening a keymap with
+// nothing but its name is how assignments are added to it, and is no mistake.
+void CmdProcessor::warnIgnoredRedefinition(const Keymap &existing,
+										   const Keymap &ignored,
+										   const CmdArgsDefKeymap &data)
+{
+	const std::wstring hint = L". Use another name to define a new one.";
+	if (!data.windowClassName.empty() && !isSameWindow(existing, ignored))
+		warning(L"`" + std::wstring(data.name.c_str()) +
+				L"': already defined, so " + describeWindow(ignored) +
+				L" given here is ignored (keeps " + describeWindow(existing) +
+				L")" + hint);
+
+	const Keymap *parent = existing.getParentKeymap();
+	if (!data.parentName.empty() &&
+		(!parent || parent->getName() != data.parentName))
+		warning(L"`" + std::wstring(data.name.c_str()) +
+				L"': already defined, so parent `" +
+				std::wstring(data.parentName.c_str()) +
+				L"' given here is ignored (keeps " +
+				(parent ? L"`" + std::wstring(parent->getName().c_str()) + L"'"
+						: std::wstring(L"no parent")) +
+				L")" + hint);
+}
+
+
 void CmdProcessor::operator()(CmdArgsDefKeymap &data)
 {
 	Keymap::Type type = Keymap::Type_keymap;
@@ -343,13 +399,34 @@ void CmdProcessor::operator()(CmdArgsDefKeymap &data)
 	} else if (data.keyword == L"window" && !data.windowClassName.empty()) {
 		type = Keymap::Type_windowAnd;
 	}
-	Keymap *keymap = m_builder->addKeymap(Keymap(type, data.name, data.windowClassName, data.windowTitleName, nullptr, nullptr));
+	Keymap declared(type, data.name, data.windowClassName, data.windowTitleName, nullptr, nullptr);
+
+	// A name that is already defined reopens that keymap: what follows adds
+	// to it, and nothing in this definition replaces what it was declared
+	// with.  A name that was only ever named as a parent is not defined yet,
+	// so this definition is the one that counts.
+	Keymap *keymap = m_builder->searchKeymapByName(data.name);
+	auto undefined = std::find(m_undefinedKeymaps.begin(),
+							   m_undefinedKeymaps.end(), keymap);
+	if (!keymap) {
+		keymap = m_builder->addKeymap(declared);
+	} else if (undefined != m_undefinedKeymaps.end()) {
+		m_undefinedKeymaps.erase(undefined);
+		keymap = m_builder->replaceKeymap(keymap, declared);
+	} else {
+		warnIgnoredRedefinition(*keymap, declared, data);
+	}
 
 	Keymap *parent = nullptr;
-	if (!data.parentName.empty())
-		parent = m_builder->addKeymap(
-			Keymap(Keymap::Type_keymap, data.parentName,
-				   L"", L"", nullptr, nullptr));
+	if (!data.parentName.empty()) {
+		parent = m_builder->searchKeymapByName(data.parentName);
+		if (!parent) {
+			parent = m_builder->addKeymap(
+				Keymap(Keymap::Type_keymap, data.parentName,
+					   L"", L"", nullptr, nullptr));
+			m_undefinedKeymaps.push_back(parent);
+		}
+	}
 
 	KeySeq *keySeq = nullptr;
 	if (data.defaultKeySeqIdx >= 0) keySeq = m_builder->getKeySeqRef(data.defaultKeySeqIdx);
@@ -439,6 +516,13 @@ void CmdProcessor::operator()(CmdArgsAssignMod &data)
 
 void CmdProcessor::operator()(CmdArgsCommit)
 {
+	// Named as a parent and never defined: the keymap exists but has nothing
+	// in it, which is most likely a misspelt name.
+	for (const Keymap *km : m_undefinedKeymaps)
+		warning(L"`" + std::wstring(km->getName().c_str()) +
+				L"': used as a parent but never defined.");
+	m_undefinedKeymaps.clear();
+
 	// Every key, keymap and keyseq shell now exists: materialize the deferred
 	// keyseq contents, then the substitutes that read them.
 	for (const auto &p : m_pendingKeySeqs) {
