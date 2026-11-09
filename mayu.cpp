@@ -223,15 +223,20 @@ private:
 				m_engine.setFocus(n->getHwnd(), n->m_threadId,
 								  n->m_className, n->m_titleName, false);
 
+			// An answer to &WindowIdentify or the investigate dialog is what
+			// the user asked for; a change of focus is routine.  One level for
+			// the whole report, or the filter leaves half of it behind.
+			const LogLevel level = (n->m_type == Notify::Type_name)
+								   ? LogLevel::Info : LogLevel::Debug;
 			{
-				Acquire a(&m_log, LogLevel::Debug);
+				Acquire a(&m_log, level);
 				m_log << L"HWND:     " << std::hex
 				<< n->_m_hwnd /* always 32bit width when log outout */
 				<< std::dec << std::endl;
 				m_log << L"THREADID: " << static_cast<int>(n->m_threadId)
 				<< std::endl;
 			}
-			Acquire a(&m_log, (n->m_type == Notify::Type_name) ? LogLevel::Info : LogLevel::Debug);
+			Acquire a(&m_log, level);
 			m_log << L"CLASS:    " << n->m_className << std::endl;
 			m_log << L"TITLE:   \"" << n->m_titleName << L"\"" << std::endl;
 

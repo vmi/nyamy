@@ -941,7 +941,7 @@ void Engine::funcSync(FunctionParam *i_param)
 	g_hookData->m_syncKey = 0;
 
 	if (r == WaitResult::Timeout) {
-		Acquire a(&m_log, LogLevel::Info);
+		Acquire a(&m_log, LogLevel::Warn);
 		m_log << L" *FAILED*" << std::endl;
 	}
 }
@@ -1165,7 +1165,7 @@ void Engine::shellExecute(LPARAM i_lParam)
 	std::wstring errorMessage(L"Unknown error.");
 	getTypeName(&errorMessage, r, errorTable, NUMBER_OF(errorTable));
 
-	Acquire b(&m_log, LogLevel::Info);
+	Acquire b(&m_log, LogLevel::Error);
 	m_log << L"error: " << req->m_description << L": " << errorMessage
 	<< std::endl;
 }
@@ -1266,7 +1266,7 @@ void Engine::funcLoadSetting(FunctionParam *i_param, const StrExprArg &i_name)
 		{
 			// The name is what failed, so report what it stood for as well as
 			// how it was written.
-			Acquire a(&m_log, LogLevel::Info);
+			Acquire a(&m_log, LogLevel::Error);
 			m_log << resolveStrExpr << L"unknown setting name: " << i_name
 			<< describeStrExpr << std::endl;
 		}
@@ -1770,7 +1770,7 @@ void Engine::funcWindowIdentify(FunctionParam *i_param)
 			if (GetWindowText(i_param->m_hwnd, titleName, NUMBER_OF(titleName)) == 0)
 				titleName[0] = L'\0';
 			{
-				Acquire a(&m_log, LogLevel::Debug);
+				Acquire a(&m_log, LogLevel::Info);
 				m_log << L"HWND:     " << std::hex
 				<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_param->m_hwnd))
 				<< std::dec << std::endl;
@@ -1841,7 +1841,7 @@ void Engine::funcWindowSetAlpha(FunctionParam *i_param, int i_alpha)
 			i_alpha %= 101;
 			if (!setLayeredWindowAttributes(hwnd, 0,
 											(BYTE)(255 * i_alpha / 100), LWA_ALPHA)) {
-				Acquire a(&m_log, LogLevel::Info);
+				Acquire a(&m_log, LogLevel::Error);
 				m_log << L"error: &WindowSetAlpha(" << i_alpha
 				<< L") failed for HWND: " << std::hex
 				<< hwnd << std::dec << std::endl;
@@ -2148,14 +2148,14 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 	if (HANDLE hm = OpenMutex(MUTEX_ALL_ACCESS, FALSE, L"sakura"))
 		CloseHandle(hm);
 	else {
-		Acquire a(&m_log, LogLevel::Info);
+		Acquire a(&m_log, LogLevel::Error);
 		m_log << L" Error(1): Direct SSTP server does not exist." << std::endl;
 		return;
 	}
 
 	HANDLE hfm = OpenFileMapping(FILE_MAP_READ, FALSE, L"Sakura");
 	if (!hfm) {
-		Acquire a(&m_log, LogLevel::Info);
+		Acquire a(&m_log, LogLevel::Error);
 		m_log << L" Error(2): Direct SSTP server does not provide data." << std::endl;
 		return;
 	}
@@ -2164,7 +2164,7 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 		reinterpret_cast<char *>(MapViewOfFile(hfm, FILE_MAP_READ, 0, 0, 0));
 	if (!data) {
 		CloseHandle(hfm);
-		Acquire a(&m_log, LogLevel::Info);
+		Acquire a(&m_log, LogLevel::Error);
 		m_log << L" Error(3): Direct SSTP server does not provide data." << std::endl;
 		return;
 	}
@@ -2272,7 +2272,7 @@ public:
 			if (!m_dll) {
 				m_dll = LoadLibrary(i_dllName.c_str());
 				if (!m_dll) {
-					Acquire a(&i_log);
+					Acquire a(&i_log, LogLevel::Error);
 					i_log << std::endl;
 					i_log << L"error: &PlugIn() failed to load " << i_dllName << std::endl;
 					return false;
@@ -2293,7 +2293,7 @@ public:
 				if (!m_func) {
 					m_func = GetProcAddress(m_dll, to_string(i_funcName).c_str());
 					if (!m_func) {
-						Acquire a(&i_log);
+						Acquire a(&i_log, LogLevel::Error);
 						i_log << std::endl;
 						i_log << L"error: &PlugIn() failed to find function: "
 						<< i_funcName << std::endl;
@@ -2351,7 +2351,7 @@ void Engine::funcPlugIn(FunctionParam *i_param,
 		auto rawPlugin = plugin.release();
 		if (_beginthread(shu::plugInThread, 0, rawPlugin) == -1) {
 			delete rawPlugin;
-			Acquire a(&m_log);
+			Acquire a(&m_log, LogLevel::Error);
 			m_log << std::endl;
 			m_log << L"error: &PlugIn() failed to create thread." << std::endl;
 		}
