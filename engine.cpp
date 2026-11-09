@@ -204,34 +204,37 @@ bool Engine::fixModifierKey(ModifiedKey *io_mkey, Keymap::AssignMode *o_am)
 }
 
 
-// write "{mark}{note}{scan codes}  {key}"
+// write "{mark} {key} ({scan codes}) {note}", or "{mark} {scan codes}" for a
+// key that matches no physical key
 //
-// Everything is padded with spaces rather than tabs: the log control's tab
-// stops depend on the font the user picked, so tabs put the columns in a
-// different place for everyone.
+// The name comes first because a run of OUT lines is read by name, and that
+// way the names start in one column with no padding to keep them there.
 void Engine::writeKeyLine(const Key *i_key, const ModifiedKey &i_mkey,
 						  const wchar_t *i_mark, const wchar_t *i_note)
 {
-	m_log << i_mark;
-	if (i_note)
-		m_log << i_note;
+	const size_t scanCodes = i_key->getScanCodesSize();
+	const bool hasParens = i_mkey.m_key && 0 < scanCodes;
 
-	// scan codes; the "E0-" / "E1-" slot is blank-filled when absent so that
-	// the hex codes stay in one column
-	for (size_t i = 0; i < i_key->getScanCodesSize(); ++ i) {
+	m_log << i_mark << L" ";
+	if (i_mkey.m_key)
+		m_log << i_mkey;
+	if (hasParens)
+		m_log << L" (";
+	for (size_t i = 0; i < scanCodes; ++ i) {
 		const ScanCode &sc = i_key->getScanCodes()[i];
+		if (0 < i)
+			m_log << L" ";
 		if (sc.m_flags & ScanCode::E0)
 			m_log << L"E0-";
 		else if (sc.m_flags & ScanCode::E1)
 			m_log << L"E1-";
-		else
-			m_log << L"   ";
 		m_log << L"0x" << std::hex << std::setw(2) << std::setfill(L'0')
-		<< static_cast<int>(sc.m_scan) << std::dec << L" ";
+		<< static_cast<int>(sc.m_scan) << std::dec;
 	}
-
-	if (i_mkey.m_key)		// otherwise the key matches no physical key
-		m_log << L" " << i_mkey;
+	if (hasParens)
+		m_log << L")";
+	if (i_note)
+		m_log << L" " << i_note;
 	m_log << std::endl;
 }
 
@@ -242,7 +245,7 @@ void Engine::logNote(LogLevel i_level, const wchar_t *i_text)
 	if (!m_log.wouldLog(i_level))
 		return;
 	Acquire a(&m_log, i_level);
-	m_log << L"*   " << i_text << std::endl;
+	m_log << L"* " << i_text << std::endl;
 }
 
 
@@ -267,7 +270,7 @@ void Engine::outputInputToLog(const Key *i_key, const ModifiedKey &i_mkey,
 	m_inputLogBlock.open(i_level);
 	if (m_log.wouldLog(i_level)) {
 		Acquire a(&m_log, i_level);
-		writeKeyLine(i_key, i_mkey, L"IN ", NULL);
+		writeKeyLine(i_key, i_mkey, L"IN", NULL);
 	}
 	// said here rather than where it is found out, which is before the
 	// block opens: it is about this key event
@@ -437,8 +440,8 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 	mkey.m_modifier.on(Modifier::Type_Down, i_doPress);
 	outputToLog(i_key, mkey, LogLevel::Debug, L"OUT",
 				isAlreadyReleased
-				? (doGenerate ? L"(already released, sent anyway) "
-				   : L"(already released) ")
+				? (doGenerate ? L"(already released, sent anyway)"
+				   : L"(already released)")
 				: NULL);
 }
 
@@ -453,7 +456,7 @@ void Engine::generateEvents(Current i_c, const Keymap *i_keymap, Key *i_event)
 				i_c.m_keymap->searchAssignment(i_c.m_mkey)) {
 		if (m_log.wouldLog(LogLevel::Debug)) {
 			Acquire a(&m_log, LogLevel::Debug);
-			m_log << L"*   event " << i_event->getName() << std::endl;
+			m_log << L"* event " << i_event->getName() << std::endl;
 		}
 		generateKeySeqEvents(i_c, keyAssign->m_keySeq, Part_all);
 	}
@@ -588,7 +591,7 @@ void Engine::generateActionEvents(const Current &i_c, const Action *i_a,
 		LogBlock block(m_log, LogLevel::Debug);
 		if (m_log.wouldLog(LogLevel::Debug)) {
 			Acquire a(&m_log, LogLevel::Debug);
-			m_log << L"FN  " << af->m_functionData.get() << std::endl;
+			m_log << L"FN " << af->m_functionData.get() << std::endl;
 		}
 
 		FunctionParam param;
@@ -644,7 +647,7 @@ void Engine::generateKeyboardEvents(const Current &i_c)
 	if (++ m_generateKeyboardEventsRecursionGuard ==
 			MAX_GENERATE_KEYBOARD_EVENTS_RECURSION_COUNT) {
 		Acquire a(&m_log, LogLevel::Error);
-		m_log << L"too deep keymap recursion.  there may be a loop."
+		m_log << L"too deep keymap recursion. there may be a loop."
 		<< std::endl;
 		-- m_generateKeyboardEventsRecursionGuard;
 		return;
@@ -708,7 +711,7 @@ void Engine::beginGeneratingKeyboardEvents(
 		}
 
 		logNote(LogLevel::Debug, L"substitute");
-		outputToLog(mkey.m_key, cnew.m_mkey, LogLevel::Debug, L"IN ");
+		outputToLog(mkey.m_key, cnew.m_mkey, LogLevel::Debug, L"IN");
 	}
 
 	// for prefix key
@@ -952,7 +955,7 @@ void Engine::resetModifiersIfIdle()
 	if (m_currentKeyPressCount <= 0) {
 		if (m_log.wouldLog(LogLevel::Debug)) {
 			Acquire a(&m_log, LogLevel::Debug);
-			m_log << L"*   No key is pressed" << std::endl;
+			m_log << L"* No key is pressed" << std::endl;
 		}
 		generateModifierEvents(Modifier());
 		if (0 < m_currentKeyPressCountOnWin32)
@@ -1051,7 +1054,7 @@ void Engine::resyncKeyStates(bool i_force)
 				Acquire a(&m_log, LogLevel::Debug);
 				if (!dropped)
 					m_log << L"resync" << std::endl;
-				m_log << L"*   drop stale key " << *key << std::endl;
+				m_log << L"* drop stale key " << *key << std::endl;
 			}
 			key->m_isPressed = false;
 			-- m_currentKeyPressCount;
@@ -1580,7 +1583,7 @@ void Engine::keyboardHandler()
 				resetModifiersIfIdle();
 			} else if (reason && m_log.wouldLog(LogLevel::Debug)) {
 				Acquire a(&m_log, LogLevel::Debug);
-				m_log << L"*   " << reason << std::endl;
+				m_log << L"* " << reason << std::endl;
 			}
 			continue;
 		}

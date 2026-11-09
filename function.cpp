@@ -809,7 +809,7 @@ void Engine::forwardKey(FunctionParam *i_param, const Current &i_c,
 {
 	if (i_doesReport && m_log.wouldLog(LogLevel::Debug)) {
 		Acquire a(&m_log, LogLevel::Debug);
-		m_log << L"*   keymap: " << i_c.m_keymap->getName() << std::endl;
+		m_log << L"* keymap: " << i_c.m_keymap->getName() << std::endl;
 	}
 	if (i_param->m_logBlock)
 		i_param->m_logBlock->close();
@@ -1084,7 +1084,7 @@ void Engine::funcShellExecute(FunctionParam *i_param,
 		<< arg(i_file, req->m_file) << L", "
 		<< arg(i_parameters, req->m_parameters) << L", "
 		<< arg(i_directory, req->m_directory) << L", "
-		<< i_showCommand << L") ";
+		<< i_showCommand << L")";
 		req->m_description = desc.str();
 	}
 

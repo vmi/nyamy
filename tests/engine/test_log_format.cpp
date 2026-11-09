@@ -9,6 +9,8 @@
 #include "engine_test.h"
 #include "function.h"
 
+#include <memory>
+#include <sstream>
 #include <thread>
 #include <vector>
 
@@ -447,6 +449,9 @@ void checkShape(const Lines &i_lines, const char *i_what)
 		const std::wstring body = line.substr(kPrefix);
 		const size_t spaces = body.find_first_not_of(L' ');
 		ENGINE_CHECK(spaces != std::wstring::npos, i_what);
+		ENGINE_CHECK(body.back() != L' ', i_what);
+		ENGINE_CHECK(spaces == std::wstring::npos ||
+					 body.find(L"  ", spaces) == std::wstring::npos, i_what);
 		const bool opens = 2 <= body.size() &&
 						   body.compare(body.size() - 2, 2, L" {") == 0;
 		if (!isInBlock) {
@@ -718,11 +723,11 @@ void aKeyHandedOnStaysAtOneDepth()
 	Lines lines = r.lines();
 	checkShape(lines, "a chain keeps the shape");
 	ENGINE_CHECK(bodiesAfterTheFirst(lines) ==
-				 Lines({ L"  FN  &KeymapParent",
-						 L"    *   keymap: Middle",
-						 L"  FN  &KeymapParent",
-						 L"    *   keymap: Last",
-						 L"  FN  &Ignore",
+				 Lines({ L"  FN &KeymapParent",
+						 L"    * keymap: Middle",
+						 L"  FN &KeymapParent",
+						 L"    * keymap: Last",
+						 L"  FN &Ignore",
 						 L"}" }),
 				 "every function of the chain at one depth, each with its report");
 }
@@ -761,11 +766,11 @@ void theLastOfAChainKeepsItsOutput()
 		if (bodies.size() < 7)
 			return;
 		ENGINE_CHECK(Lines(bodies.begin(), bodies.begin() + 5) ==
-					 Lines({ L"  FN  &KeymapWindow",
-							 L"    *   keymap: First",
-							 L"  FN  &OtherWindowClass",
-							 L"    *   keymap: Second",
-							 L"  FN  &DescribeBindings" }),
+					 Lines({ L"  FN &KeymapWindow",
+							 L"    * keymap: First",
+							 L"  FN &OtherWindowClass",
+							 L"    * keymap: Second",
+							 L"  FN &DescribeBindings" }),
 					 "the chain at one depth, each step reporting where it went");
 		ENGINE_CHECK(bodies[5] == L"    DescribeBindings",
 					 "and what the last function does stays under it");
@@ -814,6 +819,109 @@ void anActivationHasADetailBody()
 				 "with the details filtered it is one plain line");
 }
 
+
+/// what one call of outputToLog() writes, with the prefix taken off
+std::wstring keyLine(Rig *io_r, const Key &i_key, const ModifiedKey &i_mkey,
+					 const wchar_t *i_note = NULL)
+{
+	EngineTestAccess::outputToLog(&io_r->m_engine, &i_key, i_mkey,
+								  LogLevel::Debug, L"OUT", i_note);
+	Lines lines = io_r->lines();
+	checkShape(lines, "a key line keeps the shape");
+	return lines.size() == 1 ? Rig::body(lines[0]) : L"<not one line>";
+}
+
+
+///
+void aKeyLineHasTheNameFirst()
+{
+	Rig r;
+	KeyA a;
+	ENGINE_CHECK(keyLine(&r, a.m_key, a.m_mkey) == L"OUT D-A (0x1e)",
+				 "name, then the scan code in parentheses");
+	ENGINE_CHECK(keyLine(&r, a.m_key, a.m_mkey, L"(already released)")
+				 == L"OUT D-A (0x1e) (already released)",
+				 "a note goes at the end, where it moves nothing");
+
+	Key left;
+	left.addName(L"Left");
+	left.addScanCode(ScanCode(0x4b, ScanCode::E0));
+	ModifiedKey leftUp(&left);
+	leftUp.m_modifier.on(Modifier::Type_Up);
+	ENGINE_CHECK(keyLine(&r, left, leftUp) == L"OUT U-Left (E0-0x4b)",
+				 "an extended key says so");
+
+	Key pause;
+	pause.addName(L"Pause");
+	pause.addScanCode(ScanCode(0x1d, ScanCode::E1));
+	pause.addScanCode(ScanCode(0x45, 0));
+	ModifiedKey pauseDown(&pause);
+	pauseDown.m_modifier.on(Modifier::Type_Down);
+	ENGINE_CHECK(keyLine(&r, pause, pauseDown) == L"OUT D-Pause (E1-0x1d 0x45)",
+				 "several scan codes are separated by a space");
+
+	Key unknown;
+	unknown.addScanCode(ScanCode(0x7e, 0));
+	ENGINE_CHECK(keyLine(&r, unknown, ModifiedKey()) == L"OUT 0x7e",
+				 "with no name there is nothing to put in parentheses");
+
+	Key event;
+	event.addName(L"prefixed");
+	ModifiedKey eventDown(&event);
+	eventDown.m_modifier.on(Modifier::Type_Down);
+	ENGINE_CHECK(keyLine(&r, event, eventDown) == L"OUT D-prefixed",
+				 "an event has no scan code, and so no parentheses");
+}
+
+
+///
+void aNoteHasOneSpaceAfterItsMark()
+{
+	Rig r;
+	EngineTestAccess::logNote(&r.m_engine, LogLevel::Info, L"text");
+	Lines lines = r.lines();
+	checkShape(lines, "a note keeps the shape");
+	ENGINE_CHECK(lines.size() == 1 && Rig::body(lines[0]) == L"* text",
+				 "the mark and the text");
+}
+
+
+///
+void aFunctionsTextEndsWithItsLastCharacter()
+{
+	std::unique_ptr<FunctionData> fd(createFunctionData(L"WindowRaise"));
+	std::wostringstream text;
+	text << fd.get();
+	ENGINE_CHECK(!text.str().empty() && text.str().back() == L')',
+				 "nothing is left over after the closing parenthesis");
+}
+
+
+///
+void bindingsHaveNoStraySpaces()
+{
+	std::shared_ptr<Setting> setting = std::make_shared<Setting>();
+	ActionFunction af(createFunctionData(L"OtherWindowClass"));
+	KeySeq *seq = setting->m_keySeqs.add(KeySeq(L"").add(af).add(af));
+	setting->m_keymaps.add(Keymap(Keymap::Type_windowOr, L"Global", L"", L"",
+								  seq, NULL));
+
+	Rig r(LogLevel::Info);
+	EngineTestAccess::applySetting(&r.m_engine, setting);
+	takeLog(&r.m_log);
+	EngineTestAccess::describeBindings(&r.m_engine);
+	Lines lines = r.lines();
+	checkShape(lines, "the bindings have no stray spaces");
+	ENGINE_CHECK(3 <= lines.size(), "header, a keymap and the brace");
+	if (lines.size() < 3)
+		return;
+	const std::wstring tail = L" = &OtherWindowClass &OtherWindowClass";
+	const std::wstring &line = lines[1];
+	ENGINE_CHECK(tail.size() < line.size() &&
+				 line.compare(line.size() - tail.size(), tail.size(), tail) == 0,
+				 "a key sequence is separated by single spaces");
+}
+
 } // namespace
 
 
@@ -847,4 +955,8 @@ void runLogFormatTests()
 	aKeyHandedOnStaysAtOneDepth();
 	theLastOfAChainKeepsItsOutput();
 	anActivationHasADetailBody();
+	aKeyLineHasTheNameFirst();
+	aNoteHasOneSpaceAfterItsMark();
+	aFunctionsTextEndsWithItsLastCharacter();
+	bindingsHaveNoStraySpaces();
 }

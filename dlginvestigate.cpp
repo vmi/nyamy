@@ -108,10 +108,10 @@ public:
 					  bool /* i_isAltDown */, bool i_isKeyup) {
 		Acquire a(&m_data.m_engine->m_log, LogLevel::Info);
 		m_data.m_engine->m_log
-		<< (i_isExtended ? L" E-" : L"   ")
+		<< (i_isExtended ? L"E-" : L"")
 		<< L"0x" << std::hex << std::setw(2) << std::setfill(L'0')
-		<< i_nVirtKey << std::dec << L"  &VK( "
-		<< (i_isExtended ? L"E-" : L"  ")
+		<< i_nVirtKey << std::dec << L" &VK( "
+		<< (i_isExtended ? L"E-" : L"")
 		<< (i_isKeyup ? L"U-" : L"D-");
 
 		for (const VKeyTable *vkt = g_vkeyTable; vkt->m_name; ++ vkt) {
