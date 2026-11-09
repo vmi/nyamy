@@ -147,6 +147,7 @@ private:
 void runSettingActivationTests();
 void runAdHocKeySeqTests();
 void runStickyNoticeTests();
+void runLogFormatTests();
 
 
 #endif // !_ENGINE_TEST_H

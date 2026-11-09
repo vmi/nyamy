@@ -78,6 +78,7 @@ int main()
 	runSettingActivationTests();
 	runAdHocKeySeqTests();
 	runStickyNoticeTests();
+	runLogFormatTests();
 
 	if (g_engineTestFailures == 0) {
 		printf("\nALL PASSED (%d checks)\n", engineTestCount());

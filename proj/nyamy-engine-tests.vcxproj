@@ -101,6 +101,7 @@
     <ClCompile Include="..\tests\engine\test_setting_activation.cpp" />
     <ClCompile Include="..\tests\engine\test_adhoc_keyseq.cpp" />
     <ClCompile Include="..\tests\engine\test_sticky_notice.cpp" />
+    <ClCompile Include="..\tests\engine\test_log_format.cpp" />
     <!-- no OS hook is installed from here; shared with nyamy-scripter-tests -->
     <ClCompile Include="..\tests\scripter\hook_stub.cpp" />
     <!-- what they test, and what it needs to link -->
