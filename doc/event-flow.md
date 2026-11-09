@@ -525,8 +525,8 @@ sync 通知は `Engine::syncNotify()` を通り、そこは `m_mutex` を取る�
 
 | 結果 | 契機 | 挙動 |
 |---|---|---|
-| `Signaled` | 対象アプリから sync 通知が返った | 正常。キーシーケンスを続行 |
-| `Timeout` | 5 秒経過 | ログに ` *FAILED*` を出してキーシーケンスを続行 |
+| `Signaled` | 対象アプリから sync 通知が返った | 正常。ログに `* synced: waited N ms, started hh:mm:ss.SSS` (Debug) を出してキーシーケンスを続行 |
+| `Timeout` | 5 秒経過 | ログに `* sync timed out: waited 5000 ms, started hh:mm:ss.SSS` (Warn) を出してキーシーケンスを続行 |
 | `Aborted` | `signalStop()` が `m_eShutdown` をシグナル | `m_isAborting` を立て、キー生成を打ち切る |
 
 `Aborted` が要る理由は終了処理にある。`~Mayu` は先に `uninstallMessageHook()` するので、
