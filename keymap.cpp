@@ -435,7 +435,7 @@ void Keymap::describe(std::wostream &i_ost, DescribeParam *i_dp) const
 			Modifier::Type type = static_cast<Modifier::Type>(t);
 			const Keymap::ModAssignments &ma = getModAssignments(type);
 			if (ma.size()) {
-				i_ost << L" mod " << type << L"  = ";
+				i_ost << L"  mod " << type << L"  = ";
 				for (Keymap::ModAssignments::const_iterator
 						j = ma.begin(); j != ma.end(); ++ j) {
 					switch (j->m_assignMode) {
@@ -480,14 +480,12 @@ void Keymap::describe(std::wostream &i_ost, DescribeParam *i_dp) const
 			if (i->m_modifiedKey.m_key == *e)
 				break;
 		if (*e)
-			i_ost << L" event " << *i->m_modifiedKey.m_key;
+			i_ost << L"  event " << *i->m_modifiedKey.m_key;
 		else
-			i_ost << L" key " << i->m_modifiedKey;
+			i_ost << L"  key " << i->m_modifiedKey;
 		i_ost << L"  = " << *i->m_keySeq << std::endl;
 		i_dp->m_dk.push_back(i->m_modifiedKey);
 	}
-
-	i_ost << std::endl;
 
 	if (m_parentKeymap)
 		m_parentKeymap->describe(i_ost, i_dp);

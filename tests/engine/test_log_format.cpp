@@ -7,6 +7,7 @@
 
 
 #include "engine_test.h"
+#include "function.h"
 
 #include <thread>
 #include <vector>
@@ -432,6 +433,387 @@ void unterminatedTextKeepsItsLevel()
 	ENGINE_CHECK(l.levels() == L"D", "the level is the first writer's");
 }
 
+
+/// the rules every line has to keep, whoever wrote it
+void checkShape(const Lines &i_lines, const char *i_what)
+{
+	bool isInBlock = false;
+	for (const std::wstring &line : i_lines) {
+		if (isDateLine(line))
+			continue;
+		ENGINE_CHECK(kPrefix < line.size() && line[kPrefix - 1] == L' ', i_what);
+		if (line.size() <= kPrefix)
+			continue;
+		const std::wstring body = line.substr(kPrefix);
+		const size_t spaces = body.find_first_not_of(L' ');
+		ENGINE_CHECK(spaces != std::wstring::npos, i_what);
+		const bool opens = 2 <= body.size() &&
+						   body.compare(body.size() - 2, 2, L" {") == 0;
+		if (!isInBlock) {
+			ENGINE_CHECK(spaces == 0, i_what);
+			ENGINE_CHECK(body != L"}", i_what);
+			isInBlock = opens;
+		} else if (body == L"}") {
+			isInBlock = false;
+		} else {
+			ENGINE_CHECK(2 <= spaces && spaces % 2 == 0, i_what);
+			ENGINE_CHECK(!opens, i_what);
+		}
+	}
+	ENGINE_CHECK(!isInBlock, i_what);
+}
+
+
+/// a Key named "A", as the keyboard definition would make it
+struct KeyA
+{
+	Key m_key;
+	ModifiedKey m_mkey;
+
+	///
+	KeyA() : m_mkey(&m_key) {
+		m_key.addName(L"A");
+		m_key.addScanCode(ScanCode(0x1e, 0));
+		m_mkey.m_modifier.on(Modifier::Type_Down);
+	}
+};
+
+
+/// An engine and its log, with the startup chatter already taken away.
+class Rig
+{
+public:
+	womsgstream m_log;
+	Engine m_engine;
+
+	///
+	explicit Rig(LogLevel i_threshold = LogLevel::Debug)
+			: m_log(WM_APP), m_engine(m_log) {
+		m_log.setThreshold(i_threshold);
+		write(&m_log, LogLevel::Error, L"start");
+		takeLog(&m_log);
+	}
+
+	/// the lines since the last call, as written
+	Lines lines() {
+		return takeLines(&m_log);
+	}
+
+	/// the text of one line
+	static std::wstring body(const std::wstring &i_line) {
+		return i_line.substr(kPrefix);
+	}
+};
+
+
+///
+void aKeyEventIsOneBlock()
+{
+	Rig r;
+	KeyA a;
+	EngineTestAccess::outputInputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+									   LogLevel::Debug);
+	EngineTestAccess::logNote(&r.m_engine, LogLevel::Debug, L"a note");
+	EngineTestAccess::outputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+								  LogLevel::Debug, L"OUT");
+	ENGINE_CHECK(takeLog(&r.m_log).empty(), "nothing shows until the event ends");
+	EngineTestAccess::closeInputBlock(&r.m_engine);
+
+	Lines lines = r.lines();
+	checkShape(lines, "a key event keeps the shape");
+	ENGINE_CHECK(lines.size() == 4, "header, two lines and the brace");
+	if (lines.size() != 4)
+		return;
+	ENGINE_CHECK(Rig::body(lines[0]).compare(0, 2, L"IN") == 0, "IN is the header");
+	ENGINE_CHECK(Rig::body(lines[1]).find(L"a note") != std::wstring::npos &&
+				 Rig::body(lines[1]).compare(0, 2, L"  ") == 0,
+				 "the body is indented by the stream");
+	ENGINE_CHECK(Rig::body(lines[3]) == L"}", "and it ends with the brace");
+
+	EngineTestAccess::closeInputBlock(&r.m_engine);
+	ENGINE_CHECK(takeLog(&r.m_log).empty(), "closing twice writes nothing");
+}
+
+
+/// That the key is a modifier key is found out before its IN line is written,
+/// and said inside its block all the same: it is about this key event.
+void aModifierKeyIsSaidInsideItsKeyEvent()
+{
+	Rig r;
+	KeyA a;
+	EngineTestAccess::outputInputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+									   LogLevel::Debug, true);
+	EngineTestAccess::closeInputBlock(&r.m_engine);
+
+	Lines lines = r.lines();
+	checkShape(lines, "a modifier key's event keeps the shape");
+	ENGINE_CHECK(lines.size() == 3, "header, the note and the brace");
+	if (lines.size() != 3)
+		return;
+	ENGINE_CHECK(Rig::body(lines[0]).compare(0, 2, L"IN") == 0, "IN is the header");
+	ENGINE_CHECK(Rig::body(lines[1]).compare(0, 3, L"  *") == 0 &&
+				 Rig::body(lines[1]).find(L"Modifier Key") != std::wstring::npos,
+				 "the note is the first line of its body");
+	ENGINE_CHECK(Rig::body(lines[2]) == L"}", "and the brace ends it");
+}
+
+
+/// What the investigate dialog's log mode writes: the IN line and no more.
+void aKeyEventWithNothingElseIsOneLine()
+{
+	Rig r(LogLevel::Info);
+	KeyA a;
+	EngineTestAccess::outputInputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+									   LogLevel::Info);
+	EngineTestAccess::logNote(&r.m_engine, LogLevel::Debug, L"filtered");
+	EngineTestAccess::closeInputBlock(&r.m_engine);
+
+	Lines lines = r.lines();
+	checkShape(lines, "a lone IN line keeps the shape");
+	ENGINE_CHECK(lines.size() == 1 &&
+				 lines[0].find(L'{') == std::wstring::npos,
+				 "one line and no braces");
+}
+
+
+/// In normal mode the IN line is filtered, and a failure has no block to be in.
+void aFailureWithoutItsKeyEventStandsAlone()
+{
+	Rig r(LogLevel::Info);
+	KeyA a;
+	EngineTestAccess::outputInputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+									   LogLevel::Debug);
+	EngineTestAccess::logNote(&r.m_engine, LogLevel::Warn, L"sync timed out");
+	EngineTestAccess::closeInputBlock(&r.m_engine);
+
+	Lines lines = r.lines();
+	checkShape(lines, "a lone failure keeps the shape");
+	ENGINE_CHECK(lines.size() == 1 &&
+				 lines[0].find(L"sync timed out") != std::wstring::npos,
+				 "only the failure is written");
+}
+
+
+///
+void describeBindingsIsABlock()
+{
+	Rig r(LogLevel::Info);
+	EngineTestAccess::applySetting(&r.m_engine, makeGlobalSetting());
+	takeLog(&r.m_log);
+
+	EngineTestAccess::describeBindings(&r.m_engine);
+	Lines lines = r.lines();
+	checkShape(lines, "the bindings keep the shape");
+	ENGINE_CHECK(3 <= lines.size(), "header, a keymap and the brace");
+	if (lines.size() < 3)
+		return;
+	ENGINE_CHECK(Rig::body(lines[0]) == L"DescribeBindings {", "it has a header");
+	ENGINE_CHECK(Rig::body(lines[1]).compare(0, 9, L"  window ") == 0,
+				 "and the keymap heads its own part of the body");
+}
+
+
+/// Run from a key in detail mode, the key event's block is already open.
+void describeBindingsNestsInAKeyEvent()
+{
+	Rig r;
+	EngineTestAccess::applySetting(&r.m_engine, makeGlobalSetting());
+	takeLog(&r.m_log);
+	KeyA a;
+
+	EngineTestAccess::outputInputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+									   LogLevel::Debug);
+	EngineTestAccess::describeBindings(&r.m_engine);
+	EngineTestAccess::closeInputBlock(&r.m_engine);
+
+	Lines lines = r.lines();
+	checkShape(lines, "nested bindings keep the shape");
+	ENGINE_CHECK(4 <= lines.size(), "the event, its header, a keymap, the brace");
+	if (lines.size() < 4)
+		return;
+	ENGINE_CHECK(Rig::body(lines[1]) == L"  DescribeBindings",
+				 "no braces inside the key event's block");
+	ENGINE_CHECK(Rig::body(lines[2]).compare(0, 11, L"    window ") == 0,
+				 "and its body goes one step deeper");
+}
+
+
+/// A wait says when it began and how long it took.  The line itself carries
+/// the time the key event's block closes, which is after the wait.
+void aWaitSaysWhenItBeganAndHowLongItTook()
+{
+	Rig r;
+	EngineTestAccess::funcWait(&r.m_engine, 50);
+	Lines lines;
+	bool hasDateLine = false;			// midnight passed, and the times wrap
+	for (const std::wstring &line : r.lines()) {
+		if (isDateLine(line))
+			hasDateLine = true;
+		else
+			lines.push_back(line);
+	}
+	ENGINE_CHECK(lines.size() == 1, "one line for the wait");
+	if (lines.size() != 1)
+		return;
+
+	// what follows the mark; the mark's own spacing is not what this is about
+	const std::wstring body = Rig::body(lines[0]);
+	const size_t at = body.find(L"waited ");
+	unsigned long long ms = 0;
+	unsigned hh = 99, mm = 99, ss = 99, sss = 9999;
+	int length = 0;
+	const bool isParsed = body.compare(0, 1, L"*") == 0 &&
+		at != std::wstring::npos &&
+		swscanf_s(body.c_str() + at,
+				  L"waited %llu ms, started %2u:%2u:%2u.%3u%n",
+				  &ms, &hh, &mm, &ss, &sss, &length) == 5 &&
+		at + static_cast<size_t>(length) == body.size();
+	ENGINE_CHECK(isParsed, "it reads \"* waited N ms, started hh:mm:ss.SSS\"");
+	if (!isParsed)
+		return;
+	ENGINE_CHECK(hh < 24 && mm < 60 && ss < 60 && sss < 1000,
+				 "the start is a time of day");
+	// a timeout may end up to a timer tick early
+	ENGINE_CHECK(40 <= ms && ms < 5000, "the wait is about as long as asked");
+	ENGINE_CHECK(hasDateLine ||
+				 body.substr(body.size() - 12) <= lines[0].substr(0, 12),
+				 "and it began before the line was written");
+}
+
+
+/// the text of every line after the first
+Lines bodiesAfterTheFirst(const Lines &i_lines)
+{
+	Lines bodies;
+	for (size_t i = 1; i < i_lines.size(); ++ i)
+		bodies.push_back((kPrefix <= i_lines[i].size())
+						 ? Rig::body(i_lines[i]) : L"<short>");
+	return bodies;
+}
+
+
+/// A key with no assignment walks from keymap to keymap, one function inside
+/// the next.  Each closes its own block before handing the key on, so the
+/// chain reads down the page at one depth rather than a step deeper each time.
+void aKeyHandedOnStaysAtOneDepth()
+{
+	ActionFunction toParent(createFunctionData(L"KeymapParent"));
+	ActionFunction ignore(createFunctionData(L"Ignore"));
+	KeySeq handOn(L"");
+	handOn.add(toParent);
+	KeySeq stop(L"");
+	stop.add(ignore);
+	Keymap last(Keymap::Type_keymap, L"Last", L"", L"", &stop, NULL);
+	Keymap middle(Keymap::Type_keymap, L"Middle", L"", L"", &handOn, &last);
+	Keymap first(Keymap::Type_keymap, L"First", L"", L"", &handOn, &middle);
+
+	Rig r;
+	KeyA a;
+	EngineTestAccess::outputInputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+									   LogLevel::Debug);
+	EngineTestAccess::generateKeyboardEvents(&r.m_engine, a.m_mkey, &first,
+											 { &first });
+	EngineTestAccess::closeInputBlock(&r.m_engine);
+
+	Lines lines = r.lines();
+	checkShape(lines, "a chain keeps the shape");
+	ENGINE_CHECK(bodiesAfterTheFirst(lines) ==
+				 Lines({ L"  FN  &KeymapParent",
+						 L"    *   keymap: Middle",
+						 L"  FN  &KeymapParent",
+						 L"    *   keymap: Last",
+						 L"  FN  &Ignore",
+						 L"}" }),
+				 "every function of the chain at one depth, each with its report");
+}
+
+
+/// &KeymapWindow and &OtherWindowClass hand the key on as well, and say where
+/// to.  The function that ends the chain keeps what it does nested under it.
+void theLastOfAChainKeepsItsOutput()
+{
+	ActionFunction toWindow(createFunctionData(L"KeymapWindow"));
+	ActionFunction toNext(createFunctionData(L"OtherWindowClass"));
+	ActionFunction describe(createFunctionData(L"DescribeBindings"));
+	KeySeq window(L"");
+	window.add(toWindow);
+	KeySeq next(L"");
+	next.add(toNext);
+	KeySeq bindings(L"");
+	bindings.add(describe);
+	Keymap second(Keymap::Type_windowOr, L"Second", L"", L"", &bindings, NULL);
+	Keymap first(Keymap::Type_windowOr, L"First", L"", L"", &next, NULL);
+	Keymap start(Keymap::Type_keymap, L"Start", L"", L"", &window, NULL);
+
+	{
+		Rig r;
+		KeyA a;
+		EngineTestAccess::outputInputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+										   LogLevel::Debug);
+		EngineTestAccess::generateKeyboardEvents(&r.m_engine, a.m_mkey, &start,
+												 { &first, &second });
+		EngineTestAccess::closeInputBlock(&r.m_engine);
+
+		Lines lines = r.lines();
+		checkShape(lines, "a chain through window keymaps keeps the shape");
+		Lines bodies = bodiesAfterTheFirst(lines);
+		ENGINE_CHECK(7 <= bodies.size(), "the chain, the bindings and the brace");
+		if (bodies.size() < 7)
+			return;
+		ENGINE_CHECK(Lines(bodies.begin(), bodies.begin() + 5) ==
+					 Lines({ L"  FN  &KeymapWindow",
+							 L"    *   keymap: First",
+							 L"  FN  &OtherWindowClass",
+							 L"    *   keymap: Second",
+							 L"  FN  &DescribeBindings" }),
+					 "the chain at one depth, each step reporting where it went");
+		ENGINE_CHECK(bodies[5] == L"    DescribeBindings",
+					 "and what the last function does stays under it");
+		ENGINE_CHECK(bodies.back() == L"}", "the key event's brace ends it");
+	}
+
+	// In normal mode no function opens a block, and there is none to close.
+	{
+		Rig r(LogLevel::Info);
+		KeyA a;
+		EngineTestAccess::outputInputToLog(&r.m_engine, &a.m_key, a.m_mkey,
+										   LogLevel::Debug);
+		EngineTestAccess::generateKeyboardEvents(&r.m_engine, a.m_mkey, &start,
+												 { &first, &second });
+		EngineTestAccess::closeInputBlock(&r.m_engine);
+
+		Lines lines = r.lines();
+		checkShape(lines, "the bindings alone keep the shape");
+		ENGINE_CHECK(!lines.empty() &&
+					 Rig::body(lines[0]) == L"DescribeBindings {",
+					 "in normal mode the bindings stand alone, unindented");
+	}
+}
+
+
+///
+void anActivationHasADetailBody()
+{
+	{
+		Rig r;
+		EngineTestAccess::applySetting(&r.m_engine, makeGlobalSetting());
+		Lines lines = r.lines();
+		checkShape(lines, "activation keeps the shape in detail mode");
+		ENGINE_CHECK(lines.size() == 3, "header, details and the brace");
+		if (lines.size() == 3)
+			ENGINE_CHECK(Rig::body(lines[1]).compare(0, 17,
+													 L"  global keymaps:") == 0,
+						 "the details are the body");
+	}
+
+	Rig r(LogLevel::Info);
+	EngineTestAccess::applySetting(&r.m_engine, makeGlobalSetting());
+	Lines lines = r.lines();
+	checkShape(lines, "activation keeps the shape in normal mode");
+	ENGINE_CHECK(lines.size() == 1 && lines[0].find(L'{') == std::wstring::npos,
+				 "with the details filtered it is one plain line");
+}
+
 } // namespace
 
 
@@ -455,4 +837,14 @@ void runLogFormatTests()
 	aBlockCarriesTheTimeItClosedAt();
 	logBlockClosesWithItsScope();
 	unterminatedTextKeepsItsLevel();
+	aKeyEventIsOneBlock();
+	aModifierKeyIsSaidInsideItsKeyEvent();
+	aKeyEventWithNothingElseIsOneLine();
+	aFailureWithoutItsKeyEventStandsAlone();
+	describeBindingsIsABlock();
+	describeBindingsNestsInAKeyEvent();
+	aWaitSaysWhenItBeganAndHowLongItTook();
+	aKeyHandedOnStaysAtOneDepth();
+	theLastOfAChainKeepsItsOutput();
+	anActivationHasADetailBody();
 }

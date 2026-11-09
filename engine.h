@@ -439,17 +439,17 @@ public:
                                                     dialog's edit) */
 
 private:
-	/** Nesting level of the detail log, in units of two spaces.  Only the
-	    keyboard handler thread touches these three.
-	*/
-	int m_logIndent;
+	// Only the keyboard handler thread touches these three.
+
 	/// true while generateModifierEvents() is running
 	bool m_isGeneratingModifiers;
-	/** True once the "Gen Modifiers" header has been written for the current
-	    block.  The header is deferred until a modifier is actually generated,
-	    because the block is empty most of the time.
+	/** True while the "Gen Modifiers" block is open.  The header is deferred
+	    until a modifier is actually generated, because the block is empty most
+	    of the time.
 	*/
 	bool m_modifierHeaderWritten;
+	/// the block of the key event being processed; see outputInputToLog()
+	LogBlock m_inputLogBlock;
 
 public:
 	/// keyboard handler thread
@@ -521,20 +521,21 @@ private:
 	/// fix modifier key
 	bool fixModifierKey(ModifiedKey *io_mkey, Keymap::AssignMode *o_am);
 
-	/// write 2 spaces per nesting level; m_log must already be acquired
-	void logIndent(int i_level);
 	/// write one key line; m_log must already be acquired
 	void writeKeyLine(const Key *i_key, const ModifiedKey &i_mkey,
 					  const wchar_t *i_mark, const wchar_t *i_note);
-	/// write a "*" note line at the current nesting level
+	/// write a "*" note line
 	void logNote(LogLevel i_level, const wchar_t *i_text);
 	/// output one key to the log
 	void outputToLog(const Key *i_key, const ModifiedKey &i_mkey,
 					 LogLevel i_level, const wchar_t *i_mark,
 					 const wchar_t *i_note = NULL);
-	/// output a physical key event; opens a new block in the log
+	/** Output a physical key event, and open its block in the log.  The block
+	    stays open for everything the event sets off, and keyboardHandler()
+	    closes it when the event is done with.  i_isModifier, the answer of
+	    fixModifierKey(), adds a note that the key is a modifier key. */
 	void outputInputToLog(const Key *i_key, const ModifiedKey &i_mkey,
-						  LogLevel i_level);
+						  LogLevel i_level, bool i_isModifier = false);
 
 	/// genete modifier events
 	void generateModifierEvents(const Modifier &i_mod);
@@ -588,6 +589,26 @@ private:
 	    entry points to drop what they were about to do; see the comment on
 	    that member.  Shutdown sets m_isAborting and the caller unwinds. */
 	WaitResult waitWhileUnlocked(HANDLE i_event, DWORD i_timeout);
+
+	/** Write a "*" note on a wait that began at i_start: "{i_what}waited N ms,
+	    started hh:mm:ss.SSS".  Every line of a block carries the time the block
+	    closed, so without this a long wait inside a key event would leave no
+	    trace of when it began. */
+	void logWait(LogLevel i_level, const wchar_t *i_what,
+				 const FILETIME &i_start);
+
+	/** Hand the key on to i_c.m_keymap from inside a function: report where
+	    it goes unless the function's own line already names it, close the
+	    function's block in the log, and process the key there.
+
+	    A key with no assignment walks from keymap to keymap this way, one
+	    function inside the next.  Closing the block before handing on keeps
+	    that chain at one depth in the log rather than a step deeper at each
+	    link.  Call it before anything in the function opens a block of its
+	    own: blocks are counted, not named, so that one would be closed
+	    instead. */
+	void forwardKey(FunctionParam *i_param, const Current &i_c,
+					bool i_doesReport);
 
 	/// get current modifiers
 	Modifier getCurrentModifiers(Key *i_key, bool i_isPressed);
@@ -1004,8 +1025,10 @@ public:
 	bool m_isPressed;				/// is key pressed ?
 	HWND m_hwnd;					///
 	Engine::Current m_c;				/// new context
-	bool m_doesNeedEndl;				/// need endl ?
 	const ActionFunction *m_af;			///
+	/** The function's own block in the log, which Engine::forwardKey()
+	    closes early; NULL when the function was not run from a key. */
+	LogBlock *m_logBlock = NULL;
 };
 
 
