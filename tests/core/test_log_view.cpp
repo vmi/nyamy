@@ -295,4 +295,64 @@ void runLogViewTests()
 		}
 		CORE_CHECK(ok, "the view survives clears at arbitrary points");
 	}
+
+	// LogFollow: scrolling away from the end stops the refreshes, and getting
+	// back to it resumes them.  Positions are the control's scroll positions.
+	{
+		LogFollow f;
+		CORE_CHECK(f.shouldRefresh(0, true, false), "it starts out following");
+		f.leftAt(10);
+		CORE_CHECK(f.shouldRefresh(10, true, false), "left at the end: refresh");
+		f.leftAt(12);
+		CORE_CHECK(f.shouldRefresh(12, false, false),
+				   "out of sight of the end without having been moved - the "
+				   "text re-wrapped, say - does not stop it");
+		f.leftAt(14);
+		CORE_CHECK(!f.shouldRefresh(5, false, false),
+				   "moved away from the end: stop");
+		CORE_CHECK(!f.isFollowing(), "and it is stopped");
+		CORE_CHECK(!f.shouldRefresh(5, false, false),
+				   "nothing while the reader stays");
+		CORE_CHECK(!f.shouldRefresh(9, false, false),
+				   "nor while the reader heads back down");
+		CORE_CHECK(f.shouldRefresh(14, true, false), "the end again: resume");
+		CORE_CHECK(f.isFollowing(), "and it follows");
+	}
+
+	// up and back down between two refreshes is no scroll back
+	{
+		LogFollow f;
+		f.leftAt(20);
+		CORE_CHECK(f.shouldRefresh(21, true, false),
+				   "moved, but at the end: still following");
+	}
+
+	// A selection holds the refreshes off without stopping them: appending
+	// would move the caret and lose it.
+	{
+		LogFollow f;
+		f.leftAt(30);
+		CORE_CHECK(!f.shouldRefresh(30, true, true), "held off while selected");
+		CORE_CHECK(f.isFollowing(), "but still following");
+		CORE_CHECK(f.shouldRefresh(30, true, false),
+				   "and it goes on once the selection is gone");
+		CORE_CHECK(!f.shouldRefresh(10, false, true),
+				   "scrolling away with a selection stops it");
+		CORE_CHECK(!f.isFollowing(), "stopped");
+		CORE_CHECK(!f.shouldRefresh(30, true, true),
+				   "back at the end, still selected: held off");
+		CORE_CHECK(f.isFollowing(), "though following again");
+	}
+
+	// resume() follows whatever the reader did, and the old position goes
+	{
+		LogFollow f;
+		f.leftAt(40);
+		f.shouldRefresh(0, false, false);
+		CORE_CHECK(!f.isFollowing(), "stopped first");
+		f.resume();
+		CORE_CHECK(f.isFollowing(), "resumed");
+		CORE_CHECK(f.shouldRefresh(0, false, false),
+				   "and where it was left before no longer counts");
+	}
 }

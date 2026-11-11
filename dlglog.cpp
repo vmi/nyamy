@@ -41,6 +41,15 @@ class DlgLog : public LayoutManager
 	/// works out what the control has to be told; see log_view.h
 	LogView m_view;
 
+	/// whether the control is kept at the end of the log; see log_view.h
+	LogFollow m_follow;
+
+	/// the caption the resource gives, and the one shown while held still
+	std::wstring m_caption;
+	std::wstring m_captionPaused;
+	/// is the caption saying that the control is held still ?
+	bool m_isPausedShown;
+
 	/** Style of the log edit control with the horizontal-scroll bits masked
 	    off.  Word wrap is switched by recreating the control with or without
 	    them: an edit control ignores a later change to ES_AUTOHSCROLL.
@@ -56,7 +65,7 @@ class DlgLog : public LayoutManager
 
 	/** Where the log was being read when a DPI change started; see
 	    onDpiChangeBegin().  m_dpiAnchor is a character index, or -1 for none. */
-	bool m_dpiWasAtBottom;
+	bool m_dpiWasFollowing;
 	int m_dpiAnchor;
 
 	enum {
@@ -76,11 +85,12 @@ public:
 			m_hfont(NULL),
 			m_log(NULL),
 			m_logBuffer(NULL),
+			m_isPausedShown(false),
 			m_editStyle(0),
 			m_editExStyle(0),
 			m_isWordWrap(true),
 			m_restoreMaximized(false),
-			m_dpiWasAtBottom(false),
+			m_dpiWasFollowing(false),
 			m_dpiAnchor(-1) {
 	}
 
@@ -96,6 +106,13 @@ public:
 		// set icons
 		setSmallIcon(m_hwnd, IDI_ICON_mayu);
 		setBigIcon(m_hwnd, IDI_ICON_mayu);
+
+		// the caption, and the one that says the control is held still
+		wchar_t caption[256];
+		if (GetWindowText(m_hwnd, caption, NUMBER_OF(caption)) == 0)
+			caption[0] = L'\0';
+		m_caption = caption;
+		m_captionPaused = loadString(IDS_logCaptionPaused);
 
 		// set font
 		ini.read(L"logFont", &m_lf, loadString(IDS_logFont));
@@ -205,7 +222,7 @@ public:
 	    read here rather than in wmDpiChanged: by then the dialog manager has
 	    already rescaled the font and the view has already moved. */
 	void onDpiChangeBegin() override {
-		m_dpiWasAtBottom = isAtBottom();
+		m_dpiWasFollowing = m_follow.isFollowing();
 		m_dpiAnchor = -1;
 		int wasFirst = static_cast<int>(
 						   SendMessage(m_hwndEdit, EM_GETFIRSTVISIBLELINE,
@@ -234,13 +251,11 @@ public:
 			m_hfont = hfontNew;
 		}
 
-		if (m_dpiWasAtBottom) {
+		if (m_dpiWasFollowing) {
 			// The log follows its own tail, and a taller font fits fewer
 			// lines: anchoring the top line here would push the newest ones
-			// out of sight until the next line arrived.  Scrolling past the
-			// end clamps.
-			SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
-						static_cast<LPARAM>(Edit_GetLineCount(m_hwndEdit)));
+			// out of sight until the next line arrived.
+			scrollToEnd();
 		} else if (0 <= m_dpiAnchor) {
 			int wantLine = static_cast<int>(
 							   SendMessage(m_hwndEdit, EM_LINEFROMCHAR,
@@ -267,13 +282,27 @@ public:
 			ShowWindow(m_hwnd, SW_SHOWMAXIMIZED);
 		}
 		if (i_isShown) {
-			// catch up on everything that arrived while it was hidden
+			// catch up on everything that arrived while it was hidden, and
+			// show the end again wherever the reader had left the control
+			m_follow.resume();
 			refresh();
 			SetTimer(m_hwnd, ID_RefreshTimer, kRefreshIntervalMillisec, NULL);
 		} else {
 			KillTimer(m_hwnd, ID_RefreshTimer);
 		}
 		return FALSE;
+	}
+
+	/** WM_SIZE
+
+	    A new width re-wraps the text, which moves the view without the reader
+	    doing anything.  While following, put it back at the end here rather
+	    than leave the next refresh to puzzle over the move. */
+	BOOL wmSize(DWORD i_fwSizeType, short i_nWidth, short i_nHeight) override {
+		BOOL result = LayoutManager::wmSize(i_fwSizeType, i_nWidth, i_nHeight);
+		if (m_follow.isFollowing())
+			scrollToEnd();
+		return result;
 	}
 
 	/// WM_TIMER
@@ -323,6 +352,9 @@ public:
 				SetWindowFont(m_hwndEdit, hfontNew, true);
 				DeleteObject(m_hfont);
 				m_hfont = hfontNew;
+				// the new font re-wraps the text; see wmSize()
+				if (m_follow.isFollowing())
+					scrollToEnd();
 				IniFile().write(L"logFont", m_lf);
 			}
 			return TRUE;
@@ -351,31 +383,38 @@ public:
 	}
 
 private:
-	/** Bring the edit control into step with the log.
+	/** Bring the edit control into step with the log, unless the reader is
+	    holding it still.
 
-	    What to do is worked out by LogView, which holds no window; this puts
-	    the answer into the control. */
+	    What to do is worked out by LogFollow and LogView, which hold no
+	    window; this reads the control for them and puts the answer in. */
 	void refresh() {
 		if (!m_logBuffer || !IsWindowVisible(m_hwnd))
+			return;
+		int position = 0;
+		bool isAtEnd = readScroll(&position);
+		bool doesRefresh =
+			m_follow.shouldRefresh(position, isAtEnd, hasSelection());
+		showPaused(!doesRefresh);
+		if (!doesRefresh)
 			return;
 		LogViewUpdate update;
 		m_view.update(*m_logBuffer, &update);
 		applyUpdate(update);
+		noteWhereLeft();
 	}
 
-	/** Put what LogView decided into the control.
+	/** Put what LogView decided into the control, and leave its end in view.
 
 	    Deletions happen before appends so that the control never has to hold
 	    both at once, and the whole tick is at most one delete and one append
 	    however many lines arrived.
 
-	    <p><b>EM_REPLACESEL scrolls the caret into view</b>, so both the delete
-	    at the front and the append at the end move the view by themselves -
-	    the append lands at the end of the text and therefore always ends at
-	    the bottom.  A reader who has scrolled back is put back afterwards,
-	    once the text has settled; correcting between the two would only be
-	    undone by the append.  Painting is held off in the meantime so that the
-	    trip to the bottom and back is never on screen.</p> */
+	    <p>This only runs while the control follows the end with nothing
+	    selected (see LogFollow), so where the reader was and what they had
+	    selected need no keeping.  EM_REPLACESEL scrolls the caret into view,
+	    which the delete at the front takes to the top; the append and the
+	    scroll at the end take it back down.</p> */
 	void applyUpdate(const LogViewUpdate &i_update) {
 		if (i_update.m_isRebuild) {
 			SetWindowText(m_hwndEdit, i_update.m_append.c_str());
@@ -388,87 +427,29 @@ private:
 			return;
 
 		const int drop = static_cast<int>(i_update.m_dropChars);
-		const bool wasAtBottom = isAtBottom();
-
-		// Where the reader is, as a character index rather than a line
-		// number: the delete renumbers every line and the append re-wraps the
-		// last one, but a character means the same place through both.  The
-		// selection is kept for the same reason - the append would otherwise
-		// drop one made to copy from.
-		int anchor = -1;
-		DWORD selStart = 0;
-		DWORD selEnd = 0;
-		if (!wasAtBottom) {
-			int first = static_cast<int>(
-							SendMessage(m_hwndEdit,
-										EM_GETFIRSTVISIBLELINE, 0, 0));
-			if (0 <= first)
-				anchor = static_cast<int>(
-							 SendMessage(m_hwndEdit, EM_LINEINDEX,
-										 static_cast<WPARAM>(first), 0));
-			SendMessage(m_hwndEdit, EM_GETSEL,
-						reinterpret_cast<WPARAM>(&selStart),
-						reinterpret_cast<LPARAM>(&selEnd));
-			SetWindowRedraw(m_hwndEdit, FALSE);
-		}
-
 		if (0 < drop) {
 			Edit_SetSel(m_hwndEdit, 0, drop);
 			Edit_ReplaceSel(m_hwndEdit, L"");
 		}
-
 		if (!i_update.m_append.empty()) {
 			int end = Edit_GetTextLength(m_hwndEdit);
 			Edit_SetSel(m_hwndEdit, end, end);
 			Edit_ReplaceSel(m_hwndEdit, i_update.m_append.c_str());
 		}
-
-		if (wasAtBottom) {
-			SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
-						static_cast<LPARAM>(Edit_GetLineCount(m_hwndEdit)));
-			return;
-		}
-
-		// Everything the reader held was measured before the delete, so it
-		// moves up by what went.  Clamping at 0 is what happens when the line
-		// they were on has itself been evicted: the view settles at the top
-		// rather than chasing a line that is no longer there.
-		Edit_SetSel(m_hwndEdit,
-					clampToZero(static_cast<int>(selStart) - drop),
-					clampToZero(static_cast<int>(selEnd) - drop));
-		if (0 <= anchor) {
-			int wantLine = static_cast<int>(
-							   SendMessage(m_hwndEdit, EM_LINEFROMCHAR,
-										   static_cast<WPARAM>(
-											   clampToZero(anchor - drop)), 0));
-			int nowFirst = static_cast<int>(
-							   SendMessage(m_hwndEdit,
-										   EM_GETFIRSTVISIBLELINE, 0, 0));
-			if (0 <= wantLine && 0 <= nowFirst && wantLine != nowFirst)
-				SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
-							static_cast<LPARAM>(wantLine - nowFirst));
-		}
-
-		// The text under the view is the same as it was, but the scroll bar
-		// has to take in the lines that came and went, so the repaint cannot
-		// be skipped.  Without erasing: the control draws over its own
-		// background and erasing first would show as a flash.
-		SetWindowRedraw(m_hwndEdit, TRUE);
-		InvalidateRect(m_hwndEdit, NULL, FALSE);
+		SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
+					static_cast<LPARAM>(Edit_GetLineCount(m_hwndEdit)));
 	}
 
-	/// negative positions come out of the subtractions above; the control wants none
-	static int clampToZero(int i_value) {
-		return (i_value < 0) ? 0 : i_value;
-	}
-
-	/** Put the whole of the log into the control, replacing what is there.
+	/** Put the whole of the log into the control, replacing what is there,
+	    and follow its end again.
 
 	    Used when the control has been recreated for a word wrap change, and
 	    after the log has been cleared.  The cost is one pass over the buffer,
 	    which is why the ordinary path does not use it. */
 	void rebuild() {
 		m_view.reset();
+		m_follow.resume();
+		showPaused(false);
 		if (!m_logBuffer) {
 			SetWindowText(m_hwndEdit, L"");
 			return;
@@ -476,24 +457,63 @@ private:
 		LogViewUpdate update;
 		m_view.update(*m_logBuffer, &update);	// reset() forces a rebuild
 		applyUpdate(update);
+		noteWhereLeft();
 	}
 
-	/** Is the end of the log in view?
+	/// bring the end of the text into view, and note where that left it
+	void scrollToEnd() {
+		// scrolling past the end clamps
+		SendMessage(m_hwndEdit, EM_LINESCROLL, 0,
+					static_cast<LPARAM>(Edit_GetLineCount(m_hwndEdit)));
+		noteWhereLeft();
+	}
+
+	/// tell LogFollow where the control has just been left
+	void noteWhereLeft() {
+		int position = 0;
+		readScroll(&position);
+		m_follow.leftAt(position);
+	}
+
+	/** Where is the control scrolled to, and is the end of the log in view?
 
 	    Asked of the scroll bar rather than worked out from the font metrics and
 	    the formatting rectangle: the control already tracks this, in the same
 	    wrapped lines the scrolling messages count, and reading it moves
-	    nothing. */
-	bool isAtBottom() const {
+	    nothing.
+
+	    @param o_position	the scroll position, in wrapped lines
+	    @return whether the end is in view */
+	bool readScroll(int *o_position) const {
+		*o_position = 0;
 		SCROLLINFO si;
 		memset(&si, 0, sizeof(si));
 		si.cbSize = sizeof(si);
 		si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
 		if (!GetScrollInfo(m_hwndEdit, SB_VERT, &si))
 			return false;
+		*o_position = si.nPos;
 		if (si.nPage == 0)		// everything fits; nothing to scroll past
 			return true;
 		return si.nMax <= si.nPos + static_cast<int>(si.nPage) - 1;
+	}
+
+	/// is any of the text selected ?
+	bool hasSelection() const {
+		DWORD start = 0;
+		DWORD end = 0;
+		SendMessage(m_hwndEdit, EM_GETSEL, reinterpret_cast<WPARAM>(&start),
+					reinterpret_cast<LPARAM>(&end));
+		return start != end;
+	}
+
+	/// say in the caption whether the control is being held still
+	void showPaused(bool i_isPaused) {
+		if (i_isPaused == m_isPausedShown || m_captionPaused.empty())
+			return;
+		m_isPausedShown = i_isPaused;
+		SetWindowText(m_hwnd, (i_isPaused ? m_captionPaused
+							   : m_caption).c_str());
 	}
 
 	/** Build the log font for a given DPI.

@@ -92,3 +92,39 @@ void LogView::update(const LogBuffer &i_buffer, LogViewUpdate *o_update)
 		m_shownEndSeq = i_buffer.endSeq();
 	}
 }
+
+
+LogFollow::LogFollow()
+		: m_isFollowing(true),
+		m_hasLeftAt(false),
+		m_leftAt(0)
+{
+}
+
+
+bool LogFollow::shouldRefresh(int i_position, bool i_isAtEnd,
+							  bool i_hasSelection)
+{
+	if (m_isFollowing) {
+		// moved since the last refresh, and away from the end
+		if (m_hasLeftAt && i_position != m_leftAt && !i_isAtEnd)
+			m_isFollowing = false;
+	} else if (i_isAtEnd) {
+		m_isFollowing = true;
+	}
+	return m_isFollowing && !i_hasSelection;
+}
+
+
+void LogFollow::leftAt(int i_position)
+{
+	m_leftAt = i_position;
+	m_hasLeftAt = true;
+}
+
+
+void LogFollow::resume()
+{
+	m_isFollowing = true;
+	m_hasLeftAt = false;
+}
