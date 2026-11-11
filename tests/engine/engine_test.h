@@ -189,6 +189,21 @@ public:
 		io_engine->generateKeyboardEvents(c);
 	}
 
+	/// &KeymapPrevPrefix(i_previous), i_history being the prefix keymaps of
+	/// the key sequence so far, oldest first
+	static void funcKeymapPrevPrefix(Engine *io_engine,
+									 const ModifiedKey &i_mkey,
+									 const Keymaps::KeymapPtrList &i_history,
+									 int i_previous) {
+		io_engine->m_keymapPrefixHistory = i_history;
+		io_engine->m_currentFocusOfThread = &io_engine->m_globalFocus;
+		FunctionParam param{};
+		param.m_isPressed = true;
+		param.m_c.m_keymap = NULL;
+		param.m_c.m_mkey = i_mkey;
+		io_engine->funcKeymapPrevPrefix(&param, i_previous);
+	}
+
 private:
 	static Engine::FocusOfThread *findFocus(Engine *io_engine, DWORD i_threadId) {
 		Engine::FocusOfThreads::iterator i =

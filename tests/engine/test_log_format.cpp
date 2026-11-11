@@ -796,6 +796,39 @@ void theLastOfAChainKeepsItsOutput()
 }
 
 
+/// &KeymapPrevPrefix(n) hands the key on to the keymap n prefixes back, and
+/// does nothing when the history does not go back that far.  It used to read
+/// past the end of the history then, an empty one included.
+void prevPrefixGoesNoFurtherBackThanItsHistory()
+{
+	ActionFunction ignore(createFunctionData(L"Ignore"));
+	KeySeq stop(L"");
+	stop.add(ignore);
+	Keymap older(Keymap::Type_keymap, L"Older", L"", L"", &stop, NULL);
+	Keymap newer(Keymap::Type_keymap, L"Newer", L"", L"", &stop, NULL);
+	const Keymaps::KeymapPtrList history = { &older, &newer };
+
+	auto run = [&](const Keymaps::KeymapPtrList &i_history, int i_previous) {
+		Rig r;
+		KeyA a;
+		EngineTestAccess::funcKeymapPrevPrefix(&r.m_engine, a.m_mkey,
+											   i_history, i_previous);
+		Lines bodies;
+		for (const std::wstring &line : r.lines())
+			bodies.push_back(Rig::body(line));
+		return bodies;
+	};
+
+	ENGINE_CHECK(run(history, 1) == Lines({ L"* keymap: Newer", L"FN &Ignore" }),
+				 "one back is the latest prefix keymap");
+	ENGINE_CHECK(run(history, 2) == Lines({ L"* keymap: Older", L"FN &Ignore" }),
+				 "two back is the one before it");
+	ENGINE_CHECK(run(history, 3).empty(), "further back than the history: nothing");
+	ENGINE_CHECK(run({}, 1).empty(), "an empty history: nothing");
+	ENGINE_CHECK(run(history, 0).empty(), "and nothing for zero either");
+}
+
+
 ///
 void anActivationHasADetailBody()
 {
@@ -954,6 +987,7 @@ void runLogFormatTests()
 	aWaitSaysWhenItBeganAndHowLongItTook();
 	aKeyHandedOnStaysAtOneDepth();
 	theLastOfAChainKeepsItsOutput();
+	prevPrefixGoesNoFurtherBackThanItsHistory();
 	anActivationHasADetailBody();
 	aKeyLineHasTheNameFirst();
 	aNoteHasOneSpaceAfterItsMark();

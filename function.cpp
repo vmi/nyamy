@@ -840,15 +840,18 @@ void Engine::funcKeymapWindow(FunctionParam *i_param)
 // use a corresponding key of the previous prefixed keymap
 void Engine::funcKeymapPrevPrefix(FunctionParam *i_param, int i_previous)
 {
+	// The history is empty outside a prefix, and holds only as many keymaps
+	// as there have been prefixes: asking further back than that does nothing.
+	if (i_previous <= 0 ||
+			m_keymapPrefixHistory.size() < static_cast<size_t>(i_previous))
+		return;
+
 	Current c(i_param->m_c);
-	if (0 < i_previous && 0 <= m_keymapPrefixHistory.size() - i_previous) {
-		int n = i_previous - 1;
-		KeymapPtrList::reverse_iterator i = m_keymapPrefixHistory.rbegin();
-		while (0 < n && i != m_keymapPrefixHistory.rend())
-			--n, ++i;
-		c.m_keymap = *i;
-		forwardKey(i_param, c, true);
-	}
+	KeymapPtrList::reverse_iterator i = m_keymapPrefixHistory.rbegin();
+	for (int n = i_previous - 1; 0 < n; -- n)
+		++ i;
+	c.m_keymap = *i;
+	forwardKey(i_param, c, true);
 }
 
 // use a corresponding key of an other window class, or use a default key
