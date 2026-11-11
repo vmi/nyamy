@@ -76,14 +76,14 @@ restart:
 					FocusOfThreads::iterator j = m_focusOfThreads.find((*i));
 					if (j != m_focusOfThreads.end()) {
 						FocusOfThread *fot = &((*j).second);
+						LogBlock block(m_log, LogLevel::Debug);
 						Acquire a(&m_log, LogLevel::Debug);
 						m_log << L"RemoveThread" << std::endl;
-						m_log << L"  HWND:     " << std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(fot->m_hwndFocus))
+						m_log << L"HWND:     " << std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(fot->m_hwndFocus))
 						<< std::dec << std::endl;
-						m_log << L"  THREADID: " << fot->m_threadId << std::endl;
-						m_log << L"  CLASS:    " << fot->m_className << std::endl;
-						m_log << L"  TITLE:   \"" << fot->m_titleName << L"\"" << std::endl;
-						m_log << std::endl;
+						m_log << L"THREADID: " << fot->m_threadId << std::endl;
+						m_log << L"CLASS:    " << fot->m_className << std::endl;
+						m_log << L"TITLE:   \"" << fot->m_titleName << L"\"" << std::endl;
 						m_focusOfThreads.erase(j);
 					}
 				}
@@ -104,23 +104,23 @@ restart:
 					m_hwndFocus = m_currentFocusOfThread->m_hwndFocus;
 					checkShow(m_hwndFocus);
 
+					LogBlock block(m_log, LogLevel::Debug);
 					Acquire a(&m_log, LogLevel::Debug);
 					m_log << L"FocusChanged" << std::endl;
-					m_log << L"  HWND:     "
+					m_log << L"HWND:     "
 					<< std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(m_currentFocusOfThread->m_hwndFocus))
 					<< std::dec << std::endl;
-					m_log << L"  THREADID: "
+					m_log << L"THREADID: "
 					<< m_currentFocusOfThread->m_threadId << std::endl;
-					m_log << L"  CLASS:    "
+					m_log << L"CLASS:    "
 					<< m_currentFocusOfThread->m_className << std::endl;
-					m_log << L"  TITLE:   \""
+					m_log << L"TITLE:   \""
 					<< m_currentFocusOfThread->m_titleName << L"\"" << std::endl;
 					// 0 means the setting has not taken effect on this thread,
 					// which the log used to leave unsaid: nothing here named
 					// the state, only the internal error the next key raised
-					m_log << L"  KEYMAPS:  "
+					m_log << L"KEYMAPS:  "
 					<< m_currentFocusOfThread->m_keymaps.size() << std::endl;
-					m_log << std::endl;
 					return;
 				}
 			}
@@ -137,12 +137,14 @@ restart:
 				// title is what window matchers see.
 				std::wstring title = escapeControlChars(titleName);
 				setFocus(hwndFore, threadId, className, title.c_str(), true);
+				LogBlock block(m_log, LogLevel::Debug);
 				Acquire a(&m_log, LogLevel::Debug);
+				m_log << L"ConsoleFocus" << std::endl;
 				m_log << L"HWND:     " << std::hex << static_cast<DWORD>(reinterpret_cast<uintptr_t>(hwndFore))
 				<< std::dec << std::endl;
 				m_log << L"THREADID: " << threadId << std::endl;
 				m_log << L"CLASS:    " << className << std::endl;
-				m_log << L"TITLE:   \"" << title << L"\"" << std::endl << std::endl;
+				m_log << L"TITLE:   \"" << title << L"\"" << std::endl;
 				goto restart;
 			}
 		}
@@ -191,7 +193,6 @@ bool Engine::fixModifierKey(ModifiedKey *io_mkey, Keymap::AssignMode *o_am)
 		for (Keymap::ModAssignments::const_iterator
 				j = ma.begin(); j != ma.end(); ++ j)
 			if (io_mkey->m_key == (*j).m_key) { // is io_mkey a modifier ?
-				logNote(LogLevel::Debug, L"Modifier Key");
 				// set dontcare for this modifier
 				io_mkey->m_modifier.dontcare(static_cast<Modifier::Type>(i));
 				*o_am = (*j).m_assignMode;
@@ -203,60 +204,48 @@ bool Engine::fixModifierKey(ModifiedKey *io_mkey, Keymap::AssignMode *o_am)
 }
 
 
-// write 2 spaces per nesting level
-void Engine::logIndent(int i_level)
-{
-	static const wchar_t spaces[] = L"                                ";
-	int n = i_level * 2;
-	if (n < 0)
-		n = 0;
-	if (NUMBER_OF(spaces) - 1 < static_cast<size_t>(n))
-		n = NUMBER_OF(spaces) - 1;
-	m_log.write(spaces, n);
-}
-
-
-// write "{indent}{mark}{note}{scan codes}  {key}"
+// write "{mark} {key} ({scan codes}) {note}", or "{mark} {scan codes}" for a
+// key that matches no physical key
 //
-// Everything is padded with spaces rather than tabs: the log control's tab
-// stops depend on the font the user picked, so tabs put the columns in a
-// different place for everyone.
+// The name comes first because a run of OUT lines is read by name, and that
+// way the names start in one column with no padding to keep them there.
 void Engine::writeKeyLine(const Key *i_key, const ModifiedKey &i_mkey,
 						  const wchar_t *i_mark, const wchar_t *i_note)
 {
-	logIndent(m_logIndent);
-	m_log << i_mark;
-	if (i_note)
-		m_log << i_note;
+	const size_t scanCodes = i_key->getScanCodesSize();
+	const bool hasParens = i_mkey.m_key && 0 < scanCodes;
 
-	// scan codes; the "E0-" / "E1-" slot is blank-filled when absent so that
-	// the hex codes stay in one column
-	for (size_t i = 0; i < i_key->getScanCodesSize(); ++ i) {
+	m_log << i_mark << L" ";
+	if (i_mkey.m_key)
+		m_log << i_mkey;
+	if (hasParens)
+		m_log << L" (";
+	for (size_t i = 0; i < scanCodes; ++ i) {
 		const ScanCode &sc = i_key->getScanCodes()[i];
+		if (0 < i)
+			m_log << L" ";
 		if (sc.m_flags & ScanCode::E0)
 			m_log << L"E0-";
 		else if (sc.m_flags & ScanCode::E1)
 			m_log << L"E1-";
-		else
-			m_log << L"   ";
 		m_log << L"0x" << std::hex << std::setw(2) << std::setfill(L'0')
-		<< static_cast<int>(sc.m_scan) << std::dec << L" ";
+		<< static_cast<int>(sc.m_scan) << std::dec;
 	}
-
-	if (i_mkey.m_key)		// otherwise the key matches no physical key
-		m_log << L" " << i_mkey;
+	if (hasParens)
+		m_log << L")";
+	if (i_note)
+		m_log << L" " << i_note;
 	m_log << std::endl;
 }
 
 
-// write a "*" note line at the current nesting level
+// write a "*" note line
 void Engine::logNote(LogLevel i_level, const wchar_t *i_text)
 {
 	if (!m_log.wouldLog(i_level))
 		return;
 	Acquire a(&m_log, i_level);
-	logIndent(m_logIndent);
-	m_log << L"*   " << i_text << std::endl;
+	m_log << L"* " << i_text << std::endl;
 }
 
 
@@ -274,30 +263,33 @@ void Engine::outputToLog(const Key *i_key, const ModifiedKey &i_mkey,
 }
 
 
-// output a physical key event; opens a new block in the log
+// output a physical key event, and open its block in the log
 void Engine::outputInputToLog(const Key *i_key, const ModifiedKey &i_mkey,
-							  LogLevel i_level)
+							  LogLevel i_level, bool i_isModifier)
 {
-	m_logIndent = 0;
+	m_inputLogBlock.open(i_level);
 	if (m_log.wouldLog(i_level)) {
 		Acquire a(&m_log, i_level);
-		m_log << std::endl;	// blank line between one keystroke and the next
-		writeKeyLine(i_key, i_mkey, L"IN ", NULL);
+		writeKeyLine(i_key, i_mkey, L"IN", NULL);
 	}
-	m_logIndent = 1;
+	// said here rather than where it is found out, which is before the
+	// block opens: it is about this key event
+	if (i_isModifier)
+		logNote(LogLevel::Debug, L"Modifier Key");
 }
 
 
 // describe bindings
 void Engine::describeBindings()
 {
+	LogBlock block(m_log, LogLevel::Info);
 	Acquire a(&m_log, LogLevel::Info);
+	m_log << L"DescribeBindings" << std::endl;
 
 	Keymap::DescribeParam dp;
 	for (KeymapPtrList::iterator i = m_currentFocusOfThread->m_keymaps.begin();
 			i != m_currentFocusOfThread->m_keymaps.end(); ++ i)
 		(*i)->describe(m_log, &dp);
-	m_log << std::endl;
 }
 
 
@@ -437,10 +429,10 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 
 	// the "Gen Modifiers" header is written here rather than by
 	// generateModifierEvents(), so that an empty block prints nothing at all
-	if (m_isGeneratingModifiers && !m_modifierHeaderWritten) {
+	if (m_isGeneratingModifiers && !m_modifierHeaderWritten &&
+			m_log.beginBlock(LogLevel::Debug)) {
 		m_modifierHeaderWritten = true;
 		logNote(LogLevel::Debug, L"Gen Modifiers");
-		++ m_logIndent;
 	}
 
 	ModifiedKey mkey(i_key);
@@ -448,8 +440,8 @@ void Engine::generateKeyEvent(Key *i_key, bool i_doPress, bool i_isByAssign)
 	mkey.m_modifier.on(Modifier::Type_Down, i_doPress);
 	outputToLog(i_key, mkey, LogLevel::Debug, L"OUT",
 				isAlreadyReleased
-				? (doGenerate ? L"(already released, sent anyway) "
-				   : L"(already released) ")
+				? (doGenerate ? L"(already released, sent anyway)"
+				   : L"(already released)")
 				: NULL);
 }
 
@@ -464,8 +456,7 @@ void Engine::generateEvents(Current i_c, const Keymap *i_keymap, Key *i_event)
 				i_c.m_keymap->searchAssignment(i_c.m_mkey)) {
 		if (m_log.wouldLog(LogLevel::Debug)) {
 			Acquire a(&m_log, LogLevel::Debug);
-			logIndent(m_logIndent);
-			m_log << L"*   event " << i_event->getName() << std::endl;
+			m_log << L"* event " << i_event->getName() << std::endl;
 		}
 		generateKeySeqEvents(i_c, keyAssign->m_keySeq, Part_all);
 	}
@@ -476,7 +467,7 @@ void Engine::generateEvents(Current i_c, const Keymap *i_keymap, Key *i_event)
 void Engine::generateModifierEvents(const Modifier &i_mod)
 {
 	auto s = m_setting.load(std::memory_order_relaxed);
-	// The header and the indent are produced by generateKeyEvent(), the first
+	// The header and its block are opened by generateKeyEvent(), the first
 	// time it actually generates something.  Most blocks generate nothing.
 	bool wasGenerating = m_isGeneratingModifiers;
 	bool hadHeader = m_modifierHeaderWritten;
@@ -540,7 +531,7 @@ void Engine::generateModifierEvents(const Modifier &i_mod)
 	}
 
 	if (m_modifierHeaderWritten)
-		-- m_logIndent;
+		m_log.endBlock();
 	m_isGeneratingModifiers = wasGenerating;
 	m_modifierHeaderWritten = hadHeader;
 }
@@ -596,28 +587,24 @@ void Engine::generateActionEvents(const Current &i_c, const Action *i_a,
 		if (!is_down && !is_up)
 			break;
 
+		// what the function reports, and whatever it sets off, nests under this
+		LogBlock block(m_log, LogLevel::Debug);
 		if (m_log.wouldLog(LogLevel::Debug)) {
 			Acquire a(&m_log, LogLevel::Debug);
-			logIndent(m_logIndent);
-			m_log << L"FN  " << af->m_functionData.get();
+			m_log << L"FN " << af->m_functionData.get() << std::endl;
 		}
 
 		FunctionParam param;
 		param.m_isPressed = i_doPress;
 		param.m_hwnd = m_currentFocusOfThread->m_hwndFocus;
 		param.m_c = i_c;
-		param.m_doesNeedEndl = true;
 		param.m_af = af;
+		param.m_logBlock = &block;
 
 		param.m_c.m_mkey.m_modifier.on(Modifier::Type_Up, !i_doPress);
 		param.m_c.m_mkey.m_modifier.on(Modifier::Type_Down, i_doPress);
 
 		af->m_functionData->exec(this, &param);
-
-		if (param.m_doesNeedEndl && m_log.wouldLog(LogLevel::Debug)) {
-			Acquire a(&m_log, LogLevel::Debug);
-			m_log << std::endl;
-		}
 		break;
 	}
 	}
@@ -660,7 +647,7 @@ void Engine::generateKeyboardEvents(const Current &i_c)
 	if (++ m_generateKeyboardEventsRecursionGuard ==
 			MAX_GENERATE_KEYBOARD_EVENTS_RECURSION_COUNT) {
 		Acquire a(&m_log, LogLevel::Error);
-		m_log << L"too deep keymap recursion.  there may be a loop."
+		m_log << L"too deep keymap recursion. there may be a loop."
 		<< std::endl;
 		-- m_generateKeyboardEventsRecursionGuard;
 		return;
@@ -724,7 +711,7 @@ void Engine::beginGeneratingKeyboardEvents(
 		}
 
 		logNote(LogLevel::Debug, L"substitute");
-		outputToLog(mkey.m_key, cnew.m_mkey, LogLevel::Debug, L"IN ");
+		outputToLog(mkey.m_key, cnew.m_mkey, LogLevel::Debug, L"IN");
 	}
 
 	// for prefix key
@@ -968,8 +955,7 @@ void Engine::resetModifiersIfIdle()
 	if (m_currentKeyPressCount <= 0) {
 		if (m_log.wouldLog(LogLevel::Debug)) {
 			Acquire a(&m_log, LogLevel::Debug);
-			logIndent(m_logIndent);
-			m_log << L"*   No key is pressed" << std::endl;
+			m_log << L"* No key is pressed" << std::endl;
 		}
 		generateModifierEvents(Modifier());
 		if (0 < m_currentKeyPressCountOnWin32)
@@ -1046,6 +1032,10 @@ void Engine::resyncKeyStates(bool i_force)
 	if (m_currentKeyPressCount <= 0 && !i_force)
 		return;
 
+	// A block of its own, and only when there is something to say: this runs
+	// on every key event, and before the key's own block can be opened - the
+	// modifiers its IN line shows depend on what is dropped here.
+	LogBlock block(m_log);
 	bool dropped = false;
 	for (Keyboard::KeyIterator i = s->m_keyboard.getKeyIterator(); *i; ++ i) {
 		Key *key = *i;
@@ -1059,9 +1049,12 @@ void Engine::resyncKeyStates(bool i_force)
 					 : i_force;
 		if (stale) {
 			if (m_log.wouldLog(LogLevel::Debug)) {
+				if (!dropped)
+					block.open(LogLevel::Debug);
 				Acquire a(&m_log, LogLevel::Debug);
-				logIndent(m_logIndent);
-				m_log << L"*   resync: drop stale key " << *key << std::endl;
+				if (!dropped)
+					m_log << L"resync" << std::endl;
+				m_log << L"* drop stale key " << *key << std::endl;
 			}
 			key->m_isPressed = false;
 			-- m_currentKeyPressCount;
@@ -1101,6 +1094,40 @@ Engine::WaitResult Engine::waitWhileUnlocked(HANDLE i_event, DWORD i_timeout)
 	// WAIT_TIMEOUT, or a failed wait: keep the historical behaviour of
 	// carrying on with the rest of the key sequence
 	return WaitResult::Timeout;
+}
+
+
+// write how long a wait took; see the header
+void Engine::logWait(LogLevel i_level, const wchar_t *i_what,
+					 const FILETIME &i_start)
+{
+	if (!m_log.wouldLog(i_level))
+		return;
+	FILETIME now;
+	GetSystemTimePreciseAsFileTime(&now);
+	auto ticks = [](const FILETIME &i_ft) {
+		return (static_cast<unsigned long long>(i_ft.dwHighDateTime) << 32) |
+			i_ft.dwLowDateTime;
+	};
+	// in 100 ns units; a clock set back during the wait counts as no time
+	const unsigned long long elapsed = (ticks(i_start) < ticks(now))
+		? (ticks(now) - ticks(i_start)) / 10000 : 0;
+
+	// local time, as the prefix of every log line shows it
+	FILETIME local;
+	SYSTEMTIME st = {};
+	if (!FileTimeToLocalFileTime(&i_start, &local) ||
+			!FileTimeToSystemTime(&local, &st))
+		st = SYSTEMTIME();
+
+	wchar_t text[128];
+	std::swprintf(text, NUMBER_OF(text),
+				  L"%lswaited %llu ms, started %02u:%02u:%02u.%03u", i_what,
+				  elapsed, static_cast<unsigned>(st.wHour),
+				  static_cast<unsigned>(st.wMinute),
+				  static_cast<unsigned>(st.wSecond),
+				  static_cast<unsigned>(st.wMilliseconds));
+	logNote(i_level, text);
 }
 
 
@@ -1516,6 +1543,15 @@ void Engine::keyboardHandler()
 		if (m_resyncForceRequested.exchange(false))
 			resyncKeyStates(true);
 
+		// The key event's log block ends with this round, and there are a
+		// good many ways out of it below.
+		struct InputBlockCloser {
+			LogBlock &m_block;
+			~InputBlockCloser() {
+				m_block.close();
+			}
+		} inputBlockCloser = { m_inputLogBlock };
+
 		checkFocusWindow();
 
 		Lock lock(this);
@@ -1547,7 +1583,7 @@ void Engine::keyboardHandler()
 				resetModifiersIfIdle();
 			} else if (reason && m_log.wouldLog(LogLevel::Debug)) {
 				Acquire a(&m_log, LogLevel::Debug);
-				m_log << L"*   " << reason << std::endl;
+				m_log << L"* " << reason << std::endl;
 			}
 			continue;
 		}
@@ -1641,18 +1677,18 @@ void Engine::keyboardHandler()
 		}
 
 		if (m_isLogMode) {
-			outputInputToLog(&key, c.m_mkey, LogLevel::Info);
+			outputInputToLog(&key, c.m_mkey, LogLevel::Info, isModifier);
 			if (kid.Flags & KEYBOARD_INPUT_DATA::E1) {
 				// through mouse event even if log mode
 				injectInputThrough(&kid, c.m_mkey.m_key);
 			}
 		} else if (am == Keymap::AM_true) {
 			// true modifier doesn't generate scan code
-			outputInputToLog(&key, c.m_mkey, LogLevel::Debug);
+			outputInputToLog(&key, c.m_mkey, LogLevel::Debug, isModifier);
 			logNote(LogLevel::Debug, L"true modifier");
 		} else if (am == Keymap::AM_oneShot || am == Keymap::AM_oneShotRepeatable) {
 			// oneShot modifier doesn't generate scan code
-			outputInputToLog(&key, c.m_mkey, LogLevel::Debug);
+			outputInputToLog(&key, c.m_mkey, LogLevel::Debug, isModifier);
 			logNote(LogLevel::Debug,
 					(am == Keymap::AM_oneShot) ? L"one shot modifier"
 					: L"one shot repeatable modifier");
@@ -1690,7 +1726,7 @@ void Engine::keyboardHandler()
 			}
 		} else if (c.m_mkey.m_key) {
 			// normal key
-			outputInputToLog(&key, c.m_mkey, LogLevel::Debug);
+			outputInputToLog(&key, c.m_mkey, LogLevel::Debug, isModifier);
 			if (isPhysicallyPressed)
 				m_oneShotKey.m_key = NULL;
 			beginGeneratingKeyboardEvents(c, isModifier);
@@ -1726,9 +1762,9 @@ Engine::Engine(womsgstream &i_log)
 		m_readEvent(NULL),
 		m_queueMutex(NULL),
 		m_isLogMode(false),
-		m_logIndent(0),
 		m_isGeneratingModifiers(false),
 		m_modifierHeaderWritten(false),
+		m_inputLogBlock(i_log),
 		m_isEnabled(true),
 		m_isSynchronizing(false),
 		m_isAborting(false),
@@ -1965,16 +2001,19 @@ void Engine::applySetting(std::shared_ptr<Setting> newSetting) {
 	// the same log, so a setting that was compiled but never reached the
 	// engine looked exactly like one that had.  This line is the engine's.
 	{
-		Acquire a(&m_log, LogLevel::Info);
-		m_log << L"setting activated: " << raw->m_keymaps.size()
-		<< L" keymaps, " << raw->m_keySeqs.size() << L" keyseqs, "
-		<< raw->m_keyboard.countKeys() << L" keys" << std::endl;
-	}
-	if (m_log.wouldLog(LogLevel::Debug)) {
-		Acquire a(&m_log, LogLevel::Debug);
-		m_log << L"  global keymaps: " << m_globalFocus.m_keymaps.size()
-		<< L", focus threads: " << m_focusOfThreads.size()
-		<< L" (" << refilled << L" had no keymap)" << std::endl;
+		LogBlock block(m_log, LogLevel::Info);
+		{
+			Acquire a(&m_log, LogLevel::Info);
+			m_log << L"setting activated: " << raw->m_keymaps.size()
+			<< L" keymaps, " << raw->m_keySeqs.size() << L" keyseqs, "
+			<< raw->m_keyboard.countKeys() << L" keys" << std::endl;
+		}
+		if (m_log.wouldLog(LogLevel::Debug)) {
+			Acquire a(&m_log, LogLevel::Debug);
+			m_log << L"global keymaps: " << m_globalFocus.m_keymaps.size()
+			<< L", focus threads: " << m_focusOfThreads.size()
+			<< L" (" << refilled << L" had no keymap)" << std::endl;
+		}
 	}
 	// Cleared without a word: the line above already says the setting is in
 	// force, and there was nothing wrong to recover from.

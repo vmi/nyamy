@@ -185,7 +185,7 @@ foreach ($stmt in $statements) {
         }
 
         if ($argc -gt 0) {
-            $null = $sb.AppendLine("    i_ost << L`") `";")
+            $null = $sb.AppendLine("    i_ost << L`")`";")
         }
         $null = $sb.AppendLine("    return i_ost;")
         $null = $sb.AppendLine("  }")

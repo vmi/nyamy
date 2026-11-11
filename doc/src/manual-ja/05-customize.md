@@ -726,15 +726,16 @@ cmdLine="${NYAMY_ROOT}\nyamy-scripter.exe -I ${HOME}\nyamy-lib -D MYFLAG .mayu.r
 
 #### ログの書式 {#logformat}
 
-[ログウインドウ](#menu-l)の各行は、`hh:mm:ss.SSS` の時刻とレベル 1 文字を `|` で区切った 15 文字が先頭に付きます。日付が変わると `[YYYY-MM-DD]` だけの行が挿入されます。この行だけは桁の並びが崩れますが、それがそのまま「日付が変わった」という目印になります。
+[ログウインドウ](#menu-l)の各行は、`hh:mm:ss.SSS` の時刻とレベル 1 文字を `|` で区切り、空白を 1 個置いた 16 文字が先頭に付きます。日付が変わると `[YYYY-MM-DD]` に区切り線の付いた行が挿入されます。この行だけは桁の並びが崩れますが、それがそのまま「日付が変わった」という目印になります。
 
 ```
-[2026-08-10]
-12:34:56.789|D|IN    0x1d  D-LeftControl
-12:34:56.789|D|  FN  &OtherWindowClass
-12:34:56.790|D|    OUT 0x1d  U-LeftControl
-12:34:57.102|W|gave up adding the tasktray icon.
-12:34:58.004|E|too deep keymap recursion.  there may be a loop.
+[2026-08-10] -------------------------------
+12:34:56.790|D| IN D-LeftControl (0x1d) {
+12:34:56.790|D|   FN &OtherWindowClass
+12:34:56.790|D|     OUT D-LeftControl (0x1d)
+12:34:56.790|D| }
+12:34:57.102|W| gave up adding the tasktray icon.
+12:34:58.004|E| too deep keymap recursion. there may be a loop.
 ```
 
 レベルは次の 4 段階です。`D` は「□詳細」がチェックされているときだけ出ます。
@@ -746,16 +747,33 @@ cmdLine="${NYAMY_ROOT}\nyamy-scripter.exe -I ${HOME}\nyamy-lib -D MYFLAG .mayu.r
 | `I` | 情報 |
 | `D` | 詳細 (内部の変換処理) |
 
-区切りのあとに空白は入りません。`|` の直後からの空白の数が、そのまま入れ子の深さになります。
+`|` の後の空白 1 個に続く空白の数が、そのまま入れ子の深さになります。
 
-「□詳細」をチェックしたときに出る行は、行頭の印で種別が分かります。1 打鍵ごとに空行で区切られます。
+ひとまとまりの出力は、見出しの行末の `{` と、`}` だけの行で囲まれたブロックになります。本文は字下げされます。本文が残らなかったときは見出しの行だけが括弧無しで出ます。ブロックの中のブロックには括弧を付けず、字下げだけで表します。ただし、キーを別のキーマップへ渡す [`&KeymapParent`](#function_KeymapParent)、[`&OtherWindowClass`](#function_OtherWindowClass)、[`&KeymapWindow`](#function_KeymapWindow)、[`&KeymapPrevPrefix`](#function_KeymapPrevPrefix)、[`&Keymap`](#function_Keymap) は、渡した先の処理を字下げせず、同じ深さに続けて出力します。割り当ての無いキーがキーマップを次々にたどる様子は、`FN` の行が縦に並んだ形で読めます。
+
+| 見出し | 内容 |
+| --- | --- |
+| `IN` | 1 打鍵の処理 |
+| `resync` | 押されたままと記録されていたキーの解除 |
+| `FocusChanged` | 適用するウィンドウの切り替え |
+| `FocusNotify` | フックから届いたフォーカス変更の通知 |
+| `ConsoleFocus` | コンソールウィンドウへの切り替え |
+| `RemoveThread` | 終了したスレッドの記録の削除 |
+| `WindowInfo` | [調査](#menu-i)と [`&WindowIdentify`](#function_WindowIdentify) の結果 |
+| `DescribeBindings` | [`&DescribeBindings`](#function_DescribeBindings) の結果 |
+| `setting activated:` | 設定の反映 |
+| `Check Keystate` | キー状態の確認 |
+
+ブロックは閉じた時点でまとめて出力されるので、途中に別の行が挟まることはありません。ブロックの行の時刻は、すべてブロックを閉じた時刻です。処理中に別のところから出力された行はブロックより前に並び、時刻もブロックより前になります。そのため、`IN` の行の時刻はキーが押された時刻ではなく、その打鍵の処理を終えた時刻です。待ち合わせをする [`&Wait`](#function_Wait) と [`&Sync`](#function_Sync) は、待ち始めた時刻と待った時間を `* waited 503 ms, started 12:34:56.789` や `* sync timed out: waited 5000 ms, started 12:34:56.789` のように出力します。
+
+「□詳細」をチェックしたときに出る行は、行頭の印で種別が分かります。`IN` と `OUT` の行は、キー名の後ろの括弧にスキャンコードが出ます。
 
 | 印 | 意味 |
 | --- | --- |
-| `IN ` | 実際に入力された物理キー |
+| `IN` | 実際に入力された物理キー |
 | `OUT` | NYamy が生成したキー |
-| `FN ` | 実行した `⟨FUNCTION⟩` |
-| `*  ` | 注記・状態 (`* Modifier Key` など) |
+| `FN` | 実行した `⟨FUNCTION⟩` |
+| `*` | 注記・状態 (`* Modifier Key` など) |
 
 なお、[調査](#menu-i)や `FocusChanged` が出力する `TITLE:` の中の制御文字は、`<TAB>` / `<LF>` / `<CR>`、それ以外は `<XX>` (文字コードが 0xFF を超える場合は `<U+XXXX>`) と表記されます。この文字列は [`window`](#windowClass) のクラス名/タイトル名の照合対象そのものなので、制御文字にマッチさせている設定がある場合は書き換えが必要です (以前のバージョンではすべて `?` と表記されていました)。
 

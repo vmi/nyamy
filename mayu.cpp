@@ -223,15 +223,20 @@ private:
 				m_engine.setFocus(n->getHwnd(), n->m_threadId,
 								  n->m_className, n->m_titleName, false);
 
-			{
-				Acquire a(&m_log, LogLevel::Debug);
-				m_log << L"HWND:     " << std::hex
-				<< n->_m_hwnd /* always 32bit width when log outout */
-				<< std::dec << std::endl;
-				m_log << L"THREADID: " << static_cast<int>(n->m_threadId)
-				<< std::endl;
-			}
-			Acquire a(&m_log, (n->m_type == Notify::Type_name) ? LogLevel::Info : LogLevel::Debug);
+			// An answer to &WindowIdentify or the investigate dialog is what
+			// the user asked for; a change of focus is routine.  One level for
+			// the whole report, or the filter leaves half of it behind.
+			const LogLevel level = (n->m_type == Notify::Type_name)
+								   ? LogLevel::Info : LogLevel::Debug;
+			LogBlock block(m_log, level);
+			Acquire a(&m_log, level);
+			m_log << ((n->m_type == Notify::Type_name)
+					  ? L"WindowInfo" : L"FocusNotify") << std::endl;
+			m_log << L"HWND:     " << std::hex
+			<< n->_m_hwnd /* always 32bit width when log outout */
+			<< std::dec << std::endl;
+			m_log << L"THREADID: " << static_cast<int>(n->m_threadId)
+			<< std::endl;
 			m_log << L"CLASS:    " << n->m_className << std::endl;
 			m_log << L"TITLE:   \"" << n->m_titleName << L"\"" << std::endl;
 
@@ -264,8 +269,6 @@ private:
 			<< rc.left << L", " << rc.top << L") / ("
 			<< rcWidth(&rc) << L"x" << rcHeight(&rc) << L")"
 			<< std::endl;
-
-			m_log << std::endl;
 			break;
 		}
 
@@ -603,16 +606,19 @@ private:
 						BYTE keys[256];
 						ret = GetKeyboardState(keys);
 						if (ret == 0) {
-							This->m_log << L"Check Keystate Failed(%d)"
-							<< GetLastError() << std::endl;
+							Acquire a(&This->m_log, LogLevel::Error);
+							This->m_log << L"Check Keystate Failed("
+							<< GetLastError() << L")" << std::endl;
 						} else {
-							This->m_log << L"Check Keystate: " << std::endl;
+							LogBlock block(This->m_log, LogLevel::Info);
+							Acquire a(&This->m_log, LogLevel::Info);
+							This->m_log << L"Check Keystate" << std::endl;
 							for (int i = 0; i < 0xff; i++) {
 								USHORT asyncKey;
 								asyncKey = GetAsyncKeyState(i);
 								This->m_log << std::hex;
 								if (asyncKey & 0x8000) {
-									This->m_log << L"  " << VK2WCHAR[i]
+									This->m_log << VK2WCHAR[i]
 									<< L"(0x" << i << L"): pressed!"
 									<< std::endl;
 								}
@@ -623,14 +629,13 @@ private:
 										i == 0x91    // VK_SCROLL
 								   ) {
 									if (keys[i] & 1) {
-										This->m_log << L"  " << VK2WCHAR[i]
+										This->m_log << VK2WCHAR[i]
 										<< L"(0x" << i << L"): locked!"
 										<< std::endl;
 									}
 								}
 								This->m_log << std::dec;
 							}
-							This->m_log << std::endl;
 						}
 						break;
 					}

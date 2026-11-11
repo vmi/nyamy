@@ -798,16 +798,22 @@ int Engine::EmacsEditKillLine::pred()
 // send a default key to Windows
 void Engine::funcDefault(FunctionParam *i_param)
 {
-	if (m_log.wouldLog(LogLevel::Debug)) {
-		Acquire a(&m_log, LogLevel::Debug);
-		m_log << std::endl;
-	}
-	// Outside the guard: this says the caller has no trailing newline left to
-	// write, which is true whether or not the line was kept.
-	i_param->m_doesNeedEndl = false;
 	if (i_param->m_isPressed)
 		generateModifierEvents(i_param->m_c.m_mkey.m_modifier);
 	generateKeyEvent(i_param->m_c.m_mkey.m_key, i_param->m_isPressed, true);
+}
+
+// hand the key on to another keymap; see the header
+void Engine::forwardKey(FunctionParam *i_param, const Current &i_c,
+						bool i_doesReport)
+{
+	if (i_doesReport && m_log.wouldLog(LogLevel::Debug)) {
+		Acquire a(&m_log, LogLevel::Debug);
+		m_log << L"* keymap: " << i_c.m_keymap->getName() << std::endl;
+	}
+	if (i_param->m_logBlock)
+		i_param->m_logBlock->close();
+	generateKeyboardEvents(i_c);
 }
 
 // use a corresponding key of a parent keymap
@@ -819,13 +825,7 @@ void Engine::funcKeymapParent(FunctionParam *i_param)
 		funcDefault(i_param);
 		return;
 	}
-
-	if (m_log.wouldLog(LogLevel::Debug)) {
-		Acquire a(&m_log, LogLevel::Debug);
-		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
-	}
-	i_param->m_doesNeedEndl = false;
-	generateKeyboardEvents(c);
+	forwardKey(i_param, c, true);
 }
 
 // use a corresponding key of a current window
@@ -834,21 +834,24 @@ void Engine::funcKeymapWindow(FunctionParam *i_param)
 	Current c(i_param->m_c);
 	c.m_keymap = m_currentFocusOfThread->m_keymaps.front();
 	c.m_i = m_currentFocusOfThread->m_keymaps.begin();
-	generateKeyboardEvents(c);
+	forwardKey(i_param, c, true);
 }
 
 // use a corresponding key of the previous prefixed keymap
 void Engine::funcKeymapPrevPrefix(FunctionParam *i_param, int i_previous)
 {
+	// The history is empty outside a prefix, and holds only as many keymaps
+	// as there have been prefixes: asking further back than that does nothing.
+	if (i_previous <= 0 ||
+			m_keymapPrefixHistory.size() < static_cast<size_t>(i_previous))
+		return;
+
 	Current c(i_param->m_c);
-	if (0 < i_previous && 0 <= m_keymapPrefixHistory.size() - i_previous) {
-		int n = i_previous - 1;
-		KeymapPtrList::reverse_iterator i = m_keymapPrefixHistory.rbegin();
-		while (0 < n && i != m_keymapPrefixHistory.rend())
-			--n, ++i;
-		c.m_keymap = *i;
-		generateKeyboardEvents(c);
-	}
+	KeymapPtrList::reverse_iterator i = m_keymapPrefixHistory.rbegin();
+	for (int n = i_previous - 1; 0 < n; -- n)
+		++ i;
+	c.m_keymap = *i;
+	forwardKey(i_param, c, true);
 }
 
 // use a corresponding key of an other window class, or use a default key
@@ -862,12 +865,7 @@ void Engine::funcOtherWindowClass(FunctionParam *i_param)
 	}
 
 	c.m_keymap = *c.m_i;
-	if (m_log.wouldLog(LogLevel::Debug)) {
-		Acquire a(&m_log, LogLevel::Debug);
-		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
-	}
-	i_param->m_doesNeedEndl = false;
-	generateKeyboardEvents(c);
+	forwardKey(i_param, c, true);
 }
 
 // prefix key
@@ -885,12 +883,6 @@ void Engine::funcPrefix(FunctionParam *i_param, const Keymap *i_keymap,
 	m_isPrefix = true;
 	m_doesEditNextModifier = false;
 	m_doesIgnoreModifierForPrefix = !!i_doesIgnoreModifiers;
-
-	if (m_log.wouldLog(LogLevel::Debug)) {
-		Acquire a(&m_log, LogLevel::Debug);
-		m_log << L"(" << i_keymap->getName() << L", "
-		<< (i_doesIgnoreModifiers ? L"true" : L"false") << L")";
-	}
 }
 
 // other keymap's key
@@ -898,12 +890,8 @@ void Engine::funcKeymap(FunctionParam *i_param, const Keymap *i_keymap)
 {
 	Current c(i_param->m_c);
 	c.m_keymap = i_keymap;
-	if (m_log.wouldLog(LogLevel::Debug)) {
-		Acquire a(&m_log, LogLevel::Debug);
-		m_log << L"(" << c.m_keymap->getName() << L")" << std::endl;
-	}
-	i_param->m_doesNeedEndl = false;
-	generateKeyboardEvents(c);
+	// the function's own line already names the keymap
+	forwardKey(i_param, c, false);
 }
 
 // sync
@@ -931,6 +919,8 @@ void Engine::funcSync(FunctionParam *i_param)
 	m_isSynchronizing = true;
 	generateKeyEvent(sync, false, false);
 
+	FILETIME start;
+	GetSystemTimePreciseAsFileTime(&start);
 	WaitResult r = waitWhileUnlocked(m_eSync, kSyncTimeoutMillisec);
 	m_isSynchronizing = false;
 
@@ -940,10 +930,10 @@ void Engine::funcSync(FunctionParam *i_param)
 	// a stale signal behind.
 	g_hookData->m_syncKey = 0;
 
-	if (r == WaitResult::Timeout) {
-		Acquire a(&m_log, LogLevel::Info);
-		m_log << L" *FAILED*" << std::endl;
-	}
+	if (r == WaitResult::Timeout)
+		logWait(LogLevel::Warn, L"sync timed out: ", start);
+	else if (r == WaitResult::Signaled)
+		logWait(LogLevel::Debug, L"synced: ", start);
 }
 
 // toggle lock
@@ -1097,7 +1087,7 @@ void Engine::funcShellExecute(FunctionParam *i_param,
 		<< arg(i_file, req->m_file) << L", "
 		<< arg(i_parameters, req->m_parameters) << L", "
 		<< arg(i_directory, req->m_directory) << L", "
-		<< i_showCommand << L") ";
+		<< i_showCommand << L")";
 		req->m_description = desc.str();
 	}
 
@@ -1165,7 +1155,7 @@ void Engine::shellExecute(LPARAM i_lParam)
 	std::wstring errorMessage(L"Unknown error.");
 	getTypeName(&errorMessage, r, errorTable, NUMBER_OF(errorTable));
 
-	Acquire b(&m_log, LogLevel::Info);
+	Acquire b(&m_log, LogLevel::Error);
 	m_log << L"error: " << req->m_description << L": " << errorMessage
 	<< std::endl;
 }
@@ -1266,7 +1256,7 @@ void Engine::funcLoadSetting(FunctionParam *i_param, const StrExprArg &i_name)
 		{
 			// The name is what failed, so report what it stood for as well as
 			// how it was written.
-			Acquire a(&m_log, LogLevel::Info);
+			Acquire a(&m_log, LogLevel::Error);
 			m_log << resolveStrExpr << L"unknown setting name: " << i_name
 			<< describeStrExpr << std::endl;
 		}
@@ -1325,9 +1315,12 @@ void Engine::funcWait(FunctionParam *i_param, int i_milliSecond)
 		return;					// too long wait
 
 	m_isSynchronizing = true;
+	FILETIME start;
+	GetSystemTimePreciseAsFileTime(&start);
 	// no event to wait for - just the timeout, cut short by shutdown
 	waitWhileUnlocked(NULL, static_cast<DWORD>(i_milliSecond));
 	m_isSynchronizing = false;
+	logWait(LogLevel::Debug, L"", start);
 }
 
 // investigate WM_COMMAND, WM_SYSCOMMAND
@@ -1335,12 +1328,9 @@ void Engine::funcInvestigateCommand(FunctionParam *i_param)
 {
 	if (!i_param->m_isPressed)
 		return;
-	Acquire a(&m_log, LogLevel::Info);
 	g_hookData->m_doesNotifyCommand = !g_hookData->m_doesNotifyCommand;
-	if (g_hookData->m_doesNotifyCommand)
-		m_log << L" begin" << std::endl;
-	else
-		m_log << L" end" << std::endl;
+	logNote(LogLevel::Info, g_hookData->m_doesNotifyCommand
+			? L"investigate command: begin" : L"investigate command: end");
 }
 
 // show mayu dialog box
@@ -1359,10 +1349,6 @@ void Engine::funcDescribeBindings(FunctionParam *i_param)
 {
 	if (!i_param->m_isPressed)
 		return;
-	{
-		Acquire a(&m_log, LogLevel::Debug);
-		m_log << std::endl;
-	}
 	describeBindings();
 }
 
@@ -1769,13 +1755,12 @@ void Engine::funcWindowIdentify(FunctionParam *i_param)
 			wchar_t titleName[1024];
 			if (GetWindowText(i_param->m_hwnd, titleName, NUMBER_OF(titleName)) == 0)
 				titleName[0] = L'\0';
-			{
-				Acquire a(&m_log, LogLevel::Debug);
-				m_log << L"HWND:     " << std::hex
-				<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_param->m_hwnd))
-				<< std::dec << std::endl;
-			}
+			LogBlock block(m_log, LogLevel::Info);
 			Acquire a(&m_log, LogLevel::Info);
+			m_log << L"WindowInfo" << std::endl;
+			m_log << L"HWND:     " << std::hex
+			<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_param->m_hwnd))
+			<< std::dec << std::endl;
 			m_log << L"CLASS:    " << className << std::endl;
 			// same escaping as the hook applies, so that the title reads the
 			// same whichever path reported it
@@ -1796,7 +1781,6 @@ void Engine::funcWindowIdentify(FunctionParam *i_param)
 			<< rcWidth(&rc) << L"x" << rcHeight(&rc)
 			<< L")" << std::endl;
 
-			m_log << std::endl;
 			ok = true;
 		}
 	}
@@ -1841,7 +1825,7 @@ void Engine::funcWindowSetAlpha(FunctionParam *i_param, int i_alpha)
 			i_alpha %= 101;
 			if (!setLayeredWindowAttributes(hwnd, 0,
 											(BYTE)(255 * i_alpha / 100), LWA_ALPHA)) {
-				Acquire a(&m_log, LogLevel::Info);
+				Acquire a(&m_log, LogLevel::Error);
 				m_log << L"error: &WindowSetAlpha(" << i_alpha
 				<< L") failed for HWND: " << std::hex
 				<< hwnd << std::dec << std::endl;
@@ -2148,15 +2132,15 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 	if (HANDLE hm = OpenMutex(MUTEX_ALL_ACCESS, FALSE, L"sakura"))
 		CloseHandle(hm);
 	else {
-		Acquire a(&m_log, LogLevel::Info);
-		m_log << L" Error(1): Direct SSTP server does not exist." << std::endl;
+		Acquire a(&m_log, LogLevel::Error);
+		m_log << L"Error(1): Direct SSTP server does not exist." << std::endl;
 		return;
 	}
 
 	HANDLE hfm = OpenFileMapping(FILE_MAP_READ, FALSE, L"Sakura");
 	if (!hfm) {
-		Acquire a(&m_log, LogLevel::Info);
-		m_log << L" Error(2): Direct SSTP server does not provide data." << std::endl;
+		Acquire a(&m_log, LogLevel::Error);
+		m_log << L"Error(2): Direct SSTP server does not provide data." << std::endl;
 		return;
 	}
 
@@ -2164,8 +2148,8 @@ void Engine::funcDirectSSTP(FunctionParam *i_param,
 		reinterpret_cast<char *>(MapViewOfFile(hfm, FILE_MAP_READ, 0, 0, 0));
 	if (!data) {
 		CloseHandle(hfm);
-		Acquire a(&m_log, LogLevel::Info);
-		m_log << L" Error(3): Direct SSTP server does not provide data." << std::endl;
+		Acquire a(&m_log, LogLevel::Error);
+		m_log << L"Error(3): Direct SSTP server does not provide data." << std::endl;
 		return;
 	}
 
@@ -2272,8 +2256,7 @@ public:
 			if (!m_dll) {
 				m_dll = LoadLibrary(i_dllName.c_str());
 				if (!m_dll) {
-					Acquire a(&i_log);
-					i_log << std::endl;
+					Acquire a(&i_log, LogLevel::Error);
 					i_log << L"error: &PlugIn() failed to load " << i_dllName << std::endl;
 					return false;
 				}
@@ -2293,8 +2276,7 @@ public:
 				if (!m_func) {
 					m_func = GetProcAddress(m_dll, to_string(i_funcName).c_str());
 					if (!m_func) {
-						Acquire a(&i_log);
-						i_log << std::endl;
+						Acquire a(&i_log, LogLevel::Error);
 						i_log << L"error: &PlugIn() failed to find function: "
 						<< i_funcName << std::endl;
 						return false;
@@ -2351,8 +2333,7 @@ void Engine::funcPlugIn(FunctionParam *i_param,
 		auto rawPlugin = plugin.release();
 		if (_beginthread(shu::plugInThread, 0, rawPlugin) == -1) {
 			delete rawPlugin;
-			Acquire a(&m_log);
-			m_log << std::endl;
+			Acquire a(&m_log, LogLevel::Error);
 			m_log << L"error: &PlugIn() failed to create thread." << std::endl;
 		}
 		return;

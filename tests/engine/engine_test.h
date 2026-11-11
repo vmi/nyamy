@@ -134,6 +134,76 @@ public:
 			fot->m_keymaps.clear();
 	}
 
+	/// the log line of a physical key event, which opens its block
+	static void outputInputToLog(Engine *io_engine, const Key *i_key,
+								 const ModifiedKey &i_mkey, LogLevel i_level,
+								 bool i_isModifier = false) {
+		io_engine->outputInputToLog(i_key, i_mkey, i_level, i_isModifier);
+	}
+
+	/// what the end of a round of keyboardHandler() does to that block
+	static void closeInputBlock(Engine *io_engine) {
+		io_engine->m_inputLogBlock.close();
+	}
+
+	///
+	static void outputToLog(Engine *io_engine, const Key *i_key,
+							const ModifiedKey &i_mkey, LogLevel i_level,
+							const wchar_t *i_mark,
+							const wchar_t *i_note = NULL) {
+		io_engine->outputToLog(i_key, i_mkey, i_level, i_mark, i_note);
+	}
+
+	///
+	static void logNote(Engine *io_engine, LogLevel i_level,
+						const wchar_t *i_text) {
+		io_engine->logNote(i_level, i_text);
+	}
+
+	///
+	static void describeBindings(Engine *io_engine) {
+		io_engine->describeBindings();
+	}
+
+	/// &Wait, run the way a key sequence runs it: with the engine lock held once
+	static void funcWait(Engine *io_engine, int i_milliSecond) {
+		Engine::Lock lock(io_engine);
+		FunctionParam param{};
+		param.m_isPressed = true;
+		io_engine->funcWait(&param, i_milliSecond);
+	}
+
+	/** Process a key from i_start on, as a key event does once its keymap is
+	    known.  i_keymaps stands for the keymaps the focused window matched,
+	    which &KeymapWindow and &OtherWindowClass walk. */
+	static void generateKeyboardEvents(Engine *io_engine,
+									   const ModifiedKey &i_mkey,
+									   const Keymap *i_start,
+									   const Keymaps::KeymapPtrList &i_keymaps) {
+		io_engine->m_globalFocus.m_keymaps = i_keymaps;
+		io_engine->m_currentFocusOfThread = &io_engine->m_globalFocus;
+		Engine::Current c;
+		c.m_keymap = i_start;
+		c.m_mkey = i_mkey;
+		c.m_i = io_engine->m_globalFocus.m_keymaps.begin();
+		io_engine->generateKeyboardEvents(c);
+	}
+
+	/// &KeymapPrevPrefix(i_previous), i_history being the prefix keymaps of
+	/// the key sequence so far, oldest first
+	static void funcKeymapPrevPrefix(Engine *io_engine,
+									 const ModifiedKey &i_mkey,
+									 const Keymaps::KeymapPtrList &i_history,
+									 int i_previous) {
+		io_engine->m_keymapPrefixHistory = i_history;
+		io_engine->m_currentFocusOfThread = &io_engine->m_globalFocus;
+		FunctionParam param{};
+		param.m_isPressed = true;
+		param.m_c.m_keymap = NULL;
+		param.m_c.m_mkey = i_mkey;
+		io_engine->funcKeymapPrevPrefix(&param, i_previous);
+	}
+
 private:
 	static Engine::FocusOfThread *findFocus(Engine *io_engine, DWORD i_threadId) {
 		Engine::FocusOfThreads::iterator i =
@@ -147,6 +217,7 @@ private:
 void runSettingActivationTests();
 void runAdHocKeySeqTests();
 void runStickyNoticeTests();
+void runLogFormatTests();
 
 
 #endif // !_ENGINE_TEST_H

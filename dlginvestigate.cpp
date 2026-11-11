@@ -82,13 +82,12 @@ public:
 				wchar_t titleName[1024];
 				if (GetWindowText(i_hwndTarget, titleName, NUMBER_OF(titleName)) == 0)
 					titleName[0] = L'\0';
-				{
-					Acquire a(&m_data.m_engine->m_log, LogLevel::Debug);
-					m_data.m_engine->m_log << L"HWND:     " << std::hex
-					<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_hwndTarget))
-					<< std::dec << std::endl;
-				}
+				LogBlock block(m_data.m_engine->m_log, LogLevel::Info);
 				Acquire a(&m_data.m_engine->m_log, LogLevel::Info);
+				m_data.m_engine->m_log << L"WindowInfo" << std::endl;
+				m_data.m_engine->m_log << L"HWND:     " << std::hex
+				<< static_cast<DWORD>(reinterpret_cast<uintptr_t>(i_hwndTarget))
+				<< std::dec << std::endl;
 				m_data.m_engine->m_log << L"CLASS:    " << className << std::endl;
 				// same escaping as the hook applies, so that the title reads
 				// the same whichever path reported it
@@ -109,10 +108,10 @@ public:
 					  bool /* i_isAltDown */, bool i_isKeyup) {
 		Acquire a(&m_data.m_engine->m_log, LogLevel::Info);
 		m_data.m_engine->m_log
-		<< (i_isExtended ? L" E-" : L"   ")
+		<< (i_isExtended ? L"E-" : L"")
 		<< L"0x" << std::hex << std::setw(2) << std::setfill(L'0')
-		<< i_nVirtKey << std::dec << L"  &VK( "
-		<< (i_isExtended ? L"E-" : L"  ")
+		<< i_nVirtKey << std::dec << L" &VK( "
+		<< (i_isExtended ? L"E-" : L"")
 		<< (i_isKeyup ? L"U-" : L"D-");
 
 		for (const VKeyTable *vkt = g_vkeyTable; vkt->m_name; ++ vkt) {

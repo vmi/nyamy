@@ -32,7 +32,7 @@ MSBuild proj/nyamy-engine-tests.vcxproj -p:Configuration=Debug -p:Platform=x64
 Debug/nyamy-engine-tests.exe
 ```
 
-対象は `Engine::applySetting()` と、その周辺 (`ensureKeymaps()` / `canRunAdHocKeySeq()` / `StickyNotice`)。ソース一覧は `nyamy-scripter-tests` から mruby と scripter を抜いたもので、`tests/scripter/hook_stub.cpp` を共有している。**OS フックは一切導入しない。**
+対象は `Engine::applySetting()` と、その周辺 (`ensureKeymaps()` / `canRunAdHocKeySeq()` / `StickyNotice`)、およびログの書式 (`msgstream.h` のブロックとキーの行)。ソース一覧は `nyamy-scripter-tests` から mruby と scripter を抜いたもので、`tests/scripter/hook_stub.cpp` を共有している。**OS フックは一切導入しない。**
 
 テストを足すときは `tests/engine/` に `test_*.cpp` を作り、`engine_test.h` に `run*Tests()` を宣言して `engine_test_main.cpp` から呼ぶ。
 
@@ -126,7 +126,7 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 
 > **サスペンドは省略できない。** グローバルフックの DLL がアンロードされるのは「注入先が次にメッセージを取り出したとき」で、通常の GUI アプリはこれを常時行っている。「触らずに放置する」だけでは手で次の操作をするまでの数秒で先にアンロードされ、**条件が成立しないまま 4 を通過してしまう** (2026-08-17 実測)。サスペンドできない場合は、kill と再起動を 1 本のスクリプトで連続実行して隙間を潰す。
 >
-> 見るのは `FocusChanged` ではなく **`HWND:` / `THREADID:` / `CLASS:` / `TITLE:` の 4 行ブロック**。理由は 6 章。
+> 見るのは `FocusChanged` ではなく **`FocusNotify` ブロック**。理由は 6 章。
 
 直接証拠は Debug ビルド + DebugView (**Capture Global Win32** を有効化。ツールについては 7 章)。`HOOK_RPT` は Debug のみ有効で、`WriteFile to mailslot failed(...), reopening` → `open mailslot successed` の 2 行が出れば再オープンが発火している。**この 2 行が無いまま成功した場合は DLL が再注入されただけで、検証になっていない。**
 
@@ -135,7 +135,7 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 ## 6. ログの読み方 (誤解しやすいもの)
 
 - フォーカス通知が出るのは**アクティブなウィンドウが実際に変わったとき**だけ。フックが `notifySetFocus()` を撃つのは `WM_ACTIVATEAPP` / `WM_NCACTIVATE` / `WM_ACTIVATE` / `WM_MOUSEACTIVATE` / `WM_SETFOCUS` とメニューループの出入り (`hook.cpp`) で、**カーソルを乗せただけでは 1 つも発生しない**。切り替えはクリックか Alt+Tab で行うこと。同じウィンドウ内をクリックし直しても、`GetFocus()` の変化を見ているので 2 回目以降は出ない
-- `FocusChanged` を出す `checkFocusWindow()` は、**入力キューからイベントを 1 つ取り出したときにしか呼ばれない** (`engine.cpp`)。`mouse-event` を使っていない設定ではマウスはキューに入らないので、**ウィンドウを切り替えただけでは出ない。キーを 1 つ押して初めて出る** (Alt+Tab はキー入力を兼ねるので両方出る)。フォーカス通知そのものが届いたかを見たいなら、フックから来て `mayu.cpp` の `notifyHandler()` が出す `HWND:` / `THREADID:` / `CLASS:` / `TITLE:` の 4 行ブロックを見る (こちらはキー入力が要らない)
+- `FocusChanged` を出す `checkFocusWindow()` は、**入力キューからイベントを 1 つ取り出したときにしか呼ばれない** (`engine.cpp`)。`mouse-event` を使っていない設定ではマウスはキューに入らないので、**ウィンドウを切り替えただけでは出ない。キーを 1 つ押して初めて出る** (Alt+Tab はキー入力を兼ねるので両方出る)。フォーカス通知そのものが届いたかを見たいなら、フックから来て `mayu.cpp` の `notifyHandler()` が出す `FocusNotify` ブロックを見る (こちらはキー入力が要らない)
 - `FocusChanged` は**変化したときだけ**出る。毎回出ないのは正常
 - `FocusChanged` が**一度も**出ないときは、`m_focusOfThreads` の照会が外れてグローバルフォーカスへ落ちている。この経路は `GLOBAL FOCUS` を **1 行出したきり沈黙する** (`m_currentFocusOfThread != &m_globalFocus` が 2 回目以降は偽になるため) ので、黙っていること自体は手がかりにならない。**ログを `GLOBAL FOCUS` / `NO GLOBAL FOCUS` で検索して確かめる**。原因は 2 つあり、**ログ上は見分けが付かない**。(a) 登録側と照会側のスレッド ID の食い違い → [event-flow.md](event-flow.md) 2 章、(b) 強制終了後の再起動で古い DLL が名乗り直さない → [known-limitations.md](known-limitations.md) 2.1 節。**切り分けはクリーン起動で再現するかどうか**で行う
 - 終了時のメッセージ (`ScripterManager: scripter did not exit; terminating` など) は**ログダイアログでは読めない**。ダイアログが終了処理で破棄されるため。`LOG_TO_FILE` はソースを書き換えないと有効にならないので逃げ道も無い。**scripter の終了コードで判定する**: `0` = 自力で正常終了 (メッセージは出ていない)、`1` = nyamy の `TerminateProcess(h, 1)` に殺された (メッセージが出た)、`2` = scripter が自分で自分を殺した (スクリプトが `kScripterQuitTimeoutMillisec` で返らなかった)。PowerShell なら終了前に `Get-Process` して `$s.Handle` に触れておけば、終了後も `$s.ExitCode` を読める
@@ -143,7 +143,7 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 - 編集欄は**表示器であって保管場所ではない**。テキストは `LogBuffer` が持ち、編集欄は 100ms のタイマーで追いつく。したがって **1 行流した直後にダイアログを見ても、まだ出ていないことがある** (最大 100ms)。出ないと判断する前にもう一度見ること
 - ログダイアログが**非表示の間、編集欄は更新されない**。行は溜まり続けるので内容は失われないが、「表示した瞬間にまとめて出る」のは正常
 - 保管場所は起動時に一度だけ確保される `logMaxSize` 文字 (既定 100000) の固定長リング。溢れた分は**古い方から行単位で**捨てられ、先頭に切れかけの行は残らないので、**残る先頭行は設定値どおりに決まる**。上限を上げても増えるのは起動時に確保するメモリだけで、1 行あたりのコストは変わらない
-- 編集欄を**スクロールして遡っている間は表示位置が保たれる**。末尾への追従が起きるのは、末尾が見えている状態で流したときだけ
+- 編集欄を**遡っている間と文字を選択している間は、編集欄そのものが止まる** (タイトルに「一時停止中」)。新しい行はリングにだけ溜まり、末尾まで戻るか選択を外した時点でまとめて取り込まれる。止まるのは、前回の更新で末尾に合わせた位置から利用者が動かして末尾が見えなくなったときだけで、折り返しのやり直しなどで位置がずれても止まらない。遡っている間も追記し続けると、`mouse-event` 有効時の詳細モードではホイールの操作そのものがログに出て、ホイールで末尾へ戻れなくなるため
 - `NoFocusWindow` はアクティブ化遷移の一瞬 (`WM_ACTIVATEAPP` がフォーカス確定前に届く) で頻出するが正常。危険信号は「**実 hwnd の報告が続かない** `NoFocusWindow`」であって、出現頻度ではない
 - ウィンドウ別キーマップは 1 つだけ選ばれるのではなく、**マッチしたものが連なりとして積まれる**。複数のパターンが同じクラス連鎖にマッチすれば、どちらのキーも生きる
 - **設定が engine に反映されたかどうかは `setting activated:` の行で見る。** scripter 側の完了メッセージ (`[scripter]` が付く) や `loader: setting committed` はコンパイルの終わりを言っているだけで、engine が実際に切り替えたかどうかは言っていない。件数も出るので、**`keys` が極端に少なければキーボード定義の `load` を忘れた設定**だと分かる (3 章)
@@ -151,7 +151,10 @@ Start の書式は `ctrl_stream_writer.cpp` の `writeStart()` を参照 ([scrip
 - **内部エラーは状態ごとに 1 回しか出ない。** `m_currentFocusOfThread == NULL` / `m_currentKeymap == NULL` は最初の 1 回だけ出て、復帰時に `recovered: ... (suppressed N more)` が出る。**同じ行が並んでいないことは「1 回しか起きていない」ことを意味しない**ので、`recovered:` の側の件数を見ること
 - **`no setting yet; keys are not remapped` は異常ではない。** scripter が最初の設定を渡すまでの数秒はキーをそのまま通すのが正しい動作で、この行はその状態を 1 回だけ知らせるもの (Info)。**復帰行は出ない**。設定が入ったことは直後の `setting activated:` が言う。この行のあとに `setting activated:` が続かないときだけが異常
 - 昇格ウィンドウがアクティブな間にマウスの `IN` 行が出ないのは正常 ([input-injection.md](input-injection.md))
-- **`FN ` の行は 2 箇所が別々に書いている。** 前半 (`FN ` と関数名) は `engine.cpp` の `generateActionEvents()`、**末尾の括弧は関数自身** (`function.cpp`)。キーマップを辿る関数はここに**解決先のキーマップ名**を出すので、`FN  &KeymapParent(EmacsEdit)` は「親を辿った結果 `EmacsEdit` に行き着いた」の意味であって、`&KeymapParent` の引数ではない (この関数は引数を取らない)。`&Keymap(X)` と `&Prefix(X, ...)` は関数名の側も引数を出すため **`FN  &Keymap(X) (X)` と括弧が 2 回**並ぶ。`&Prefix` は改行を出さないので**次の出力が同じ行に続く**。いずれも異常ではない
+- **`FN` の行は関数を呼ぶ前に 1 行で書き切られ、関数からの報告とその関数が起こした出力は次の行から入れ子で出る。** キーマップを辿る関数は**解決先のキーマップ名**を報告するので、`FN &KeymapParent` の下の `* keymap: EmacsEdit` は「親を辿った結果 `EmacsEdit` に行き着いた」の意味であって、`&KeymapParent` の引数ではない (この関数は引数を取らない)。`&Keymap(X)` と `&Prefix(X, ...)` は `FN` の行が引数を出しているので報告は出さない。**キーを別のキーマップへ渡す関数 (`&KeymapParent` / `&OtherWindowClass` / `&KeymapWindow` / `&KeymapPrevPrefix` / `&Keymap`) は、行き先を報告したあと自分のブロックを閉じてから渡す**ので、割り当ての無いキーがキーマップをたどる連鎖は同じ深さに縦に並び、渡した先の処理は次の `FN` から始まる。処理は再帰 (64 段で `too deep keymap recursion` として打ち切り) なので、**字下げの深さは呼び出しの深さとは一致しない**
+- **ブロックは閉じた時点でまとめて出る。** 打鍵のブロックは処理が終わるまで 1 行も表示されないので、`&Wait` や `&Sync` で待っている間は何も増えない。**ブロックの行の時刻はすべて閉じた時刻**なので、`IN` の行の時刻はキーが押された時刻ではなく処理を終えた時刻。途中で別のスレッドが書いた行 (`FocusNotify` など) はブロックより前に並び、時刻もブロックより前になる。**前に並んでいても、打鍵より先に起きたとは限らない**。待ちが絡むときは `&Wait` / `&Sync` の行 (`* waited N ms, started hh:mm:ss.SSS` など) の `started` と比べる
+- **通常モードでは打鍵のブロックが開かない。** 見出しの `IN` が Debug で捨てられるため。打鍵の途中で出た警告やエラー (`* sync timed out: waited 5000 ms, started ...` など) は字下げ無しの単発の行になる
+- **`resync` のブロックは打鍵のブロックの前に独立して出る。** `IN` の行のモディファイヤ表記は resync の結果で決まるので、打鍵のブロックの中には入れられない。打鍵とは無関係に、セッションのロック解除の直後にも出る
 
 行の書式とレベルはマニュアルの[ログの書式](src/manual-ja/05-customize.md)を参照。
 
