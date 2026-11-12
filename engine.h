@@ -304,6 +304,18 @@ private:
 	/// engine thread exit flag; guarded by m_queueMutex.  The queue itself
 	/// outlives it, because its producers do (see signalStop).
 	bool m_isStopping;
+	/** Guards m_inputQueue and m_isStopping, and holds this together:
+	    - every access to the queue, by the producers and by the engine thread
+	      alike, is made under it
+	    - whenever nobody holds it, a queue that is not empty has m_readEvent
+	      signaled.  Producers push and set the event under it; the engine
+	      thread resets the event under it, and only when the queue is empty.
+	      unlocked() sets the event without it, which can only wake the engine
+	      thread for nothing.
+	    - its holders take nothing else while they hold it: the producers do
+	      not touch m_mutex or the log, and the engine thread lets go of it
+	      before it injects anything or takes m_mutex.  A hook kept waiting on
+	      it is a key that may time out and get past this engine. */
 	HANDLE m_queueMutex;
 	MSLLHOOKSTRUCT m_msllHookCurrent;
 	/** Mouse buttons the hook has seen pressed, as a bit per E1 scan code.
@@ -326,8 +338,10 @@ private:
 	LONG m_dragThresholdPx;
 	InputHandler m_keyboardHandler;
 	InputHandler m_mouseHandler;
-	HANDLE m_readEvent;				/** reading from mayu device
-                                                    has been completed */
+	/// wakes the engine thread for m_inputQueue; manual reset, so that a
+	/// SetEvent() that falls between the release and the wait in
+	/// SignalObjectAndWait() is kept for it.  See m_queueMutex.
+	HANDLE m_readEvent;
 	OVERLAPPED m_ol;				/** for async read/write of
 						    mayu device */
 	HANDLE m_hookPipe;				/// named pipe for &SetImeString

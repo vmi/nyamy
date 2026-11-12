@@ -15,6 +15,9 @@ static int s_engineTestCount = 0;
 void engineTestFail(const char *i_file, int i_line, const char *i_what)
 {
 	printf("FAIL: %s(%d): %s\n", i_file, i_line, i_what);
+	// some tests run the engine thread, and a failure there may be followed
+	// by a crash that would take buffered output with it
+	fflush(stdout);
 	++ g_engineTestFailures;
 }
 
@@ -79,6 +82,7 @@ int main()
 	runAdHocKeySeqTests();
 	runStickyNoticeTests();
 	runLogFormatTests();
+	runInputQueueTests();
 
 	if (g_engineTestFailures == 0) {
 		printf("\nALL PASSED (%d checks)\n", engineTestCount());
