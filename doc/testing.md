@@ -11,7 +11,7 @@
 | プロジェクト | 対象 | 依存 |
 |---|---|---|
 | `nyamy-tests` | 単体テスト。Windows にも本体にも依存しない部品 | 無し |
-| `nyamy-engine-tests` | 単体テスト。Engine の設定反映まわり | 本体一式 (フックはスタブ) |
+| `nyamy-engine-tests` | 単体テスト。Engine の設定反映と入力キューまわり | 本体一式 (フックはスタブ) |
 | `nyamy-scripter-tests` | 結合テスト。scripter → CmdStream → Setting のパイプライン | mruby + 本体一式 |
 
 ### 1.1 単体テスト (`nyamy-tests`)
@@ -32,11 +32,13 @@ MSBuild proj/nyamy-engine-tests.vcxproj -p:Configuration=Debug -p:Platform=x64
 Debug/nyamy-engine-tests.exe
 ```
 
-対象は `Engine::applySetting()` と、その周辺 (`ensureKeymaps()` / `canRunAdHocKeySeq()` / `StickyNotice`)、およびログの書式 (`msgstream.h` のブロックとキーの行)。ソース一覧は `nyamy-scripter-tests` から mruby と scripter を抜いたもので、`tests/scripter/hook_stub.cpp` を共有している。**OS フックは一切導入しない。**
+対象は `Engine::applySetting()` と、その周辺 (`ensureKeymaps()` / `canRunAdHocKeySeq()` / `StickyNotice`)、ログの書式 (`msgstream.h` のブロックとキーの行)、および入力キューの排他 (`doc/event-flow.md` 1 章「入力キューの排他」)。ソース一覧は `nyamy-scripter-tests` から mruby と scripter を抜いたもので、`tests/scripter/hook_stub.cpp` を共有している。**OS フックは一切導入しない。**
 
 テストを足すときは `tests/engine/` に `test_*.cpp` を作り、`engine_test.h` に `run*Tests()` を宣言して `engine_test_main.cpp` から呼ぶ。
 
 **入口は `EngineTestAccess` (`engine_test.h`) で、`Engine` が `friend` に指定している。** `checkFocusWindow()` は `GetForegroundWindow()` から始まって 8 個の Win32 照会を辿るのでテストから制御できず、そこを避けて `applySetting()` などを直接叩くための窓口。`friend` はコード生成に影響しないので、出荷されるバイナリは変わらない。**振る舞いを差し替えるテスト専用マクロは使わない** (テストしたものと出荷するものが別になるため)。
+
+入力キューのテスト (`test_input_queue.cpp`) だけは `Engine::start()` で engine スレッドを実際に動かす。フックはスタブなので導入されないが、**engine スレッドが処理したキーイベントは `SendInput` で本物のデスクトップへ注入される**。そのため `KEYBOARD_INPUT_DATA` は積まず、Setting 無しでは黙って捨てられる `AdHocKeySeq` を積む。さらにログモードにしておき、空のキューから作られたキーイベントがあれば、注入されずにログへ出るようにしている。engine スレッドが `m_queueMutex` を持ったまま待つ退行が入ると停止処理もそこで止まるので、このテストはそれを検出した時点で残りを実行せずに終了する。
 
 ログの検証は `womsgstream` を attach せずに使い、`takeString()` で本文を取る。attach していなければ `PostMessage` は行われず、書かれたテキストがそのまま溜まる。詳細レベルの行を見たいときは `setThreshold(LogLevel::Debug)` を呼ぶ。
 
