@@ -1507,8 +1507,22 @@ void Engine::keyboardHandler()
 	while (1) {
 		InputEvent event;
 
+		// SignalObjectAndWait() releases a single level of m_queueMutex, so
+		// every path has to come back to it holding exactly one: a level left
+		// over would be kept through the wait, and the hooks would stall
+		// behind it until they time out and let keys past this engine.
 		WaitForSingleObject(m_queueMutex, INFINITE);
-		while (SignalObjectAndWait(m_queueMutex, m_readEvent, INFINITE, true) == WAIT_OBJECT_0) {
+		while (1) {
+			// Returns without the mutex: the wait does not take it back.  It
+			// fails only once cleanupAfterStop() has closed the handles under
+			// a thread that did not stop in time, with nothing held and the
+			// hooks long gone.  Running on from there would make up a key
+			// event out of nothing, and read a queue that is gone.
+			if (SignalObjectAndWait(m_queueMutex, m_readEvent, INFINITE, FALSE)
+					!= WAIT_OBJECT_0)
+				return;
+			WaitForSingleObject(m_queueMutex, INFINITE);
+
 			if (m_isStopping) {
 				ReleaseMutex(m_queueMutex);
 				return;
@@ -1520,6 +1534,7 @@ void Engine::keyboardHandler()
 				// deferred until the next key event
 				ResetEvent(m_readEvent);
 				if (m_resyncForceRequested.exchange(false)) {
+					// it takes m_mutex, which is never taken under this one
 					ReleaseMutex(m_queueMutex);
 					resyncKeyStates(true);
 					WaitForSingleObject(m_queueMutex, INFINITE);
@@ -1826,9 +1841,9 @@ Engine::Engine(womsgstream &i_log)
 
 // start keyboard handler thread
 void Engine::start() {
-	m_keyboardHandler.start(this);
-	m_mouseHandler.start(this);
-
+	// The hooks queue key events from the moment they are installed, so the
+	// queue has to be there first.  The other way round, a key pressed in
+	// between found no queue and no mutex, and took the hook thread down.
 	m_inputQueue = std::make_unique<std::deque<InputEvent>>();
 	m_isStopping = false;
 	m_isAborting = false;
@@ -1838,6 +1853,9 @@ void Engine::start() {
 	m_ol.Offset = 0;
 	m_ol.OffsetHigh = 0;
 	m_ol.hEvent = m_readEvent;
+
+	m_keyboardHandler.start(this);
+	m_mouseHandler.start(this);
 
 	CHECK_TRUE( m_threadHandle = (HANDLE)_beginthreadex(NULL, 0, keyboardHandler, this, 0, &m_threadId) );
 }

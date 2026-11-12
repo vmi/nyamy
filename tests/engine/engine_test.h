@@ -146,6 +146,16 @@ public:
 		io_engine->m_inputLogBlock.close();
 	}
 
+	/// the lock every access to the input queue is made under
+	static HANDLE queueMutex(Engine *io_engine) {
+		return io_engine->m_queueMutex;
+	}
+
+	/// the event that wakes the engine thread for the input queue
+	static HANDLE readEvent(Engine *io_engine) {
+		return io_engine->m_readEvent;
+	}
+
 	///
 	static void outputToLog(Engine *io_engine, const Key *i_key,
 							const ModifiedKey &i_mkey, LogLevel i_level,
@@ -218,6 +228,7 @@ void runSettingActivationTests();
 void runAdHocKeySeqTests();
 void runStickyNoticeTests();
 void runLogFormatTests();
+void runInputQueueTests();
 
 
 #endif // !_ENGINE_TEST_H

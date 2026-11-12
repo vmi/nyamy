@@ -31,7 +31,7 @@ flowchart TD
     end
 
     subgraph queue["engine.cpp — 入力キュー"]
-        D[/"m_inputQueue (deque&lt;InputEvent&gt;)<br>variant&lt;KEYBOARD_INPUT_DATA, AdHocKeySeq&gt;<br>m_queueMutex で保護<br>SetEvent(m_readEvent)"/]
+        D[/"m_inputQueue (deque&lt;InputEvent&gt;)<br>variant&lt;KEYBOARD_INPUT_DATA, AdHocKeySeq,<br>shared_ptr&lt;Setting&gt;&gt;<br>m_queueMutex で保護<br>SetEvent(m_readEvent)"/]
     end
 
     subgraph handler["engine.cpp — Engine::keyboardHandler()<br>専用スレッド (keyboardHandlerThread)"]
@@ -107,6 +107,20 @@ flowchart TD
 | キーマップ base リセット | `beginGeneratingKeyboardEvents` で実施 | 同上 (共有) |
 | modifier / oneShot 処理 | `keyboardHandler` 通常パスで実施 | 非適用 |
 | `generateKeySeqEvents` の Part | Down / Up (物理押下に応じて) | `Part_all` |
+
+### 入力キューの排他
+
+入力キュー `m_inputQueue` に積むのは、キーボード / マウスのフック、UI スレッドの `scheduleSetting()`、scripter data スレッドの `scheduleAdHocKeySeq()` で、取り出すのは engine スレッドだけである。排他は `m_queueMutex`、起床は手動リセットのイベント `m_readEvent` で行い、次の 3 つを常に成り立たせる。
+
+- キューへの操作は、積む側も取り出す側も、すべて `m_queueMutex` の中で行う
+- 誰も `m_queueMutex` を持っていない間は、キューが空でなければ `m_readEvent` がシグナル状態にある。積む側は push と `SetEvent()` をロックの中で行い、engine スレッドはロックの中でキューが空のときだけ `ResetEvent()` する。`unlocked()` はロックの外で `SetEvent()` するだけなので、余分に起こすことしかない (起きてキューが空なら待ちに戻る)
+- `m_queueMutex` を持ったまま他のロックを取らない。積む側は `m_mutex` にもログにも触れず、engine スレッドは注入や `m_mutex` を伴う処理 (再同期を含む) の前に手放す。フックスレッドがここで待たされると、そのキーはタイムアウトで NYamy を素通りする
+
+engine スレッドは `SignalObjectAndWait(m_queueMutex, m_readEvent, ...)` で待つが、**この API は待ち終わってもミューテックスを取り直さない**。そのため戻った直後に取り直す。手放してから待ちに入るまでの間に `SetEvent()` が入っても、イベントは手動リセットなので消えずに残り、待ちはすぐ戻る。また、この API が手放すのは 1 段だけなので、どの経路でも入る直前に持っているのはちょうど 1 段にしておく。2 段持ったまま入ると待っている間もロックが残り、フックが止まる。
+
+旧 Yamy 以来この取り直しが無く、engine スレッドはキューをロック無しで触っていた (#18)。キーイベントが 2 つほぼ同時に届くと、後の方が次の打鍵まで処理されない、失われる、2 回読まれる、といったことが起き、修飾キーの解放でこれが起きると押しっぱなしになる。
+
+キュー・ミューテックス・イベントは、`Engine::start()` でフックを導入するより先に作る。フックは導入した瞬間からキーを積みにくるためである。
 
 ---
 
